@@ -46,7 +46,7 @@ const getStats = unstable_cache(async function getStats() {
       SELECT id, name, mobile, rental_mode, next_due_date, last_due_date,
         CASE
           WHEN last_due_date < today_ist AND last_due_date > joined_ist
-            AND NOT EXISTS (SELECT 1 FROM uat_ops.rider_payments p WHERE p.rider_id = rent_due.id AND p.rental_period_start >= rent_due.last_due_date - rent_due.period_days * INTERVAL '1 day' AND p.amount_collected >= 1610)
+            AND NOT EXISTS (SELECT 1 FROM ${schemas.ops}.rider_payments p WHERE p.rider_id = rent_due.id AND p.rental_period_start >= rent_due.last_due_date - rent_due.period_days * INTERVAL '1 day' AND p.amount_collected >= 1610)
           THEN 'overdue'
           WHEN next_due_date BETWEEN today_ist AND today_ist + 2 THEN 'due_soon'
           ELSE 'ok'
