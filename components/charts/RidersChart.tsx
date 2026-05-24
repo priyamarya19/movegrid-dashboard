@@ -1,7 +1,7 @@
 "use client";
 import { Chart } from "react-chartjs-2";
-import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, LineElement, PointElement, Legend, Tooltip } from "chart.js";
-ChartJS.register(CategoryScale, LinearScale, BarElement, LineElement, PointElement, Legend, Tooltip);
+import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, LineController, LineElement, PointElement, Legend, Tooltip } from "chart.js";
+ChartJS.register(CategoryScale, LinearScale, BarElement, LineController, LineElement, PointElement, Legend, Tooltip);
 
 const labels = ["Apr 27","Apr 28","Apr 29","Apr 30","May 1","May 2","May 3"];
 
