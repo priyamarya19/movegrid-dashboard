@@ -1,8 +1,8 @@
-const prefix = process.env.RDS_ENV === "uat" ? "uat_" : "";
+const isUAT = process.env.RDS_ENV === "uat";
 
 export const schemas = {
-  auth: `${prefix}auth`,
-  leads: `${prefix}leads`,
-  ops: `${prefix}ops`,
-  logs: `${prefix}logs`,
+  auth: isUAT ? "uat_auth" : "auth",
+  leads: isUAT ? "uat_leads" : "leads",
+  ops: isUAT ? "mg_data_uat" : "mg_data",
+  logs: isUAT ? "uat_logs" : "logs",
 };
