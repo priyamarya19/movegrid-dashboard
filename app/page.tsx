@@ -19,7 +19,7 @@ export default async function DashboardPage() {
       ) : session.role === "ops_manager" ? (
         <OpsManagerHome />
       ) : (
-        <AdminHome role={session.role} />
+        <AdminHome role={session.role} name={session.name} />
       )}
     </DashboardShell>
   );

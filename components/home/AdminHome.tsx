@@ -7,15 +7,15 @@ import VehicleDonut from "@/components/charts/VehicleDonut";
 import CollectionsChart from "@/components/charts/CollectionsChart";
 import RevenuePie from "@/components/charts/RevenuePie";
 
-type Props = { role: string };
+type Props = { role: string; name: string };
 
 const getStats = unstable_cache(async function getStats() {
-  const [riders, vehicles, rentMTD, onboardMTD, pendingPayouts] = await Promise.all([
-    pool.query(`SELECT COUNT(*) FROM ${schemas.ops}.riders WHERE status = 'active'`),
+  const [vehicles, rentMTD, onboardMTD, securityMTD, totalInvestments] = await Promise.all([
     pool.query(`SELECT status, COUNT(*) FROM ${schemas.ops}.vehicles GROUP BY status`),
     pool.query(`SELECT COALESCE(SUM(amount_collected),0) AS total FROM ${schemas.ops}.rider_payments WHERE DATE_TRUNC('month', payment_date) = DATE_TRUNC('month', CURRENT_DATE)`),
     pool.query(`SELECT COALESCE(SUM(onboarding_fee),0) AS total FROM ${schemas.ops}.riders WHERE DATE_TRUNC('month', created_at) = DATE_TRUNC('month', CURRENT_DATE)`),
-    pool.query(`SELECT COALESCE(SUM(amount),0) AS total FROM ${schemas.ops}.investor_payouts WHERE status = 'pending'`),
+    pool.query(`SELECT COALESCE(SUM(security_deposit),0) AS total FROM ${schemas.ops}.riders WHERE DATE_TRUNC('month', created_at) = DATE_TRUNC('month', CURRENT_DATE)`),
+    pool.query(`SELECT COALESCE(SUM(total_invested),0) AS total FROM ${schemas.ops}.investor_profiles`),
   ]);
 
   const vMap: Record<string, number> = {};
@@ -23,16 +23,16 @@ const getStats = unstable_cache(async function getStats() {
   const totalVehicles = Object.values(vMap).reduce((a, b) => a + b, 0);
 
   return {
-    activeRiders: Number(riders.rows[0].count),
     assignedVehicles: vMap["assigned"] ?? 0,
     availableVehicles: vMap["available"] ?? 0,
     maintenanceVehicles: vMap["maintenance"] ?? 0,
     totalVehicles,
     rentMTD: Number(rentMTD.rows[0].total),
     onboardMTD: Number(onboardMTD.rows[0].total),
-    pendingPayouts: Number(pendingPayouts.rows[0].total),
+    securityMTD: Number(securityMTD.rows[0].total),
+    totalInvestments: Number(totalInvestments.rows[0].total),
   };
-}, ["admin-stats"], { revalidate: 60 });
+}, ["admin-stats-v2"], { revalidate: 60 });
 
 const getRecentLeads = unstable_cache(async function getRecentLeads() {
   const res = await pool.query(
@@ -47,6 +47,42 @@ const getAuditLogs = unstable_cache(async function getAuditLogs() {
   );
   return res.rows;
 }, ["admin-audit-logs"], { revalidate: 30 });
+
+const getRevenueSummary = unstable_cache(async function getRevenueSummary() {
+  const res = await pool.query(`
+    WITH rent AS (
+      SELECT DATE_TRUNC('month', payment_date) AS m, COALESCE(SUM(amount_collected),0) AS rent
+      FROM ${schemas.ops}.rider_payments GROUP BY 1
+    ),
+    onboard AS (
+      SELECT DATE_TRUNC('month', created_at) AS m,
+             COALESCE(SUM(onboarding_fee),0) AS onboard,
+             COALESCE(SUM(security_deposit),0) AS security
+      FROM ${schemas.ops}.riders GROUP BY 1
+    ),
+    payouts AS (
+      SELECT DATE_TRUNC('month', paid_date) AS m, COALESCE(SUM(amount),0) AS payouts
+      FROM ${schemas.ops}.investor_payouts WHERE status = 'paid' AND paid_date IS NOT NULL GROUP BY 1
+    ),
+    months AS (
+      SELECT m FROM rent UNION SELECT m FROM onboard UNION SELECT m FROM payouts
+    )
+    SELECT
+      TO_CHAR(months.m, 'Mon YYYY') AS month,
+      months.m AS month_date,
+      COALESCE(r.rent, 0) AS rent,
+      COALESCE(o.onboard, 0) AS onboard,
+      COALESCE(o.security, 0) AS security,
+      COALESCE(p.payouts, 0) AS payouts
+    FROM months
+    LEFT JOIN rent r ON r.m = months.m
+    LEFT JOIN onboard o ON o.m = months.m
+    LEFT JOIN payouts p ON p.m = months.m
+    ORDER BY months.m DESC
+    LIMIT 12
+  `);
+  return res.rows;
+}, ["admin-revenue-v1"], { revalidate: 300 });
 
 const fmt = (n: number) => {
   if (n >= 100000) return "₹" + (n / 100000).toFixed(1) + "L";
@@ -115,25 +151,19 @@ function activityText(log: { action: string; details: unknown }) {
   } catch { return <>{actionLabel[log.action] ?? log.action.replace(/_/g, " ")}</>; }
 }
 
-const revenueRows = [
-  { month: "Jan 2026", rent: "₹4.2L", onboard: "₹80K", security: "₹60K", refunds: "−₹10K", payouts: "−₹1.8L", net: "₹3.1L" },
-  { month: "Feb 2026", rent: "₹5.1L", onboard: "₹1.2L", security: "₹90K", refunds: "−₹20K", payouts: "−₹2.1L", net: "₹4.1L" },
-  { month: "Mar 2026", rent: "₹5.8L", onboard: "₹1.6L", security: "₹1.2L", refunds: "−₹15K", payouts: "−₹2.3L", net: "₹5.9L" },
-  { month: "Apr 2026", rent: "₹6.1L", onboard: "₹1.9L", security: "₹1.4L", refunds: "−₹30K", payouts: "−₹2.5L", net: "₹6.6L" },
-  { month: "May 2026", rent: "₹6.2L", onboard: "₹2.1L", security: "₹1.5L", refunds: "−₹25K", payouts: "−₹2.6L", net: "₹6.9L", current: true },
-];
 
-export default async function AdminHome({ role }: Props) {
-  const [stats, leads, logs] = await Promise.all([getStats(), getRecentLeads(), getAuditLogs()]);
+export default async function AdminHome({ role, name }: Props) {
+  const [stats, leads, logs, revenueSummary] = await Promise.all([getStats(), getRecentLeads(), getAuditLogs(), getRevenueSummary()]);
 
   const roleLabel: Record<string, string> = { admin: "Admin", ops_manager: "Ops Manager", hub_incharge: "Hub Incharge" };
+  const currentMonth = new Date().toLocaleDateString("en-IN", { month: "long", year: "numeric" });
 
   const statCards = [
-    { label: "Total Riders", value: stats.activeRiders.toString(), change: "+8 today", sub: "MTD: +34 riders", accent: "#6C5CE7", up: true, href: "/riders" },
-    { label: "Vehicles Deployed", value: `${stats.assignedVehicles} / ${stats.totalVehicles}`, change: `${Math.round((stats.assignedVehicles / stats.totalVehicles) * 100)}% utilization`, sub: `${stats.availableVehicles} awaiting allotment`, accent: "#00D1B2", up: true, href: "/vehicles" },
-    { label: "Rent Collected", value: fmt(stats.rentMTD), change: "+12% vs yesterday", sub: "MTD: ₹6.2L", accent: "#fdcb6e", up: true, href: "/riders" },
-    { label: "Onboarding Fees", value: fmt(stats.onboardMTD), change: "+4 today", sub: "MTD: ₹2.1L", accent: "#e17055", up: true, href: "/riders" },
-    { label: "Pending Payouts", value: fmt(stats.pendingPayouts), change: "6 overdue", sub: "Next due: May 5", accent: "#a29bfe", up: false, href: "/investors" },
+    { label: "Total Vehicles", value: stats.totalVehicles.toString(), change: `${stats.assignedVehicles} deployed`, sub: `${stats.availableVehicles} available`, accent: "#6C5CE7", up: true, href: "/vehicles" },
+    { label: "Vehicles Deployed", value: `${stats.assignedVehicles} / ${stats.totalVehicles}`, change: `${stats.totalVehicles ? Math.round((stats.assignedVehicles / stats.totalVehicles) * 100) : 0}% utilization`, sub: `${stats.availableVehicles} awaiting allotment`, accent: "#00D1B2", up: true, href: "/vehicles" },
+    { label: "Rent Collected", value: fmt(stats.rentMTD), change: "This month", sub: fmt(stats.onboardMTD) + " onboarding", accent: "#fdcb6e", up: true, href: "/riders" },
+    { label: "Onboarding Fees", value: fmt(stats.onboardMTD), change: "This month", sub: fmt(stats.securityMTD) + " security dep.", accent: "#e17055", up: true, href: "/riders" },
+    { label: "Total Investments", value: fmt(stats.totalInvestments), change: "All investors", sub: "View details", accent: "#a29bfe", up: true, href: "/investors" },
   ];
 
   return (
@@ -141,11 +171,11 @@ export default async function AdminHome({ role }: Props) {
       {/* Topbar */}
       <div className="flex items-center justify-between px-4 py-4 lg:px-7 lg:py-5 border-b border-[#1e1e2e] bg-[#0A0A0F] sticky top-0 z-10">
         <div>
-          <h2 className="text-lg font-semibold text-white">Good morning, Priyam 👋</h2>
+          <h2 className="text-lg font-semibold text-white">Good morning, {name} 👋</h2>
           <p className="text-[#666] text-sm mt-0.5">Here&apos;s what&apos;s happening with your fleet today</p>
         </div>
         <div className="flex items-center gap-4">
-          <span className="bg-[#6C5CE720] text-[#6C5CE7] px-4 py-1.5 rounded-full text-xs font-semibold">📅 May 2026</span>
+          <span className="bg-[#6C5CE720] text-[#6C5CE7] px-4 py-1.5 rounded-full text-xs font-semibold">📅 {currentMonth}</span>
           <span className="text-xs text-gray-500 uppercase tracking-wider">{roleLabel[role] ?? role}</span>
         </div>
       </div>
@@ -229,32 +259,44 @@ export default async function AdminHome({ role }: Props) {
                 <th className="text-left pb-3 text-[11px] uppercase tracking-wider text-[#00D1B2] whitespace-nowrap">Rent</th>
                 <th className="text-left pb-3 text-[11px] uppercase tracking-wider text-[#6C5CE7] whitespace-nowrap">Onboarding</th>
                 <th className="text-left pb-3 text-[11px] uppercase tracking-wider text-[#a29bfe] whitespace-nowrap">Security Dep.</th>
-                <th className="text-left pb-3 text-[11px] uppercase tracking-wider text-[#fdcb6e] whitespace-nowrap">Deposit Refunds</th>
                 <th className="text-left pb-3 text-[11px] uppercase tracking-wider text-[#e17055] whitespace-nowrap">Investor Payouts</th>
                 <th className="text-left pb-3 text-[11px] uppercase tracking-wider text-white whitespace-nowrap">Net Revenue</th>
               </tr>
             </thead>
             <tbody>
-              {revenueRows.map((row) => (
-                <tr key={row.month} className="border-b border-[#1a1a2a]">
-                  <td className={`py-2.5 ${row.current ? "font-bold text-white" : "text-[#ccc]"}`}>{row.month}</td>
-                  <td className="py-2.5 text-[#00D1B2]">{row.rent}</td>
-                  <td className="py-2.5 text-[#6C5CE7]">{row.onboard}</td>
-                  <td className="py-2.5 text-[#a29bfe]">{row.security}</td>
-                  <td className="py-2.5 text-[#fdcb6e]">{row.refunds}</td>
-                  <td className="py-2.5 text-[#e17055]">{row.payouts}</td>
-                  <td className={`py-2.5 font-bold ${row.current ? "text-[#00D1B2]" : "text-white"}`}>{row.net}</td>
-                </tr>
-              ))}
-              <tr className="border-t-2 border-[#6C5CE740]">
-                <td className="py-2.5 font-bold text-[#6C5CE7]">YTD Total</td>
-                <td className="py-2.5 font-bold text-[#00D1B2]">₹27.4L</td>
-                <td className="py-2.5 font-bold text-[#6C5CE7]">₹6.8L</td>
-                <td className="py-2.5 font-bold text-[#a29bfe]">₹4.7L</td>
-                <td className="py-2.5 font-bold text-[#fdcb6e]">−₹1.0L</td>
-                <td className="py-2.5 font-bold text-[#e17055]">−₹11.3L</td>
-                <td className="py-2.5 font-bold text-[#00D1B2] text-[15px]">₹26.6L</td>
-              </tr>
+              {revenueSummary.length === 0 ? (
+                <tr><td colSpan={6} className="py-8 text-center text-[#555]">No revenue data yet</td></tr>
+              ) : revenueSummary.map((row: { month: string; rent: number; onboard: number; security: number; payouts: number }, i: number) => {
+                const net = Number(row.rent) + Number(row.onboard) + Number(row.security) - Number(row.payouts);
+                const isCurrent = i === 0;
+                return (
+                  <tr key={row.month} className="border-b border-[#1a1a2a]">
+                    <td className={`py-2.5 ${isCurrent ? "font-bold text-white" : "text-[#ccc]"}`}>{row.month}</td>
+                    <td className="py-2.5 text-[#00D1B2]">{fmt(Number(row.rent))}</td>
+                    <td className="py-2.5 text-[#6C5CE7]">{fmt(Number(row.onboard))}</td>
+                    <td className="py-2.5 text-[#a29bfe]">{fmt(Number(row.security))}</td>
+                    <td className="py-2.5 text-[#e17055]">{Number(row.payouts) > 0 ? `−${fmt(Number(row.payouts))}` : "—"}</td>
+                    <td className={`py-2.5 font-bold ${isCurrent ? "text-[#00D1B2]" : "text-white"}`}>{fmt(net)}</td>
+                  </tr>
+                );
+              })}
+              {revenueSummary.length > 0 && (() => {
+                const ytdRent = revenueSummary.reduce((s: number, r: { rent: number }) => s + Number(r.rent), 0);
+                const ytdOnboard = revenueSummary.reduce((s: number, r: { onboard: number }) => s + Number(r.onboard), 0);
+                const ytdSecurity = revenueSummary.reduce((s: number, r: { security: number }) => s + Number(r.security), 0);
+                const ytdPayouts = revenueSummary.reduce((s: number, r: { payouts: number }) => s + Number(r.payouts), 0);
+                const ytdNet = ytdRent + ytdOnboard + ytdSecurity - ytdPayouts;
+                return (
+                  <tr className="border-t-2 border-[#6C5CE740]">
+                    <td className="py-2.5 font-bold text-[#6C5CE7]">YTD Total</td>
+                    <td className="py-2.5 font-bold text-[#00D1B2]">{fmt(ytdRent)}</td>
+                    <td className="py-2.5 font-bold text-[#6C5CE7]">{fmt(ytdOnboard)}</td>
+                    <td className="py-2.5 font-bold text-[#a29bfe]">{fmt(ytdSecurity)}</td>
+                    <td className="py-2.5 font-bold text-[#e17055]">{ytdPayouts > 0 ? `−${fmt(ytdPayouts)}` : "—"}</td>
+                    <td className="py-2.5 font-bold text-[#00D1B2] text-[15px]">{fmt(ytdNet)}</td>
+                  </tr>
+                );
+              })()}
             </tbody>
           </table>
           </div>
@@ -284,17 +326,21 @@ export default async function AdminHome({ role }: Props) {
             </div>
             <RevenuePie />
             <div className="mt-3 space-y-0">
-              {[
-                { label: "Rent", color: "#00D1B2", val: "₹6.2L (63%)" },
-                { label: "Onboarding", color: "#6C5CE7", val: "₹2.1L (21%)" },
-                { label: "Security", color: "#a29bfe", val: "₹1.5L (15%)" },
-                { label: "Total IN", color: "#fdcb6e", val: "₹9.8L" },
-              ].map((row) => (
-                <div key={row.label} className="flex justify-between py-1.5 border-b border-[#1e1e2e] last:border-0 text-xs">
-                  <span style={{ color: row.color }}>● {row.label}</span>
-                  <span className="text-white font-semibold">{row.val}</span>
-                </div>
-              ))}
+              {(() => {
+                const totalIn = stats.rentMTD + stats.onboardMTD + stats.securityMTD;
+                const pct = (n: number) => totalIn > 0 ? ` (${Math.round(n / totalIn * 100)}%)` : "";
+                return [
+                  { label: "Rent", color: "#00D1B2", val: fmt(stats.rentMTD) + pct(stats.rentMTD) },
+                  { label: "Onboarding", color: "#6C5CE7", val: fmt(stats.onboardMTD) + pct(stats.onboardMTD) },
+                  { label: "Security", color: "#a29bfe", val: fmt(stats.securityMTD) + pct(stats.securityMTD) },
+                  { label: "Total IN", color: "#fdcb6e", val: fmt(totalIn) },
+                ].map((row) => (
+                  <div key={row.label} className="flex justify-between py-1.5 border-b border-[#1e1e2e] last:border-0 text-xs">
+                    <span style={{ color: row.color }}>● {row.label}</span>
+                    <span className="text-white font-semibold">{row.val}</span>
+                  </div>
+                ));
+              })()}
             </div>
           </div>
         </div>
