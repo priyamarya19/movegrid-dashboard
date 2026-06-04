@@ -4,7 +4,7 @@ import { schemas } from "@/lib/schemas";
 import { getSession } from "@/lib/auth";
 
 export async function POST(req: NextRequest) {
-  const session = await getSession();
+  const session = await getSession(req);
   if (!session || !["admin", "ops_manager"].includes(session.role)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   }
@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
 }
 
 export async function GET(req: NextRequest) {
-  const session = await getSession();
+  const session = await getSession(req);
   if (!session || !["admin", "ops_manager", "hub_incharge"].includes(session.role)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   }

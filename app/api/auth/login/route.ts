@@ -5,6 +5,7 @@ import { schemas } from "@/lib/schemas";
 import { signToken } from "@/lib/auth";
 
 export async function POST(req: Request) {
+  const isMobile = (req as Request & { headers: Headers }).headers.get("X-Client-Type") === "mobile";
   const { email, password } = await req.json();
 
   if (!email || !password) {
@@ -38,7 +39,7 @@ export async function POST(req: Request) {
       role: user.role,
     });
 
-    const res = NextResponse.json({ success: true, role: user.role });
+    const res = NextResponse.json({ success: true, role: user.role, name: user.name, ...(isMobile ? { token } : {}) });
     res.cookies.set("mg_token", token, {
       httpOnly: true,
       secure: process.env.COOKIE_SECURE === "true",

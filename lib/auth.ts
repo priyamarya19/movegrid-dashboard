@@ -1,5 +1,6 @@
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
+import { NextRequest } from "next/server";
 
 const secret = new TextEncoder().encode(process.env.JWT_SECRET || "fallback_secret");
 
@@ -27,7 +28,16 @@ export async function verifyToken(token: string): Promise<JWTPayload | null> {
   }
 }
 
-export async function getSession(): Promise<JWTPayload | null> {
+export async function getSession(req?: NextRequest): Promise<JWTPayload | null> {
+  // Check Bearer token first (mobile apps)
+  if (req) {
+    const auth = req.headers.get("Authorization");
+    if (auth?.startsWith("Bearer ")) {
+      const token = auth.slice(7);
+      return verifyToken(token);
+    }
+  }
+  // Fall back to cookie (web dashboard)
   const cookieStore = await cookies();
   const token = cookieStore.get("mg_token")?.value;
   if (!token) return null;

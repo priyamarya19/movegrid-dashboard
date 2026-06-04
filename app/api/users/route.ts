@@ -1,11 +1,11 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import pool from "@/lib/db";
 import { schemas } from "@/lib/schemas";
 import { getSession } from "@/lib/auth";
 
-export async function GET() {
-  const session = await getSession();
+export async function GET(req: NextRequest) {
+  const session = await getSession(req);
   if (!session || session.role !== "admin") {
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   }
@@ -21,8 +21,8 @@ export async function GET() {
   return NextResponse.json(result.rows);
 }
 
-export async function POST(req: Request) {
-  const session = await getSession();
+export async function POST(req: NextRequest) {
+  const session = await getSession(req);
   if (!session || session.role !== "admin") {
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   }

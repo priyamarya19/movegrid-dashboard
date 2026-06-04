@@ -1,19 +1,28 @@
 "use client";
-import { Chart } from "react-chartjs-2";
-import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, LineController, LineElement, PointElement, Legend, Tooltip } from "chart.js";
-ChartJS.register(CategoryScale, LinearScale, BarElement, LineController, LineElement, PointElement, Legend, Tooltip);
+import { Bar } from "react-chartjs-2";
+import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Legend, Tooltip } from "chart.js";
+ChartJS.register(CategoryScale, LinearScale, BarElement, Legend, Tooltip);
 
-const labels = ["Apr 27","Apr 28","Apr 29","Apr 30","May 1","May 2","May 3"];
+type Props = { data: { label: string; count: number }[] };
 
-export default function RidersChart() {
+export default function RidersChart({ data }: Props) {
+  if (!data || data.length === 0) {
+    return <div className="h-40 flex items-center justify-center text-[#555] text-sm">No onboarding data yet</div>;
+  }
+
   return (
-    <Chart
-      type="bar"
+    <Bar
       data={{
-        labels,
+        labels: data.map(d => d.label),
         datasets: [
-          { type: "bar", label: "This Period", data: [4,7,3,8,6,9,8], backgroundColor: "#6C5CE780", borderColor: "#6C5CE7", borderWidth: 2, borderRadius: 4 },
-          { type: "line", label: "Prev Period", data: [3,5,4,6,5,7,6], borderColor: "#00D1B2", borderWidth: 2, pointBackgroundColor: "#00D1B2", fill: false, tension: 0.4 },
+          {
+            label: "Riders Onboarded",
+            data: data.map(d => d.count),
+            backgroundColor: "#6C5CE780",
+            borderColor: "#6C5CE7",
+            borderWidth: 2,
+            borderRadius: 4,
+          },
         ],
       }}
       options={{
@@ -21,7 +30,7 @@ export default function RidersChart() {
         plugins: { legend: { labels: { color: "#888", font: { size: 11 } } } },
         scales: {
           x: { grid: { color: "#1e1e2e" }, ticks: { color: "#666", font: { size: 11 } } },
-          y: { grid: { color: "#1e1e2e" }, ticks: { color: "#666", font: { size: 11 } } },
+          y: { grid: { color: "#1e1e2e" }, ticks: { color: "#666", font: { size: 11 }, stepSize: 1 } },
         },
       }}
     />

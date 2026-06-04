@@ -4,7 +4,7 @@ import { schemas } from "@/lib/schemas";
 import { getSession } from "@/lib/auth";
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const session = await getSession();
+  const session = await getSession(req);
   if (!session || !["admin", "ops_manager", "hub_incharge"].includes(session.role)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   }

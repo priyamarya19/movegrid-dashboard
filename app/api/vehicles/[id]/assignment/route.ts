@@ -4,8 +4,8 @@ import { schemas } from "@/lib/schemas";
 import { getSession } from "@/lib/auth";
 
 // GET /api/vehicles/[id]/assignment — returns active assignment for return form
-export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const session = await getSession();
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const session = await getSession(req);
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { id } = await params;

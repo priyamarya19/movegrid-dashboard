@@ -5,7 +5,7 @@ import { getSession } from "@/lib/auth";
 
 // GET /api/vehicles/lookup?ev_number=MG001 — returns vehicle details for allotment form auto-fill
 export async function GET(req: NextRequest) {
-  const session = await getSession();
+  const session = await getSession(req);
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const ev = req.nextUrl.searchParams.get("ev_number");

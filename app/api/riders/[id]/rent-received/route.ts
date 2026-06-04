@@ -5,7 +5,7 @@ import { getSession } from "@/lib/auth";
 
 // Mark rent as received for the current period
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const session = await getSession();
+  const session = await getSession(req);
   if (!session || !["admin", "ops_manager", "hub_incharge"].includes(session.role)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   }
@@ -32,7 +32,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
 // Check if rent is received for current period
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const session = await getSession();
+  const session = await getSession(req);
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id } = await params;
 
