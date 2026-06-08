@@ -4,6 +4,9 @@ import DashboardLayout from "@/components/DashboardLayout";
 import pool from "@/lib/db";
 import { schemas } from "@/lib/schemas";
 import BackButton from "@/components/BackButton";
+import { getSession } from "@/lib/auth";
+import MapVehiclesPanel from "@/components/investors/MapVehiclesPanel";
+import RecordPayoutModal from "@/components/investors/RecordPayoutModal";
 
 async function getData(id: string) {
   const [investor, vehicles, payouts] = await Promise.all([
@@ -29,11 +32,11 @@ async function getData(id: string) {
     `, [id]),
 
     pool.query(`
-      SELECT pay.amount, pay.due_date, pay.paid_date, pay.status, v.ev_number
+      SELECT pay.amount, pay.due_date, pay.paid_date, pay.status, pay.period_month, pay.proof_url, v.ev_number
       FROM ${schemas.ops}.investor_payouts pay
       LEFT JOIN ${schemas.ops}.vehicles v ON v.id = pay.vehicle_id
       WHERE pay.investor_id = $1
-      ORDER BY pay.due_date DESC
+      ORDER BY COALESCE(pay.period_month, pay.due_date) DESC
     `, [id]),
   ]);
 
@@ -63,11 +66,12 @@ const vehicleStatus: Record<string, string> = {
 
 export default async function InvestorDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const data = await getData(id);
+  const [data, session] = await Promise.all([getData(id), getSession()]);
   if (!data) notFound();
 
   const { investor, vehicles, payouts, totalPaid, totalPending } = data;
   const roi = investor.total_invested > 0 ? ((totalPaid / investor.total_invested) * 100).toFixed(1) : "0";
+  const isAdmin = session?.role === "admin";
 
   return (
     <DashboardLayout allowedRoles={["admin", "ops_manager", "hub_incharge"]}>
@@ -121,8 +125,9 @@ export default async function InvestorDetailPage({ params }: { params: Promise<{
           </div>
 
           <div className="bg-[#12121A] border border-[#1e1e2e] rounded-xl overflow-hidden">
-            <div className="px-5 py-4 border-b border-[#1e1e2e]">
+            <div className="px-5 py-4 border-b border-[#1e1e2e] flex items-center justify-between gap-3">
               <h2 className="text-white font-semibold">Vehicles Owned ({vehicles.length})</h2>
+              {isAdmin && <MapVehiclesPanel investorId={investor.id} />}
             </div>
             <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -160,28 +165,34 @@ export default async function InvestorDetailPage({ params }: { params: Promise<{
         </div>
 
         <div className="bg-[#12121A] border border-[#1e1e2e] rounded-xl overflow-hidden">
-          <div className="px-5 py-4 border-b border-[#1e1e2e]">
+          <div className="px-5 py-4 border-b border-[#1e1e2e] flex items-center justify-between gap-3">
             <h2 className="text-white font-semibold">Payout History</h2>
+            {isAdmin && <RecordPayoutModal investorId={investor.id} vehicles={vehicles.map((v: { id: string; ev_number: string }) => ({ id: v.id, ev_number: v.ev_number }))} />}
           </div>
           <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-[#1e1e2e]">
-                {["Vehicle", "Due Date", "Paid Date", "Amount", "Status"].map((h) => (
+                {["Month", "Vehicle", "Paid Date", "Amount", "Status", "Receipt"].map((h) => (
                   <th key={h} className="text-left px-5 py-3 text-[11px] text-[#555] uppercase tracking-wider">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {payouts.length === 0 ? (
-                <tr><td colSpan={5} className="px-5 py-8 text-center text-[#555]">No payouts yet</td></tr>
-              ) : payouts.map((p: { ev_number: string; due_date: string; paid_date: string; amount: number; status: string }, i: number) => (
+                <tr><td colSpan={6} className="px-5 py-8 text-center text-[#555]">No payouts yet</td></tr>
+              ) : payouts.map((p: { ev_number: string; due_date: string; paid_date: string; amount: number; status: string; period_month: string | null; proof_url: string | null }, i: number) => (
                 <tr key={i} className="border-b border-[#1a1a2a]">
+                  <td className="px-5 py-3 text-[#ccc]">{(p.period_month ?? p.due_date) ? new Date(p.period_month ?? p.due_date).toLocaleDateString("en-IN", { month: "short", year: "numeric" }) : "—"}</td>
                   <td className="px-5 py-3 text-[#6C5CE7]">{p.ev_number ?? "—"}</td>
-                  <td className="px-5 py-3 text-[#aaa]">{new Date(p.due_date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</td>
                   <td className="px-5 py-3 text-[#aaa]">{p.paid_date ? new Date(p.paid_date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "—"}</td>
                   <td className="px-5 py-3 text-[#00D1B2] font-semibold">₹{Number(p.amount).toLocaleString()}</td>
                   <td className="px-5 py-3"><span className={`px-2 py-0.5 rounded-full text-xs capitalize ${payoutStatus[p.status] ?? "bg-gray-500/20 text-gray-400"}`}>{p.status}</span></td>
+                  <td className="px-5 py-3">
+                    {p.proof_url ? (
+                      <a href={`/api/file?key=${encodeURIComponent(p.proof_url)}`} target="_blank" rel="noopener noreferrer" className="text-[#6C5CE7] hover:underline text-xs">View</a>
+                    ) : <span className="text-[#555] text-xs">—</span>}
+                  </td>
                 </tr>
               ))}
             </tbody>

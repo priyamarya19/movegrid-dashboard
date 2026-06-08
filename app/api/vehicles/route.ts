@@ -44,6 +44,7 @@ export async function GET(req: NextRequest) {
 
   const { searchParams } = new URL(req.url);
   const status = searchParams.get("status");
+  const unassigned = searchParams.get("unassigned");
 
   let query = `
     SELECT v.id, v.ev_number, v.status, v.purchase_date, v.price,
@@ -62,7 +63,8 @@ export async function GET(req: NextRequest) {
   `;
   const params: string[] = [];
   if (status) { params.push(status); query += ` AND v.status = $${params.length}`; }
-  query += ` ORDER BY v.ev_number ASC LIMIT 200`;
+  if (unassigned) { query += ` AND v.investor_id IS NULL`; }
+  query += ` ORDER BY v.ev_number ASC LIMIT 500`;
 
   const result = await pool.query(query, params);
   return NextResponse.json(result.rows);

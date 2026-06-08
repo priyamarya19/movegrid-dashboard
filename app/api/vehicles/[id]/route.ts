@@ -49,3 +49,35 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     payouts: payouts.rows,
   });
 }
+
+// Map (or unmap) a single investor for this vehicle. Only one investor per vehicle.
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const session = await getSession(req);
+  if (!session || session.role !== "admin") {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+  }
+
+  const { id } = await params;
+  const body = await req.json();
+  const investorId = body.investor_id || null;
+
+  if (investorId) {
+    const inv = await pool.query(
+      `SELECT id FROM ${schemas.ops}.investor_profiles WHERE id = $1`,
+      [investorId]
+    );
+    if (!inv.rows[0]) {
+      return NextResponse.json({ error: "Invalid investor" }, { status: 400 });
+    }
+  }
+
+  const result = await pool.query(
+    `UPDATE ${schemas.ops}.vehicles SET investor_id = $1 WHERE id = $2 RETURNING id`,
+    [investorId, id]
+  );
+  if (!result.rows[0]) {
+    return NextResponse.json({ error: "Vehicle not found" }, { status: 404 });
+  }
+
+  return NextResponse.json({ success: true, investor_id: investorId });
+}

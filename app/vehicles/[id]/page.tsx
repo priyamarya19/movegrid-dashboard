@@ -4,6 +4,8 @@ import DashboardLayout from "@/components/DashboardLayout";
 import pool from "@/lib/db";
 import { schemas } from "@/lib/schemas";
 import BackButton from "@/components/BackButton";
+import { getSession } from "@/lib/auth";
+import VehicleInvestorCard from "@/components/vehicles/VehicleInvestorCard";
 
 async function getData(id: string) {
   const [vehicle, assignments, payouts] = await Promise.all([
@@ -56,10 +58,11 @@ const payoutStatus: Record<string, string> = {
 
 export default async function VehicleDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const data = await getData(id);
+  const [data, session] = await Promise.all([getData(id), getSession()]);
   if (!data) notFound();
 
   const { vehicle, assignments, payouts } = data;
+  const isAdmin = session?.role === "admin";
   const activeAssignment = assignments.find((a: { status: string }) => a.status === "active");
   const totalPayouts = payouts.reduce((s: number, p: { amount: number }) => s + Number(p.amount), 0);
 
@@ -143,18 +146,13 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
               ) : <p className="text-[#555] text-sm">No hub assigned</p>}
             </div>
 
-            <div className="bg-[#12121A] border border-[#1e1e2e] rounded-xl p-5">
-              <h2 className="text-white font-semibold mb-3">Investor</h2>
-              {vehicle.investor_id ? (
-                <Link href={`/investors/${vehicle.investor_id}`} className="flex items-center justify-between group">
-                  <div>
-                    <p className="text-[#00D1B2] font-medium group-hover:underline">{vehicle.investor_name}</p>
-                    <p className="text-[#555] text-xs">₹{Number(vehicle.total_invested).toLocaleString()} invested</p>
-                  </div>
-                  <span className="text-[#555] group-hover:text-white">→</span>
-                </Link>
-              ) : <p className="text-[#555] text-sm">No investor linked</p>}
-            </div>
+            <VehicleInvestorCard
+              vehicleId={vehicle.id}
+              investorId={vehicle.investor_id ?? null}
+              investorName={vehicle.investor_name ?? null}
+              totalInvested={vehicle.total_invested ?? null}
+              canEdit={isAdmin}
+            />
 
             <div className="bg-[#12121A] border border-[#1e1e2e] rounded-xl p-5">
               <h2 className="text-white font-semibold mb-3">Current Rider</h2>

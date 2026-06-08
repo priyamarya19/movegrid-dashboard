@@ -7,6 +7,7 @@ type Investor = {
   id: string; name: string; email: string; mobile: string;
   total_invested: number; investment_date: string; status: string;
   vehicle_count: number; total_paid: number; pending_amount: number;
+  bank: string | null; account_number: string | null; ifsc: string | null; bank_status: string;
 };
 
 type Sort = { key: string; dir: "asc" | "desc" };
@@ -39,17 +40,28 @@ export default function InvestorsTable() {
   const [investors, setInvestors] = useState<Investor[]>([]);
   const [loading, setLoading] = useState(true);
   const [sort, setSort] = useState<Sort>({ key: "total_invested", dir: "desc" });
+  const [verifying, setVerifying] = useState<string | null>(null);
 
-  useEffect(() => {
+  const load = () =>
     fetch("/api/investors").then(r => r.json()).then(data => { setInvestors(data); setLoading(false); });
-  }, []);
+
+  useEffect(() => { load(); }, []);
 
   const toggleSort = (key: string) =>
     setSort(s => s.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: "asc" });
 
+  async function verifyBank(id: string) {
+    setVerifying(id);
+    try {
+      const res = await fetch(`/api/investors/${id}/verify-bank`, { method: "POST" });
+      if (res.ok) await load();
+    } finally { setVerifying(null); }
+  }
+
   const sorted = sortData(investors, sort);
   const totalInvested = investors.reduce((a, i) => a + Number(i.total_invested), 0);
   const totalPending = investors.reduce((a, i) => a + Number(i.pending_amount), 0);
+  const pendingBank = investors.filter((i) => i.bank_status === "pending");
 
   return (
     <div className="space-y-5">
@@ -58,7 +70,39 @@ export default function InvestorsTable() {
           <h1 className="text-white text-2xl font-bold">Investors</h1>
           <p className="text-[#666] text-sm mt-1">{investors.length} investors · ₹{(totalInvested / 100000).toFixed(1)}L total invested · ₹{(totalPending / 100000).toFixed(1)}L pending payouts</p>
         </div>
+        <Link href="/investors/new" className="px-4 py-2.5 rounded-xl bg-[#6C5CE7] hover:bg-[#7d6df0] text-white text-sm font-semibold transition-colors shrink-0">
+          + Add Investor
+        </Link>
       </div>
+
+      {/* Bank verification notifications */}
+      {pendingBank.length > 0 && (
+        <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            <p className="text-yellow-400 text-sm font-semibold">
+              {pendingBank.length} bank {pendingBank.length === 1 ? "change" : "changes"} awaiting verification
+            </p>
+          </div>
+          {pendingBank.map((inv) => (
+            <div key={inv.id} className="flex items-center justify-between gap-3 bg-[#12121A] border border-[#1e1e2e] rounded-lg px-4 py-3">
+              <div className="min-w-0">
+                <Link href={`/investors/${inv.id}`} className="text-white text-sm font-medium hover:text-[#00D1B2]">{inv.name}</Link>
+                <p className="text-[#777] text-xs mt-0.5 truncate">
+                  {inv.bank ?? "—"} · A/C {inv.account_number ?? "—"} · {inv.ifsc ?? "—"}
+                </p>
+              </div>
+              <button
+                onClick={() => verifyBank(inv.id)}
+                disabled={verifying === inv.id}
+                className="shrink-0 px-4 py-1.5 rounded-lg bg-green-500/20 text-green-400 hover:bg-green-500/30 text-xs font-semibold disabled:opacity-60 transition-colors"
+              >
+                {verifying === inv.id ? "Verifying..." : "Mark verified"}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className="grid grid-cols-3 gap-4">
         {[
