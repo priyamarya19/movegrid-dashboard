@@ -27,17 +27,23 @@ export default async function InvestorHome({ userId }: Props) {
     );
   }
 
-  const { profile, vehicles, totalPaid, roi, impact, payoutsMade, payoutsRemaining, termMonths } = portfolio;
+  const { profile, vehicles, totalPaid, roi, impact, payoutsMade, payoutsRemaining, termMonths, nextDueDate } = portfolio;
 
   const sinceMonth = profile.investment_date
     ? new Date(profile.investment_date).toLocaleDateString("en-IN", { month: "short", year: "numeric" })
     : null;
+
+  const nextDueLabel = nextDueDate
+    ? new Date(nextDueDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
+    : "—";
 
   const cards = [
     { label: "Total Invested", value: "₹" + Number(profile.total_invested).toLocaleString(), color: "#6C5CE7", sub: sinceMonth ? "Since " + sinceMonth : undefined },
     { label: "Earned So Far", value: "₹" + Number(totalPaid).toLocaleString(), color: "#00D1B2", sub: `${payoutsMade} of ${termMonths} payouts received` },
     { label: "Payouts Remaining", value: String(payoutsRemaining), color: "#e17055", sub: `of ${termMonths} months` },
     { label: "ROI So Far", value: roi.toFixed(1) + "%", color: "#fdcb6e", sub: undefined },
+    { label: "Scooters", value: vehicles.length.toLocaleString(), color: "#00C48C", sub: "In your portfolio" },
+    { label: "Next Due Date", value: nextDueLabel, color: "#74b9ff", sub: nextDueDate ? "Upcoming payout" : "All payouts done" },
   ];
 
   const co2Display = impact.co2SavedKg >= 1000
@@ -45,10 +51,6 @@ export default async function InvestorHome({ userId }: Props) {
     : Math.round(impact.co2SavedKg).toLocaleString() + " kg";
 
   const impactCards = [
-    {
-      label: "Scooters", value: vehicles.length.toLocaleString(), color: "#00C48C",
-      icon: <path d="M5 17H3a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v5"/>,
-    },
     {
       label: "Kilometres Driven", value: Math.round(impact.km).toLocaleString() + " km", color: "#00D1B2",
       icon: <path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zM12 6v6l4 2"/>,
@@ -84,7 +86,7 @@ export default async function InvestorHome({ userId }: Props) {
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00C48C" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10z"/><path d="M2 21c0-3 1.85-5.36 5.08-6"/></svg>
           <h2 className="text-white font-semibold">Environmental Impact</h2>
         </div>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
           {impactCards.map((c) => (
             <div key={c.label} className="bg-[#0A0A0F]/60 border border-white/10 rounded-2xl p-5">
               <div className="flex items-center gap-2 mb-2" style={{ color: c.color }}>
@@ -101,11 +103,11 @@ export default async function InvestorHome({ userId }: Props) {
       </div>
 
       {/* KPIs */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
         {cards.map((c) => (
           <div key={c.label} className="bg-[#111118] border border-white/10 rounded-2xl p-5">
             <p className="text-gray-400 text-xs font-semibold uppercase tracking-wider mb-2">{c.label}</p>
-            <p className="text-2xl font-bold" style={{ color: c.color }}>{c.value}</p>
+            <p className={`${c.label === "Next Due Date" ? "text-xl" : "text-2xl"} font-bold`} style={{ color: c.color }}>{c.value}</p>
             {c.sub && <p className="text-gray-500 text-xs mt-1">{c.sub}</p>}
           </div>
         ))}

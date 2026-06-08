@@ -1,10 +1,12 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import ResetPasswordForm from "@/components/auth/ResetPasswordForm";
+import Footer from "@/components/Footer";
 
 export default function ResetPasswordPage() {
   return (
-    <div className="min-h-screen bg-[#0A0A0F] flex items-center justify-center px-4">
+    <div className="min-h-screen bg-[#0A0A0F] flex items-center justify-center px-4 relative">
+      <Footer className="absolute bottom-4 inset-x-0 px-4" />
       <div className="w-full max-w-sm">
 
         <div className="mb-8 text-center">

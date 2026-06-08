@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import ImageUpload from "@/components/ImageUpload";
 
 function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
   return (
@@ -33,7 +34,7 @@ export default function InvestorForm() {
 
   const [form, setForm] = useState({
     name: "", mobile: "", email: "", password: "",
-    aadhaar: "", pan: "",
+    aadhaar: "", pan: "", aadhaar_url: "",
     total_invested: "", investment_date: "",
     bank: "", account_number: "", confirm_account_number: "", ifsc: "",
   });
@@ -76,6 +77,9 @@ export default function InvestorForm() {
         <Field label="Email" required><input type="email" className={inp} value={form.email} onChange={e => set("email", e.target.value)} placeholder="investor@email.com" required /></Field>
         <Field label="Aadhaar"><input className={inp} value={form.aadhaar} onChange={e => set("aadhaar", e.target.value)} placeholder="12-digit Aadhaar" /></Field>
         <Field label="PAN"><input className={inp} value={form.pan} onChange={e => set("pan", e.target.value.toUpperCase())} placeholder="ABCDE1234F" /></Field>
+        <div className="sm:col-span-2 lg:col-span-1">
+          <ImageUpload label="Aadhaar Image (front)" folder="investor-aadhaar" value={form.aadhaar_url} onChange={(key) => set("aadhaar_url", key)} />
+        </div>
 
         <Section title="Investment" />
         <Field label="Investment Amount (₹)" required><input type="number" min="0" className={inp} value={form.total_invested} onChange={e => set("total_invested", e.target.value)} placeholder="250000" required /></Field>

@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Sidebar from "@/components/Sidebar";
+import Footer from "@/components/Footer";
 
 type Props = {
   role: string;
@@ -74,8 +75,9 @@ export default function DashboardShell({ role, name, children }: Props) {
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto p-4 lg:p-6">
-          {children}
+        <main className="flex-1 overflow-y-auto p-4 lg:p-6 flex flex-col">
+          <div className="flex-1">{children}</div>
+          <Footer className="mt-8 pt-4" />
         </main>
       </div>
     </div>

@@ -55,7 +55,7 @@ export default function PendingPayoutsWidget({ initialPayouts }: { initialPayout
         <p className="text-sm font-semibold text-white">Pending Investor Payouts</p>
         <Link href="/investors" className="text-xs text-[#6C5CE7] hover:underline">View all →</Link>
       </div>
-      <table className="w-full text-sm">
+      <div className="overflow-x-auto"><table className="w-full text-sm">
         <thead>
           <tr className="border-b border-[#1e1e2e]">
             {["Investor", "Vehicle", "Amount", "Due Date", "Action"].map(h => (
@@ -84,7 +84,7 @@ export default function PendingPayoutsWidget({ initialPayouts }: { initialPayout
             </tr>
           ))}
         </tbody>
-      </table>
+      </table></div>
     </div>
   );
 }

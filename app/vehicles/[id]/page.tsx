@@ -173,7 +173,7 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
           <div className="px-5 py-4 border-b border-[#1e1e2e]">
             <h2 className="text-white font-semibold">Assignment History</h2>
           </div>
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto"><table className="w-full text-sm">
             <thead>
               <tr className="border-b border-[#1e1e2e]">
                 {["Rider", "From", "To", "Status"].map((h) => (
@@ -196,14 +196,14 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         </div>
 
         <div className="bg-[#12121A] border border-[#1e1e2e] rounded-xl overflow-hidden">
           <div className="px-5 py-4 border-b border-[#1e1e2e]">
             <h2 className="text-white font-semibold">Investor Payout History</h2>
           </div>
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto"><table className="w-full text-sm">
             <thead>
               <tr className="border-b border-[#1e1e2e]">
                 {["Due Date", "Paid Date", "Amount", "Status"].map((h) => (
@@ -223,7 +223,7 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         </div>
 
       </div>

@@ -347,7 +347,7 @@ export default async function AdminHome({ role, name }: Props) {
               <p className="text-sm font-semibold text-white">Recent Leads</p>
               <Link href="/leads" className="text-xs text-[#6C5CE7] hover:underline">View all →</Link>
             </div>
-            <table className="w-full text-sm border-collapse">
+            <div className="overflow-x-auto"><table className="w-full text-sm border-collapse">
               <thead>
                 <tr className="border-b border-[#1e1e2e]">
                   {["Name", "Type", "Phone", "Status"].map(h => (
@@ -371,7 +371,7 @@ export default async function AdminHome({ role, name }: Props) {
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </table></div>
           </div>
 
           <div className="bg-[#12121A] border border-[#1e1e2e] rounded-xl p-5">

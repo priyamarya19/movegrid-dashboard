@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import Footer from "@/components/Footer";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
@@ -41,7 +42,8 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0A0A0F] flex items-center justify-center px-4">
+    <div className="min-h-screen bg-[#0A0A0F] flex items-center justify-center px-4 relative">
+      <Footer className="absolute bottom-4 inset-x-0 px-4" />
       <div className="w-full max-w-sm">
 
         <div className="mb-8 text-center">

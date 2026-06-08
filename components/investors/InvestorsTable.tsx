@@ -104,7 +104,7 @@ export default function InvestorsTable() {
         </div>
       )}
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {[
           { label: "Total Investors", value: investors.length.toString(), color: "#6C5CE7" },
           { label: "Total Invested", value: "₹" + (totalInvested / 100000).toFixed(1) + "L", color: "#00D1B2" },

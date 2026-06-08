@@ -3,6 +3,7 @@ import DashboardLayout from "@/components/DashboardLayout";
 import { getSession } from "@/lib/auth";
 import { getPortfolioByUser } from "@/lib/portfolio";
 import BankDetailsForm from "@/components/investors/BankDetailsForm";
+import AadhaarImageViewer from "@/components/investors/AadhaarImageViewer";
 
 const fmtDate = (d: string | null) =>
   d ? new Date(d).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "—";
@@ -35,18 +36,18 @@ export default async function ProfilePage() {
             {/* Personal details */}
             <div className="bg-[#12121A] border border-[#1e1e2e] rounded-xl p-5">
               <h2 className="text-white font-semibold mb-4">Personal Details</h2>
-              {[
+              {([
                 { label: "Name", value: session.name },
                 { label: "Email", value: session.email },
                 { label: "PAN", value: portfolio.profile.pan ?? "—" },
-                { label: "Aadhaar", value: maskAadhaar(portfolio.profile.aadhaar) },
+                { label: "Aadhaar", value: maskAadhaar(portfolio.profile.aadhaar), icon: portfolio.profile.aadhaar_url ? <AadhaarImageViewer imageKey={portfolio.profile.aadhaar_url} /> : null },
                 { label: "Total Invested", value: "₹" + Number(portfolio.profile.total_invested).toLocaleString() },
                 { label: "Investment Date", value: fmtDate(portfolio.profile.investment_date) },
                 { label: "Status", value: portfolio.profile.status },
-              ].map((row) => (
+              ] as { label: string; value: string; icon?: React.ReactNode }[]).map((row) => (
                 <div key={row.label} className="flex justify-between py-2 border-b border-[#1e1e2e] last:border-0">
                   <span className="text-[#555] text-sm">{row.label}</span>
-                  <span className="text-[#ccc] text-sm capitalize">{row.value}</span>
+                  <span className="text-[#ccc] text-sm capitalize flex items-center gap-2">{row.value}{row.icon}</span>
                 </div>
               ))}
             </div>

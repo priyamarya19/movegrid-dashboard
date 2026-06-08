@@ -3,6 +3,8 @@ import Link from "next/link";
 import DashboardLayout from "@/components/DashboardLayout";
 import { getSession } from "@/lib/auth";
 import { getPortfolioByUser } from "@/lib/portfolio";
+import { maskMobile, maskAadhaar } from "@/lib/mask";
+import RevealNumberButton from "@/components/investors/RevealNumberButton";
 
 const payoutStatus: Record<string, string> = {
   paid: "bg-green-500/20 text-green-400",
@@ -94,20 +96,24 @@ function PortfolioView({
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-[#1e1e2e]">
-                {["EV No.", "Model", "Hub", "Rider", "Status"].map((h) => (
+                {["EV No.", "Model", "Hub", "Rider", "Mobile No.", "Aadhaar", "Status"].map((h) => (
                   <th key={h} className="text-left px-5 py-3 text-[11px] text-[#555] uppercase tracking-wider">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {vehicles.length === 0 ? (
-                <tr><td colSpan={5} className="px-5 py-8 text-center text-[#555]">No vehicles assigned yet</td></tr>
+                <tr><td colSpan={7} className="px-5 py-8 text-center text-[#555]">No vehicles assigned yet</td></tr>
               ) : vehicles.map((v) => (
                 <tr key={v.id} className="border-b border-[#1a1a2a] hover:bg-white/[0.02]">
                   <td className="px-5 py-3 text-[#6C5CE7] font-medium">{v.ev_number}</td>
                   <td className="px-5 py-3 text-[#aaa] text-xs">{v.model_name ?? "—"}</td>
                   <td className="px-5 py-3 text-[#aaa] text-xs">{v.hub_name ?? "—"}</td>
                   <td className="px-5 py-3 text-[#fdcb6e] text-xs">{v.assigned_rider ?? "—"}</td>
+                  <td className="px-5 py-3 text-xs">
+                    <RevealNumberButton vehicleId={v.id} riderName={v.assigned_rider} maskedMobile={maskMobile(v.rider_mobile)} />
+                  </td>
+                  <td className="px-5 py-3 text-[#aaa] text-xs tabular-nums">{maskAadhaar(v.rider_aadhaar) || "—"}</td>
                   <td className="px-5 py-3">
                     <span className={`px-2 py-0.5 rounded-full text-xs capitalize ${vehicleStatus[v.status] ?? "bg-gray-500/20 text-gray-400"}`}>{v.status}</span>
                   </td>

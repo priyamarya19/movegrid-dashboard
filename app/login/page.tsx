@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import Footer from "@/components/Footer";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -40,7 +41,8 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0A0A0F] flex items-center justify-center px-4">
+    <div className="min-h-screen bg-[#0A0A0F] flex items-center justify-center px-4 relative">
+      <Footer className="absolute bottom-4 inset-x-0 px-4" />
       <div className="w-full max-w-sm">
 
         <div className="mb-8 text-center">
@@ -52,7 +54,7 @@ export default function LoginPage() {
             </div>
             <span className="text-white font-bold text-xl tracking-tight">MoveGrid</span>
           </div>
-          <h1 className="text-white text-2xl font-bold">Operations Dashboard</h1>
+          <h1 className="text-white text-2xl font-bold">Dashboard</h1>
           <p className="text-gray-400 text-sm mt-1">Sign in to your account</p>
         </div>
 

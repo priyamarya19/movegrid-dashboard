@@ -24,6 +24,8 @@ export type PortfolioVehicle = {
   hub_name: string | null;
   assigned_rider: string | null;
   rider_id: string | null;
+  rider_mobile: string | null;
+  rider_aadhaar: string | null;
 };
 
 export type PortfolioPayout = {
@@ -44,6 +46,7 @@ export type Portfolio = {
     status: string;
     pan: string | null;
     aadhaar: string | null;
+    aadhaar_url: string | null;
     bank: string | null;
     ifsc: string | null;
     account_number: string | null;
@@ -59,6 +62,7 @@ export type Portfolio = {
   payoutsMade: number;
   payoutsRemaining: number;
   termMonths: number;
+  nextDueDate: string | null;
 };
 
 /**
@@ -69,7 +73,7 @@ export type Portfolio = {
  */
 export async function getPortfolioByUser(userId: string): Promise<Portfolio | null> {
   const profileResult = await pool.query(
-    `SELECT id, total_invested, investment_date, status, pan, aadhaar,
+    `SELECT id, total_invested, investment_date, status, pan, aadhaar, aadhaar_url,
             bank, ifsc, account_number, bank_status
      FROM ${schemas.ops}.investor_profiles
      WHERE user_id = $1`,
@@ -84,7 +88,8 @@ export async function getPortfolioByUser(userId: string): Promise<Portfolio | nu
       `SELECT v.id, v.ev_number, v.status,
               m.model_name, m.oem,
               h.hub_name,
-              r.name AS assigned_rider, r.id AS rider_id
+              r.name AS assigned_rider, r.id AS rider_id,
+              r.mobile AS rider_mobile, r.aadhaar AS rider_aadhaar
        FROM ${schemas.ops}.vehicles v
        LEFT JOIN ${schemas.ops}.vehicle_models m ON m.id = v.model_id
        LEFT JOIN ${schemas.ops}.hubs h ON h.id = v.hub_id
@@ -145,6 +150,13 @@ export async function getPortfolioByUser(userId: string): Promise<Portfolio | nu
     ? Math.max(0, (now.getFullYear() - invDate.getFullYear()) * 12 + (now.getMonth() - invDate.getMonth()))
     : 0;
 
+  // Next payout is due on the 10th of next month (while payouts remain).
+  let nextDueDate: string | null = null;
+  if (payoutsRemaining > 0) {
+    const due = new Date(now.getFullYear(), now.getMonth() + 1, 10);
+    nextDueDate = `${due.getFullYear()}-${String(due.getMonth() + 1).padStart(2, "0")}-10`;
+  }
+
   return {
     profile,
     vehicles: vehicles.rows,
@@ -157,5 +169,6 @@ export async function getPortfolioByUser(userId: string): Promise<Portfolio | nu
     payoutsMade,
     payoutsRemaining,
     termMonths: PAYOUT_TERM_MONTHS,
+    nextDueDate,
   };
 }

@@ -41,6 +41,7 @@ export async function POST(req: NextRequest) {
   const mobile = body.mobile?.trim();
   const password = body.password;
   const aadhaar = body.aadhaar?.trim() || null;
+  const aadhaarUrl = body.aadhaar_url?.trim() || null;
   const pan = body.pan?.trim() || null;
   const bank = body.bank?.trim() || null;
   const ifsc = body.ifsc?.trim()?.toUpperCase() || null;
@@ -87,10 +88,10 @@ export async function POST(req: NextRequest) {
 
     const profileResult = await client.query(
       `INSERT INTO ${schemas.ops}.investor_profiles
-         (user_id, pan, aadhaar, bank, ifsc, account_number, total_invested, investment_date, status, bank_status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'active', 'verified')
+         (user_id, pan, aadhaar, aadhaar_url, bank, ifsc, account_number, total_invested, investment_date, status, bank_status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'active', 'verified')
        RETURNING id`,
-      [userId, pan, aadhaar, bank, ifsc, accountNumber, totalInvested, investmentDate]
+      [userId, pan, aadhaar, aadhaarUrl, bank, ifsc, accountNumber, totalInvested, investmentDate]
     );
 
     await client.query("COMMIT");

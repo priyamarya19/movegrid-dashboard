@@ -134,7 +134,7 @@ export default async function HubDetailPage({ params }: { params: Promise<{ id: 
           <div className="px-5 py-4 border-b border-[#1e1e2e]">
             <h2 className="text-white font-semibold">Riders ({riders.length})</h2>
           </div>
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto"><table className="w-full text-sm">
             <thead>
               <tr className="border-b border-[#1e1e2e]">
                 {["Name", "Mobile", "Vehicle", "Status"].map((h) => (
@@ -162,14 +162,14 @@ export default async function HubDetailPage({ params }: { params: Promise<{ id: 
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         </div>
 
         <div className="bg-[#12121A] border border-[#1e1e2e] rounded-xl overflow-hidden">
           <div className="px-5 py-4 border-b border-[#1e1e2e]">
             <h2 className="text-white font-semibold">Vehicles ({vehicles.length})</h2>
           </div>
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto"><table className="w-full text-sm">
             <thead>
               <tr className="border-b border-[#1e1e2e]">
                 {["EV Number", "Model", "Assigned To", "Investor", "Status"].map((h) => (
@@ -202,7 +202,7 @@ export default async function HubDetailPage({ params }: { params: Promise<{ id: 
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         </div>
 
       </div>
