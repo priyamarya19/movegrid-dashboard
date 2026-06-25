@@ -50,15 +50,38 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   });
 }
 
-// Map (or unmap) a single investor for this vehicle. Only one investor per vehicle.
+// Ops-settable statuses (the system sets 'assigned' / 'returned' automatically).
+const OPS_STATUSES = ["under_maintenance", "mechanically_ok", "ready_to_deploy"];
+
+// PATCH handles: (a) vehicle status change (admin/ops), (b) investor mapping (admin only).
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession(req);
-  if (!session || session.role !== "admin") {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
-  }
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
 
   const { id } = await params;
   const body = await req.json();
+
+  // --- Status change ---
+  if (body.status !== undefined) {
+    if (!["admin", "ops_manager"].includes(session.role)) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+    }
+    if (!OPS_STATUSES.includes(body.status)) {
+      return NextResponse.json({ error: "Invalid status" }, { status: 400 });
+    }
+    const cur = await pool.query(`SELECT status FROM ${schemas.ops}.vehicles WHERE id = $1`, [id]);
+    if (!cur.rows[0]) return NextResponse.json({ error: "Vehicle not found" }, { status: 404 });
+    if (cur.rows[0].status === "assigned") {
+      return NextResponse.json({ error: "Can't change status while the vehicle is assigned to a rider. Process the return first." }, { status: 409 });
+    }
+    await pool.query(`UPDATE ${schemas.ops}.vehicles SET status = $1 WHERE id = $2`, [body.status, id]);
+    return NextResponse.json({ success: true, status: body.status });
+  }
+
+  // --- Investor mapping (admin only) ---
+  if (session.role !== "admin") {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+  }
   const investorId = body.investor_id || null;
 
   if (investorId) {

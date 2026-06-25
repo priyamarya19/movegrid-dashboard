@@ -86,6 +86,7 @@ export default function AllotmentForm() {
     if (!vehicle) { setError("Please enter a valid EV number"); return; }
     if (!rider) { setError("Please look up and confirm the rider"); return; }
     if (vehicle.status === "assigned") { setError("This vehicle is already assigned to another rider"); return; }
+    if (vehicle.status !== "ready_to_deploy") { setError("This vehicle is not 'Ready to Deploy'. Ops must clear it first."); return; }
 
     setSubmitting(true); setError("");
     try {
@@ -127,7 +128,7 @@ export default function AllotmentForm() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
 
         <Section title="Vehicle" />
-        <Field label="EV / Scooter Number" required hint={evLookingUp ? "Looking up..." : vehicle ? `Found: ${vehicle.oem} ${vehicle.model_name}${vehicle.status === "assigned" ? " — ⚠️ already assigned" : " — available"}` : evError}>
+        <Field label="EV / Scooter Number" required hint={evLookingUp ? "Looking up..." : vehicle ? `Found: ${vehicle.oem} ${vehicle.model_name}${vehicle.status === "ready_to_deploy" ? " — ✅ ready to deploy" : ` — ⚠️ ${vehicle.status?.replace(/_/g, " ")} (not allottable)`}` : evError}>
           <input className={inp + (evError ? " border-red-500/50" : vehicle ? " border-green-500/30" : "")}
             value={evInput} onChange={e => setEvInput(e.target.value)} placeholder="MG-001" required />
         </Field>

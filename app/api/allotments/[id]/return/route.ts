@@ -43,9 +43,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       ]
     );
 
-    // Update vehicle → available
+    // Update vehicle → returned (awaiting ops inspection; not allottable until ready_to_deploy)
     await client.query(
-      `UPDATE ${schemas.ops}.vehicles SET status = 'available' WHERE id = $1`, [vehicle_id]
+      `UPDATE ${schemas.ops}.vehicles SET status = 'returned' WHERE id = $1`, [vehicle_id]
     );
 
     // Update rider → inactive

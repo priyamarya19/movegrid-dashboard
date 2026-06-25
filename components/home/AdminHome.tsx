@@ -5,7 +5,7 @@ import Link from "next/link";
 import RidersChart from "@/components/charts/RidersChart";
 import VehicleDonut from "@/components/charts/VehicleDonut";
 import PendingPayoutsWidget from "@/components/home/PendingPayoutsWidget";
-import { getCollectionMTD } from "@/lib/collections";
+import { getLedgerSummary } from "@/lib/rent";
 
 type Props = { role: string; name: string };
 
@@ -191,9 +191,11 @@ function activityText(log: { action: string; details: unknown }) {
 }
 
 export default async function AdminHome({ role, name }: Props) {
-  const [stats, onboardingData, leads, logs, pendingPayouts, revenueSummary, collection] = await Promise.all([
-    getStats(), getMonthlyOnboarding(), getRecentLeads(), getAuditLogs(), getPendingPayouts(), getRevenueSummary(), getCollectionMTD(),
+  const [stats, onboardingData, leads, logs, pendingPayouts, revenueSummary, ledger] = await Promise.all([
+    getStats(), getMonthlyOnboarding(), getRecentLeads(), getAuditLogs(), getPendingPayouts(), getRevenueSummary(), getLedgerSummary(),
   ]);
+  // Single source: same ledger figures used by Ops & Investor dashboards.
+  const collection = { collected: ledger.collected, expected: ledger.expectedToDate, pending: ledger.overdue, pct: ledger.pct };
 
   const currentMonth = new Date().toLocaleDateString("en-IN", { month: "long", year: "numeric" });
   const pctColor = collection.pct >= 80 ? "#00D1B2" : collection.pct >= 50 ? "#fdcb6e" : "#ff6b6b";
@@ -254,7 +256,7 @@ export default async function AdminHome({ role, name }: Props) {
 
         {/* Rent Collection — collected vs expected (MTD) */}
         <div>
-          <p className="text-[11px] text-[#555] uppercase tracking-widest mb-3">Rent Collection — {currentMonth}</p>
+          <p className="text-[11px] text-[#555] uppercase tracking-widest mb-3">Rent Collection — to date</p>
           <div className="bg-[#12121A] border border-[#1e1e2e] rounded-xl p-5">
             <div className="flex flex-wrap items-end gap-x-10 gap-y-4">
               <div>
@@ -277,7 +279,7 @@ export default async function AdminHome({ role, name }: Props) {
             <div className="mt-4 h-2 bg-[#1e1e2e] rounded-full overflow-hidden">
               <div className="h-full rounded-full" style={{ width: `${Math.min(collection.pct, 100)}%`, background: pctColor }} />
             </div>
-            <p className="text-[11px] text-[#555] mt-2">Month-to-date · click <span className="text-[#a29bfe]">Expected</span> or <span className="text-[#ff6b6b]">Pending</span> to see which riders owe rent</p>
+            <p className="text-[11px] text-[#555] mt-2">From the rent ledger (all roles see this same figure) · click <span className="text-[#a29bfe]">Expected</span> or <span className="text-[#ff6b6b]">Pending</span> to see who owes rent</p>
           </div>
         </div>
 

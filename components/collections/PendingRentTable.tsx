@@ -1,11 +1,16 @@
 import Link from "next/link";
-import { getCollectionMTD, getPendingByRider } from "@/lib/collections";
+import { getLedgerSummary, getOverdueRiders } from "@/lib/rent";
 
 const rupee = (n: number) => "₹" + Math.round(n).toLocaleString("en-IN");
 
 export default async function PendingRentTable() {
-  const [totals, riders] = await Promise.all([getCollectionMTD(), getPendingByRider()]);
-  const month = new Date().toLocaleDateString("en-IN", { month: "long", year: "numeric" });
+  const [summary, overdue] = await Promise.all([getLedgerSummary(), getOverdueRiders()]);
+  const totals = { expected: summary.expectedToDate, collected: summary.collected, pending: summary.overdue, pct: summary.pct };
+  const riders = overdue.map((r) => ({
+    rider_id: r.rider_id, rider_code: r.rider_code, name: r.name, mobile: r.mobile,
+    ev_number: null as string | null, vehicle_id: null as string | null, model_name: null as string | null,
+    days: r.overdue_weeks, expected: 0, collected: 0, pending: r.overdue_amount,
+  }));
 
   return (
     <div className="space-y-5">
@@ -15,7 +20,7 @@ export default async function PendingRentTable() {
         <h1 className="text-white text-2xl font-bold">Pending Rent</h1>
       </div>
       <p className="text-[#666] text-sm -mt-3">
-        Expected vs collected, month-to-date ({month}). Expected = days on rent × daily rate (Shelby ₹230, EV Juno ₹240).
+        From the rent ledger — every overdue week per rider. Same figures the admin, ops and investor dashboards use.
       </p>
 
       {/* Totals strip */}
@@ -41,25 +46,20 @@ export default async function PendingRentTable() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-[#1e1e2e]">
-                {["User ID", "Name", "Mobile", "Vehicle", "Days", "Expected", "Collected", "Pending"].map((h) => (
+                {["User ID", "Name", "Mobile", "Overdue weeks", "Overdue amount"].map((h) => (
                   <th key={h} className="text-left px-5 py-3 text-[11px] text-[#555] uppercase tracking-wider font-medium whitespace-nowrap">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {riders.length === 0 ? (
-                <tr><td colSpan={8} className="px-5 py-10 text-center text-[#555]">No pending rent — fully collected 🎉</td></tr>
+                <tr><td colSpan={5} className="px-5 py-10 text-center text-[#555]">No overdue rent — fully collected 🎉</td></tr>
               ) : riders.map((r) => (
                 <tr key={r.rider_id} className="border-b border-[#1a1a2a] hover:bg-white/[0.02] transition-colors">
                   <td className="px-5 py-3"><span className="font-mono text-xs text-[#6C5CE7] font-semibold">{r.rider_code ?? "—"}</span></td>
                   <td className="px-5 py-3"><Link href={`/riders/${r.rider_id}`} className="text-white font-medium hover:text-[#6C5CE7] hover:underline transition-colors">{r.name}</Link></td>
                   <td className="px-5 py-3 text-[#aaa]">{r.mobile}</td>
-                  <td className="px-5 py-3">
-                    {r.vehicle_id ? <Link href={`/vehicles/${r.vehicle_id}`} className="text-[#6C5CE7] font-medium hover:underline">{r.ev_number}</Link> : <span className="text-[#555]">—</span>}
-                  </td>
                   <td className="px-5 py-3 text-[#aaa]">{r.days}</td>
-                  <td className="px-5 py-3 text-[#a29bfe]">{rupee(r.expected)}</td>
-                  <td className="px-5 py-3 text-[#00D1B2]">{rupee(r.collected)}</td>
                   <td className="px-5 py-3 font-semibold text-[#ff6b6b]">{rupee(r.pending)}</td>
                 </tr>
               ))}

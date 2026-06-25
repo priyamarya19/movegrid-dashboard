@@ -7,6 +7,7 @@ import KycVerifyButton from "@/components/riders/KycVerifyButton";
 import BackButton from "@/components/BackButton";
 import BlacklistButton from "@/components/riders/BlacklistButton";
 import RentMarkPaid from "@/components/riders/RentMarkPaid";
+import { getRiderCycle } from "@/lib/rent";
 import { getSession } from "@/lib/auth";
 import { EXPECTED_RENT } from "@/lib/rentConstants";
 
@@ -121,6 +122,7 @@ export default async function RiderDetailPage({ params }: { params: Promise<{ id
 
   const { rider, payments, assignments, totalCollected } = data;
   const activeAssignment = assignments.find((a: { assignment_status: string }) => a.assignment_status === "active");
+  const cycle = await getRiderCycle(rider.id); // unbroken weekly ledger (no gaps; stops at return)
 
   const periodLen = rider.rental_mode === "weekly" ? 7 : rider.rental_mode === "fortnightly" ? 14 : 30;
   const todayIST = toISTMidnight(new Date());
@@ -398,102 +400,51 @@ export default async function RiderDetailPage({ params }: { params: Promise<{ id
           </div>
         </div>
 
+        {/* Rent cycle — full unbroken weekly ledger (no gaps; stops at return) */}
         <div className="bg-[#12121A] border border-[#1e1e2e] rounded-xl overflow-hidden">
-          <div className="px-5 py-4 border-b border-[#1e1e2e]">
-            <h2 className="text-white font-semibold">Payment History</h2>
+          <div className="px-5 py-4 border-b border-[#1e1e2e] flex items-center justify-between">
+            <h2 className="text-white font-semibold">Rent Cycle</h2>
+            <span className="text-[11px] text-[#555]">{cycle.length} week{cycle.length !== 1 ? "s" : ""} · every week shown until the bike is returned</span>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-[#1e1e2e]">
-                  {["Date", "Amount", "Vehicle", "Status"].map((h) => (
-                    <th key={h} className="text-left px-5 py-3 text-[11px] text-[#555] uppercase tracking-wider">{h}</th>
+                  {["Week", "Period", "Due date", "Vehicle", "Rent", "Status", "Payment"].map((h) => (
+                    <th key={h} className="text-left px-5 py-3 text-[11px] text-[#555] uppercase tracking-wider whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {/* Overdue unpaid row */}
-                {isOverdueUnpaid && lastDueDate && lastDuePeriodStartStr && lastDuePeriodEndStr && (
-                  <tr className="border-b border-[#1a1a2a] bg-red-500/[0.04]">
-                    <td className="px-5 py-3 text-[#aaa]">
-                      {lastDueDate.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
-                    </td>
-                    <td className="px-5 py-3">
-                      {lastDuePeriodPartialAmt != null ? (
-                        <div className="text-xs leading-tight">
-                          <span className="text-orange-400 font-semibold">₹{lastDuePeriodPartialAmt.toLocaleString()} paid</span>
-                          <span className="block text-red-400">₹{lastDuePeriodBalance!.toLocaleString()} due</span>
-                        </div>
-                      ) : <span className="text-[#555]">—</span>}
-                    </td>
-                    <td className="px-5 py-3 text-[#6C5CE7]">{activeAssignment?.ev_number ?? "—"}</td>
-                    <td className="px-5 py-3">
-                      <RentMarkPaid
-                        riderId={rider.id}
-                        periodStart={lastDuePeriodStartStr}
-                        periodEnd={lastDuePeriodEndStr}
-                        daysLeft={-lastDueDaysOverdue}
-                        defaultAmount={lastDuePeriodBalance ?? undefined}
-                      />
-                    </td>
-                  </tr>
-                )}
-                {/* Next due row */}
-                {nextDueDate && nextDueDaysLeft !== null && periodStartStr && periodEndStr && (
-                  <tr className="border-b border-[#1a1a2a] bg-white/[0.01]">
-                    <td className="px-5 py-3 text-[#aaa]">
-                      {nextDueDate.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
-                    </td>
-                    <td className="px-5 py-3">
-                      {currentPeriodPartial ? (
-                        <div className="text-xs leading-tight">
-                          <span className="text-orange-400 font-semibold">₹{Number(currentPeriodPayment!.amount_collected).toLocaleString()} paid</span>
-                          <span className="block text-red-400">₹{currentPeriodBalance.toLocaleString()} due</span>
-                        </div>
-                      ) : <span className="text-[#555]">—</span>}
-                    </td>
-                    <td className="px-5 py-3 text-[#6C5CE7]">{activeAssignment?.ev_number ?? "—"}</td>
-                    <td className="px-5 py-3">
-                      {currentPeriodPaid ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-green-500/15 text-green-400">
-                          <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>
-                          Paid
-                        </span>
-                      ) : (
-                        <RentMarkPaid
-                          riderId={rider.id}
-                          periodStart={periodStartStr}
-                          periodEnd={periodEndStr}
-                          daysLeft={nextDueDaysLeft}
-                          defaultAmount={currentPeriodPartial ? currentPeriodBalance : undefined}
-                        />
-                      )}
-                    </td>
-                  </tr>
-                )}
-                {/* Past payments */}
-                {payments.length === 0 && !nextDueDate ? (
-                  <tr><td colSpan={4} className="px-5 py-8 text-center text-[#555]">No payments yet</td></tr>
-                ) : payments.map((p: { payment_date: string; amount_collected: number; ev_number: string }, i: number) => {
-                  const amt = Number(p.amount_collected);
-                  const isPartial = amt < EXPECTED_RENT;
-                  const balance = isPartial ? EXPECTED_RENT - amt : 0;
+                {cycle.length === 0 ? (
+                  <tr><td colSpan={7} className="px-5 py-8 text-center text-[#555]">No rent cycle yet (no allotment)</td></tr>
+                ) : cycle.map((w, i) => {
+                  const color = w.status === "Collected" ? "bg-green-500/15 text-green-400"
+                    : w.status === "Partial" ? "bg-orange-500/15 text-orange-400"
+                    : w.status === "Overdue" ? "bg-red-500/15 text-red-400"
+                    : "bg-yellow-500/15 text-yellow-400";
+                  const fmtD = (s: string) => new Date(s).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+                  const daysLeft = Math.round((new Date(w.due_date).getTime() - todayIST.getTime()) / 86400000);
+                  const balance = Math.max(Math.round(w.amount - w.paid), 0);
                   return (
                     <tr key={i} className="border-b border-[#1a1a2a]">
-                      <td className="px-5 py-3 text-[#aaa]">{new Date(p.payment_date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</td>
+                      <td className="px-5 py-3 text-[#aaa]">{w.week_no}</td>
+                      <td className="px-5 py-3 text-[#ccc] whitespace-nowrap">{fmtD(w.period_start)} – {fmtD(w.period_end)}</td>
+                      <td className="px-5 py-3 text-[#aaa] whitespace-nowrap">{fmtD(w.due_date)}</td>
+                      <td className="px-5 py-3 text-[#6C5CE7]">{w.ev_number ?? "—"}</td>
+                      <td className="px-5 py-3 text-white">₹{Math.round(w.amount).toLocaleString("en-IN")}</td>
+                      <td className="px-5 py-3"><span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${color}`}>{w.status}</span></td>
                       <td className="px-5 py-3">
-                        <span className={`font-semibold ${isPartial ? "text-orange-400" : "text-[#00D1B2]"}`}>₹{amt.toLocaleString()}</span>
-                        {isPartial && <span className="block text-red-400 text-xs">₹{balance.toLocaleString()} remaining</span>}
-                      </td>
-                      <td className="px-5 py-3 text-[#6C5CE7]">{p.ev_number ?? "—"}</td>
-                      <td className="px-5 py-3">
-                        {isPartial ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-orange-500/15 text-orange-400">Partial</span>
+                        {w.status === "Collected" ? (
+                          <span className="text-[#00D1B2] text-xs font-semibold">₹{Math.round(w.paid).toLocaleString("en-IN")} paid</span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-green-500/15 text-green-400">
-                            <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>
-                            Paid
-                          </span>
+                          <RentMarkPaid
+                            riderId={rider.id}
+                            periodStart={w.period_start}
+                            periodEnd={w.period_end}
+                            daysLeft={daysLeft}
+                            defaultAmount={w.status === "Partial" ? balance : Math.round(w.amount)}
+                          />
                         )}
                       </td>
                     </tr>

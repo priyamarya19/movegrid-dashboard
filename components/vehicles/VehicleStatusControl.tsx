@@ -1,0 +1,57 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+
+const LABEL: Record<string, string> = {
+  assigned: "Assigned", returned: "Returned", under_maintenance: "Under Maintenance",
+  mechanically_ok: "Mechanically OK", ready_to_deploy: "Ready to Deploy",
+  available: "Available", maintenance: "Maintenance",
+};
+const COLOR: Record<string, string> = {
+  assigned: "bg-green-500/20 text-green-400",
+  returned: "bg-orange-500/20 text-orange-400",
+  under_maintenance: "bg-yellow-500/20 text-yellow-400",
+  mechanically_ok: "bg-blue-500/20 text-blue-400",
+  ready_to_deploy: "bg-[#00D1B2]/20 text-[#00D1B2]",
+};
+// Statuses ops can set (assigned/returned are system-driven).
+const OPTIONS = ["under_maintenance", "mechanically_ok", "ready_to_deploy"];
+
+export default function VehicleStatusControl({ vehicleId, status, canEdit }: { vehicleId: string; status: string; canEdit: boolean }) {
+  const router = useRouter();
+  const [cur, setCur] = useState(status);
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState("");
+  const assigned = cur === "assigned";
+
+  async function setStatus(s: string) {
+    setSaving(true); setErr("");
+    const r = await fetch(`/api/vehicles/${vehicleId}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status: s }),
+    });
+    const j = await r.json().catch(() => ({}));
+    setSaving(false);
+    if (!r.ok) { setErr(j.error || "Failed to update status"); return; }
+    setCur(s); router.refresh();
+  }
+
+  return (
+    <div className="flex flex-col items-end gap-2">
+      <span className={`px-3 py-1 rounded-full text-sm font-medium ${COLOR[cur] ?? "bg-gray-500/20 text-gray-400"}`}>{LABEL[cur] ?? cur}</span>
+      {canEdit && (assigned ? (
+        <span className="text-[11px] text-[#555]">🔒 Status locked while assigned</span>
+      ) : (
+        <div className="flex flex-wrap gap-1.5 justify-end">
+          {OPTIONS.map((o) => (
+            <button key={o} disabled={saving || o === cur} onClick={() => setStatus(o)}
+              className={`px-2.5 py-1 rounded-md text-[11px] font-medium border transition-colors disabled:opacity-50 ${o === cur ? "border-[#00D1B2] text-[#00D1B2]" : "border-[#2a2a3a] text-[#aaa] hover:border-[#444] hover:text-white"}`}>
+              {LABEL[o]}
+            </button>
+          ))}
+        </div>
+      ))}
+      {err && <span className="text-[11px] text-red-400 max-w-[220px] text-right">{err}</span>}
+    </div>
+  );
+}

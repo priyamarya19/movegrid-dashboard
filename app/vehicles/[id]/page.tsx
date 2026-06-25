@@ -6,6 +6,7 @@ import { schemas } from "@/lib/schemas";
 import BackButton from "@/components/BackButton";
 import { getSession } from "@/lib/auth";
 import VehicleInvestorCard from "@/components/vehicles/VehicleInvestorCard";
+import VehicleStatusControl from "@/components/vehicles/VehicleStatusControl";
 
 async function getData(id: string) {
   const [vehicle, assignments, payouts] = await Promise.all([
@@ -63,6 +64,7 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
 
   const { vehicle, assignments, payouts } = data;
   const isAdmin = session?.role === "admin";
+  const canEditStatus = !!session && ["admin", "ops_manager"].includes(session.role);
   const activeAssignment = assignments.find((a: { status: string }) => a.status === "active");
   const totalPayouts = payouts.reduce((s: number, p: { amount: number }) => s + Number(p.amount), 0);
 
@@ -81,7 +83,7 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
             <h1 className="text-white text-2xl font-bold">{vehicle.ev_number}</h1>
             <p className="text-[#666] text-sm mt-1">{vehicle.model_name} · {vehicle.oem}</p>
           </div>
-          <span className={`px-3 py-1 rounded-full text-sm font-medium capitalize ${statusColor[vehicle.status] ?? "bg-gray-500/20 text-gray-400"}`}>{vehicle.status}</span>
+          <VehicleStatusControl vehicleId={vehicle.id} status={vehicle.status} canEdit={canEditStatus} />
         </div>
 
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

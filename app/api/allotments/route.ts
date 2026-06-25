@@ -26,6 +26,10 @@ export async function POST(req: NextRequest) {
     if (vCheck.rows[0].status === "assigned") {
       return NextResponse.json({ error: "Vehicle is already assigned to another rider" }, { status: 409 });
     }
+    // Only vehicles cleared by ops (Ready to Deploy) can be allotted.
+    if (vCheck.rows[0].status !== "ready_to_deploy") {
+      return NextResponse.json({ error: "Vehicle must be 'Ready to Deploy' before it can be allotted. Set its status first." }, { status: 409 });
+    }
 
     // Close any existing active assignment for this rider
     await client.query(

@@ -2,7 +2,7 @@ import pool from "@/lib/db";
 import { schemas } from "@/lib/schemas";
 import { unstable_cache } from "next/cache";
 import Link from "next/link";
-import { getCollectionMTD } from "@/lib/collections";
+import { getLedgerSummary } from "@/lib/rent";
 
 const fmt = (n: number) => {
   if (n >= 100000) return "₹" + (n / 100000).toFixed(1) + "L";
@@ -90,10 +90,11 @@ const statusColor: Record<string, string> = {
 };
 
 export default async function OpsManagerHome() {
-  const [{ rMap, vMap, recentRiders, overdueCount, dueSoonCount }, collection] = await Promise.all([getStats(), getCollectionMTD()]);
+  const [{ rMap, vMap, recentRiders, overdueCount, dueSoonCount }, ledger] = await Promise.all([getStats(), getLedgerSummary()]);
   const totalVehicles = Object.values(vMap).reduce((a, b) => a + b, 0);
+  // Single source: identical to Admin & Investor dashboards.
+  const collection = { collected: ledger.collected, expected: ledger.expectedToDate, pending: ledger.overdue, pct: ledger.pct };
   const pctColor = collection.pct >= 80 ? "#00D1B2" : collection.pct >= 50 ? "#fdcb6e" : "#ff6b6b";
-  const currentMonth = new Date().toLocaleDateString("en-IN", { month: "long", year: "numeric" });
 
   return (
     <div className="space-y-6">
@@ -122,7 +123,7 @@ export default async function OpsManagerHome() {
       {/* Rent Collection — collected vs expected (MTD) */}
       <div className="bg-[#12121A] border border-[#1e1e2e] rounded-xl p-5">
         <div className="flex items-center justify-between mb-4">
-          <p className="text-white font-semibold">Rent Collection — {currentMonth}</p>
+          <p className="text-white font-semibold">Rent Collection — to date</p>
           <span className="text-2xl font-bold" style={{ color: pctColor }}>{collection.pct}%</span>
         </div>
         <div className="flex flex-wrap items-end gap-x-10 gap-y-4">
@@ -142,7 +143,7 @@ export default async function OpsManagerHome() {
         <div className="mt-4 h-2 bg-[#1e1e2e] rounded-full overflow-hidden">
           <div className="h-full rounded-full" style={{ width: `${Math.min(collection.pct, 100)}%`, background: pctColor }} />
         </div>
-        <p className="text-[11px] text-[#555] mt-2">Month-to-date · tap Expected/Pending for the rider-wise breakdown</p>
+        <p className="text-[11px] text-[#555] mt-2">From the rent ledger · tap Expected/Pending for the rider-wise breakdown</p>
       </div>
 
       {/* Vehicle utilisation bar */}
