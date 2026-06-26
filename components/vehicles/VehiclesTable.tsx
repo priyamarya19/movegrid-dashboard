@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import ExportButton from "@/components/ExportButton";
 
 type Vehicle = {
   id: string; ev_number: string; status: string;
@@ -71,12 +72,13 @@ export default function VehiclesTable() {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-white text-2xl font-bold">Vehicles</h1>
           <p className="text-[#666] text-sm mt-1">{vehicles.length} total • {counts["assigned"] || 0} assigned · {counts["available"] || 0} available · {counts["maintenance"] || 0} maintenance</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <ExportButton filename="vehicles" columns={cols} rows={sorted} />
           <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
             className="bg-[#12121A] border border-[#1e1e2e] rounded-xl px-3 py-2 text-sm text-gray-300 focus:outline-none focus:border-[#6C5CE7]">
             <option value="">All Status</option>

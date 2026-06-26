@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import ExportButton from "@/components/ExportButton";
 
 type Rider = {
   id: string; rider_code: string; name: string; mobile: string; status: string;
@@ -114,14 +115,15 @@ export default function RidersTable({ rentFilter }: { rentFilter?: string | null
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-white text-2xl font-bold">
             Riders{rentFilter === "overdue" ? " — Overdue Rent" : rentFilter === "due_soon" ? " — Due in 2 Days" : ""}
           </h1>
           <p className="text-[#666] text-sm mt-1">{riders.length} riders • {counts["active"] || 0} active · {counts["inactive"] || 0} inactive</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <ExportButton filename="riders" columns={cols} rows={sorted} />
           <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
             className="bg-[#12121A] border border-[#1e1e2e] rounded-xl px-3 py-2 text-sm text-gray-300 focus:outline-none focus:border-[#6C5CE7]">
             <option value="">All Status</option>
@@ -160,7 +162,7 @@ export default function RidersTable({ rentFilter }: { rentFilter?: string | null
               ) : sorted.map((r) => (
                 <tr key={r.id} className="border-b border-[#1a1a2a] hover:bg-white/[0.02] transition-colors">
                   <td className="px-5 py-3">
-                    <span className="font-mono text-xs text-[#6C5CE7] font-semibold">{r.rider_code ?? "—"}</span>
+                    <Link href={`/riders/${r.id}`} className="font-mono text-xs text-[#6C5CE7] font-semibold hover:underline">{r.rider_code ?? "—"}</Link>
                   </td>
                   <td className="px-5 py-3">
                     <Link href={`/riders/${r.id}`} className="text-white font-medium hover:text-[#6C5CE7] hover:underline transition-colors">{r.name}</Link>

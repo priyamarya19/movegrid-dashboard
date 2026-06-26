@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import ExportButton from "@/components/ExportButton";
 
 type Hub = {
   id: string; hub_id: string; hub_name: string;
@@ -49,18 +50,21 @@ export default function HubsTable({ role }: { role: string }) {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-white text-2xl font-bold">Hubs</h1>
           <p className="text-[#666] text-sm mt-1">{hubs.length} hubs</p>
         </div>
-        {role === "admin" && (
-          <Link href="/hubs/new"
-            className="inline-flex items-center gap-2 bg-[#6C5CE7] hover:bg-[#7c6cf7] text-white text-sm font-medium px-4 py-2 rounded-xl transition-colors">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-            Add Hub
-          </Link>
-        )}
+        <div className="flex flex-wrap items-center gap-3">
+          <ExportButton filename="hubs" columns={cols} rows={sorted} />
+          {role === "admin" && (
+            <Link href="/hubs/new"
+              className="inline-flex items-center gap-2 bg-[#6C5CE7] hover:bg-[#7c6cf7] text-white text-sm font-medium px-4 py-2 rounded-xl transition-colors">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Add Hub
+            </Link>
+          )}
+        </div>
       </div>
 
       <div className="bg-[#12121A] border border-[#1e1e2e] rounded-2xl overflow-hidden">

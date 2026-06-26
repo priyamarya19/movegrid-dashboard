@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import ExportButton from "@/components/ExportButton";
 
 type Investor = {
   id: string; name: string; email: string; mobile: string;
@@ -65,14 +66,17 @@ export default function InvestorsTable() {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-white text-2xl font-bold">Investors</h1>
           <p className="text-[#666] text-sm mt-1">{investors.length} investors · ₹{(totalInvested / 100000).toFixed(1)}L total invested · ₹{(totalPending / 100000).toFixed(1)}L pending payouts</p>
         </div>
-        <Link href="/investors/new" className="px-4 py-2.5 rounded-xl bg-[#6C5CE7] hover:bg-[#7d6df0] text-white text-sm font-semibold transition-colors shrink-0">
-          + Add Investor
-        </Link>
+        <div className="flex flex-wrap items-center gap-3">
+          <ExportButton filename="investors" columns={cols} rows={sorted} />
+          <Link href="/investors/new" className="px-4 py-2.5 rounded-xl bg-[#6C5CE7] hover:bg-[#7d6df0] text-white text-sm font-semibold transition-colors shrink-0">
+            + Add Investor
+          </Link>
+        </div>
       </div>
 
       {/* Bank verification notifications */}

@@ -75,7 +75,7 @@ export default function DueSoonTable() {
                 return (
                   <tr key={r.id} className="border-b border-[#1a1a2a] hover:bg-white/[0.02] transition-colors">
                     <td className="px-5 py-3">
-                      <span className="font-mono text-xs text-[#6C5CE7] font-semibold">{r.rider_code ?? "—"}</span>
+                      <Link href={`/riders/${r.id}`} className="font-mono text-xs text-[#6C5CE7] font-semibold hover:underline">{r.rider_code ?? "—"}</Link>
                     </td>
                     <td className="px-5 py-3">
                       <Link href={`/riders/${r.id}`} className="text-white font-medium hover:text-[#6C5CE7] hover:underline transition-colors">{r.name}</Link>

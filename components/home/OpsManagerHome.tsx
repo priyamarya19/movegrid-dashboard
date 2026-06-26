@@ -16,7 +16,7 @@ const getStats = unstable_cache(async function getStats() {
     pool.query(`SELECT status, COUNT(*) FROM ${schemas.ops}.vehicles GROUP BY status`),
     pool.query(`
       SELECT r.id, r.name, r.mobile, r.status, r.created_at,
-             v.ev_number, h.hub_name
+             v.ev_number, v.id AS vehicle_id, h.hub_name
       FROM ${schemas.ops}.riders r
       LEFT JOIN ${schemas.ops}.rider_vehicle_assignments rva ON rva.rider_id = r.id AND rva.status = 'active'
       LEFT JOIN ${schemas.ops}.vehicles v ON v.id = rva.vehicle_id
@@ -184,14 +184,14 @@ export default async function OpsManagerHome() {
             <tbody>
               {recentRiders.length === 0 ? (
                 <tr><td colSpan={6} className="px-5 py-8 text-center text-[#555]">No riders yet</td></tr>
-              ) : recentRiders.map((r: { id: string; name: string; mobile: string; status: string; created_at: string; ev_number: string; hub_name: string }) => (
+              ) : recentRiders.map((r: { id: string; name: string; mobile: string; status: string; created_at: string; ev_number: string; vehicle_id: string; hub_name: string }) => (
                 <tr key={r.id} className="border-b border-[#1a1a2a] hover:bg-white/[0.02]">
                   <td className="px-5 py-3">
                     <Link href={`/riders/${r.id}`} className="text-white font-medium hover:text-[#6C5CE7] hover:underline">{r.name}</Link>
                   </td>
                   <td className="px-5 py-3 text-[#aaa]">{r.mobile}</td>
                   <td className="px-5 py-3 text-[#aaa]">{r.hub_name ?? "—"}</td>
-                  <td className="px-5 py-3 text-[#6C5CE7]">{r.ev_number ?? "—"}</td>
+                  <td className="px-5 py-3">{r.vehicle_id ? <Link href={`/vehicles/${r.vehicle_id}`} className="text-[#6C5CE7] hover:underline">{r.ev_number}</Link> : <span className="text-[#555]">—</span>}</td>
                   <td className="px-5 py-3">
                     <span className={`px-2 py-0.5 rounded-full text-xs capitalize ${statusColor[r.status] ?? "bg-gray-500/20 text-gray-400"}`}>{r.status}</span>
                   </td>

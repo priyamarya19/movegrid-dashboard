@@ -8,6 +8,7 @@ import BackButton from "@/components/BackButton";
 import BlacklistButton from "@/components/riders/BlacklistButton";
 import RentMarkPaid from "@/components/riders/RentMarkPaid";
 import { getRiderCycle } from "@/lib/rent";
+import ExportButton from "@/components/ExportButton";
 import { getSession } from "@/lib/auth";
 import { EXPECTED_RENT } from "@/lib/rentConstants";
 
@@ -239,6 +240,7 @@ export default async function RiderDetailPage({ params }: { params: Promise<{ id
           <div className="bg-[#12121A] border border-[#1e1e2e] rounded-xl p-5 space-y-3">
             <h2 className="text-white font-semibold mb-4">Rider Details</h2>
             {[
+              { label: "Onboarded", value: rider.created_at ? new Date(rider.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "—" },
               { label: "Mobile", value: rider.mobile },
               { label: "Employer", value: rider.employer ?? "—" },
               { label: "Aadhaar", value: rider.aadhaar ? "XXXX XXXX " + rider.aadhaar.slice(-4) : "—" },
@@ -402,9 +404,16 @@ export default async function RiderDetailPage({ params }: { params: Promise<{ id
 
         {/* Rent cycle — full unbroken weekly ledger (no gaps; stops at return) */}
         <div className="bg-[#12121A] border border-[#1e1e2e] rounded-xl overflow-hidden">
-          <div className="px-5 py-4 border-b border-[#1e1e2e] flex items-center justify-between">
+          <div className="px-5 py-4 border-b border-[#1e1e2e] flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-white font-semibold">Rent Cycle</h2>
-            <span className="text-[11px] text-[#555]">{cycle.length} week{cycle.length !== 1 ? "s" : ""} · every week shown until the bike is returned</span>
+            <div className="flex items-center gap-3">
+              <span className="text-[11px] text-[#555]">{cycle.length} week{cycle.length !== 1 ? "s" : ""} · shown until the bike is returned</span>
+              <ExportButton filename={`rent-cycle-${rider.rider_code ?? rider.mobile}`} rows={cycle} columns={[
+                { label: "Week", key: "week_no" }, { label: "Period start", key: "period_start" }, { label: "Period end", key: "period_end" },
+                { label: "Due date", key: "due_date" }, { label: "Vehicle", key: "ev_number" }, { label: "Rent", key: "amount" },
+                { label: "Paid", key: "paid" }, { label: "Status", key: "status" },
+              ]} />
+            </div>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -431,7 +440,7 @@ export default async function RiderDetailPage({ params }: { params: Promise<{ id
                       <td className="px-5 py-3 text-[#aaa]">{w.week_no}</td>
                       <td className="px-5 py-3 text-[#ccc] whitespace-nowrap">{fmtD(w.period_start)} – {fmtD(w.period_end)}</td>
                       <td className="px-5 py-3 text-[#aaa] whitespace-nowrap">{fmtD(w.due_date)}</td>
-                      <td className="px-5 py-3 text-[#6C5CE7]">{w.ev_number ?? "—"}</td>
+                      <td className="px-5 py-3">{w.vehicle_id ? <Link href={`/vehicles/${w.vehicle_id}`} className="text-[#6C5CE7] hover:underline">{w.ev_number ?? "—"}</Link> : <span className="text-[#555]">{w.ev_number ?? "—"}</span>}</td>
                       <td className="px-5 py-3 text-white">₹{Math.round(w.amount).toLocaleString("en-IN")}</td>
                       <td className="px-5 py-3"><span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${color}`}>{w.status}</span></td>
                       <td className="px-5 py-3">

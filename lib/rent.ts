@@ -25,14 +25,14 @@ const STATUS_EXPR = `
 
 export type CycleWeek = {
   week_no: number; period_start: string; period_end: string; due_date: string;
-  amount: number; paid: number; status: string; ev_number: string | null;
+  amount: number; paid: number; status: string; ev_number: string | null; vehicle_id: string | null;
 };
 
 // Full unbroken weekly cycle for one rider (across all their assignments).
 export async function getRiderCycle(riderId: string): Promise<CycleWeek[]> {
   const S = schemas.ops;
   const res = await pool.query(`
-    SELECT week_no, period_start, period_end, due_date, amount, paid, ev_number,
+    SELECT week_no, period_start, period_end, due_date, amount, paid, ev_number, vehicle_id,
       CASE WHEN paid >= amount THEN 'Collected'
            WHEN paid > 0 THEN 'Partial'
            WHEN due_dt < ${IST} THEN 'Overdue'
@@ -42,7 +42,7 @@ export async function getRiderCycle(riderId: string): Promise<CycleWeek[]> {
         to_char(d.period_start,'YYYY-MM-DD') AS period_start,
         to_char(d.period_end,'YYYY-MM-DD') AS period_end,
         to_char(d.due_date,'YYYY-MM-DD') AS due_date,
-        d.due_date AS due_dt,
+        d.due_date AS due_dt, d.vehicle_id,
         d.amount, ${PAID_SUBQ(S)} AS paid, v.ev_number, a.assigned_date
       FROM ${S}.rent_dues d
       JOIN ${S}.rider_vehicle_assignments a ON a.id = d.assignment_id
@@ -52,7 +52,7 @@ export async function getRiderCycle(riderId: string): Promise<CycleWeek[]> {
     ORDER BY assigned_date, period_start`, [riderId]);
   return res.rows.map((r) => ({
     week_no: r.week_no, period_start: r.period_start, period_end: r.period_end, due_date: r.due_date,
-    amount: Number(r.amount), paid: Number(r.paid), status: r.status, ev_number: r.ev_number,
+    amount: Number(r.amount), paid: Number(r.paid), status: r.status, ev_number: r.ev_number, vehicle_id: r.vehicle_id,
   }));
 }
 

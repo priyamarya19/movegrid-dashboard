@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getLedgerSummary, getOverdueRiders } from "@/lib/rent";
+import ExportButton from "@/components/ExportButton";
 
 const rupee = (n: number) => "₹" + Math.round(n).toLocaleString("en-IN");
 
@@ -39,8 +40,12 @@ export default async function PendingRentTable() {
       </div>
 
       <div className="bg-[#12121A] border border-[#1e1e2e] rounded-2xl overflow-hidden">
-        <div className="px-5 py-4 border-b border-[#1e1e2e]">
+        <div className="px-5 py-4 border-b border-[#1e1e2e] flex items-center justify-between gap-3">
           <p className="text-white font-semibold">{riders.length} rider{riders.length !== 1 ? "s" : ""} with pending rent</p>
+          <ExportButton filename="overdue-rent" rows={riders} columns={[
+            { label: "User ID", key: "rider_code" }, { label: "Name", key: "name" }, { label: "Mobile", key: "mobile" },
+            { label: "Overdue weeks", key: "days" }, { label: "Overdue amount", key: "pending" },
+          ]} />
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -56,7 +61,7 @@ export default async function PendingRentTable() {
                 <tr><td colSpan={5} className="px-5 py-10 text-center text-[#555]">No overdue rent — fully collected 🎉</td></tr>
               ) : riders.map((r) => (
                 <tr key={r.rider_id} className="border-b border-[#1a1a2a] hover:bg-white/[0.02] transition-colors">
-                  <td className="px-5 py-3"><span className="font-mono text-xs text-[#6C5CE7] font-semibold">{r.rider_code ?? "—"}</span></td>
+                  <td className="px-5 py-3"><Link href={`/riders/${r.rider_id}`} className="font-mono text-xs text-[#6C5CE7] font-semibold hover:underline">{r.rider_code ?? "—"}</Link></td>
                   <td className="px-5 py-3"><Link href={`/riders/${r.rider_id}`} className="text-white font-medium hover:text-[#6C5CE7] hover:underline transition-colors">{r.name}</Link></td>
                   <td className="px-5 py-3 text-[#aaa]">{r.mobile}</td>
                   <td className="px-5 py-3 text-[#aaa]">{r.days}</td>

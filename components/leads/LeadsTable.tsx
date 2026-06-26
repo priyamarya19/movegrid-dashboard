@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import ExportButton from "@/components/ExportButton";
 
 type Lead = {
   id: string; type: string; name: string; phone: string;
@@ -85,9 +86,10 @@ export default function LeadsTable() {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <h1 className="text-white text-2xl font-bold">Leads</h1>
-        <div className="flex gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <ExportButton filename="leads" columns={cols} rows={sorted} />
           <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}
             className="bg-[#111118] border border-white/10 rounded-xl px-3 py-2 text-sm text-gray-300 focus:outline-none focus:border-[#00C48C]">
             <option value="">All Types</option>

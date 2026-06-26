@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import ExportButton from "@/components/ExportButton";
 
 type Log = {
   id: string; action: string; entity: string; entity_id: string;
@@ -71,16 +72,19 @@ export default function LogsTable() {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-white text-2xl font-bold">Audit Logs</h1>
           <p className="text-[#666] text-sm mt-1">{logs.length} entries — complete activity trail</p>
         </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <ExportButton filename="audit-logs" columns={cols} rows={sorted} />
         <select value={filter} onChange={(e) => setFilter(e.target.value)}
           className="bg-[#12121A] border border-[#1e1e2e] rounded-xl px-3 py-2 text-sm text-gray-300 focus:outline-none focus:border-[#6C5CE7]">
           <option value="">All Actions</option>
           {actions.map((a) => <option key={a} value={a}>{a.replace(/_/g, " ")}</option>)}
         </select>
+        </div>
       </div>
 
       <div className="bg-[#12121A] border border-[#1e1e2e] rounded-2xl overflow-hidden">
