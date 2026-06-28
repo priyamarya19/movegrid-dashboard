@@ -3,6 +3,7 @@ import { schemas } from "@/lib/schemas";
 import { unstable_cache } from "next/cache";
 import Link from "next/link";
 import { getLedgerSummary } from "@/lib/rent";
+import { VSTATUS } from "@/lib/vehicleStatus";
 
 const fmt = (n: number) => {
   if (n >= 100000) return "₹" + (n / 100000).toFixed(1) + "L";
@@ -108,8 +109,8 @@ export default async function OpsManagerHome() {
         {[
           { label: "Active Riders", value: rMap["active"] ?? 0, color: "#00D1B2", href: "/riders?status=active" },
           { label: "Pending KYC", value: rMap["pending"] ?? 0, color: "#fdcb6e", href: "/riders?status=pending" },
-          { label: "Vehicles Deployed", value: vMap["assigned"] ?? 0, color: "#6C5CE7", href: "/vehicles?status=assigned" },
-          { label: "Available Vehicles", value: vMap["available"] ?? 0, color: "#a29bfe", href: "/vehicles?status=available" },
+          { label: "Vehicles Deployed", value: vMap[VSTATUS.assigned] ?? 0, color: "#6C5CE7", href: `/vehicles?status=${VSTATUS.assigned}` },
+          { label: "Available Vehicles", value: vMap[VSTATUS.available] ?? 0, color: "#a29bfe", href: `/vehicles?status=${VSTATUS.available}` },
           { label: "Overdue Rent", value: overdueCount, color: "#ff6b6b", href: "/riders/overdue" },
           { label: "Due in 2 Days", value: dueSoonCount, color: "#fdcb6e", href: "/riders/due-soon" },
         ].map((c) => (
@@ -151,9 +152,9 @@ export default async function OpsManagerHome() {
         <p className="text-white font-semibold mb-4">Fleet Utilisation</p>
         <div className="space-y-3">
           {[
-            { label: "Assigned", color: "#00D1B2", val: vMap["assigned"] ?? 0 },
-            { label: "Available", color: "#a29bfe", val: vMap["available"] ?? 0 },
-            { label: "Maintenance", color: "#fdcb6e", val: vMap["maintenance"] ?? 0 },
+            { label: "Assigned", color: "#00D1B2", val: vMap[VSTATUS.assigned] ?? 0 },
+            { label: "Available", color: "#a29bfe", val: vMap[VSTATUS.available] ?? 0 },
+            { label: "Maintenance", color: "#fdcb6e", val: vMap[VSTATUS.maintenance] ?? 0 },
           ].map((row) => (
             <div key={row.label} className="flex items-center gap-3 text-sm">
               <span className="w-24 text-sm shrink-0" style={{ color: row.color }}>{row.label}</span>

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import ExportButton from "@/components/ExportButton";
+import { VSTATUS, VEHICLE_FILTERS, vehicleStatusColor, vehicleStatusLabel } from "@/lib/vehicleStatus";
 
 type Vehicle = {
   id: string; ev_number: string; status: string;
@@ -14,14 +15,6 @@ type Vehicle = {
 };
 
 type Sort = { key: string; dir: "asc" | "desc" };
-
-const statusColor: Record<string, string> = {
-  assigned: "bg-green-500/20 text-green-400",
-  available: "bg-blue-500/20 text-blue-400",
-  maintenance: "bg-yellow-500/20 text-yellow-400",
-  retired: "bg-gray-500/20 text-gray-400",
-  blocked: "bg-red-500/20 text-red-400",
-};
 
 const cols: { label: string; key: string }[] = [
   { label: "EV Number", key: "ev_number" },
@@ -75,17 +68,13 @@ export default function VehiclesTable() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-white text-2xl font-bold">Vehicles</h1>
-          <p className="text-[#666] text-sm mt-1">{vehicles.length} total • {counts["assigned"] || 0} assigned · {counts["available"] || 0} available · {counts["maintenance"] || 0} maintenance</p>
+          <p className="text-[#666] text-sm mt-1">{vehicles.length} total • {counts[VSTATUS.assigned] || 0} assigned · {counts[VSTATUS.available] || 0} available · {counts[VSTATUS.maintenance] || 0} maintenance</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <ExportButton filename="vehicles" columns={cols} rows={sorted} />
           <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
             className="bg-[#12121A] border border-[#1e1e2e] rounded-xl px-3 py-2 text-sm text-gray-300 focus:outline-none focus:border-[#6C5CE7]">
-            <option value="">All Status</option>
-            <option value="assigned">Assigned</option>
-            <option value="available">Available</option>
-            <option value="maintenance">Maintenance</option>
-            <option value="blocked">Blocked</option>
+            {VEHICLE_FILTERS.map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}
           </select>
           <Link href="/vehicles/new"
             className="inline-flex items-center gap-2 bg-[#6C5CE7] hover:bg-[#7c6cf7] text-white text-sm font-medium px-4 py-2 rounded-xl transition-colors">
@@ -132,7 +121,7 @@ export default function VehiclesTable() {
                   <td className="px-5 py-3 text-[#555] text-xs">{v.purchase_date ? new Date(v.purchase_date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "—"}</td>
                   <td className="px-5 py-3 text-[#fdcb6e]">{v.price ? "₹" + Number(v.price).toLocaleString() : "—"}</td>
                   <td className="px-5 py-3">
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize ${statusColor[v.status] ?? "bg-gray-500/20 text-gray-400"}`}>{v.status}</span>
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${vehicleStatusColor[v.status] ?? "bg-gray-500/20 text-gray-400"}`}>{vehicleStatusLabel(v.status)}</span>
                   </td>
                 </tr>
               ))}

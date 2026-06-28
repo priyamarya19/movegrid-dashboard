@@ -2,6 +2,7 @@ import pool from "@/lib/db";
 import { schemas } from "@/lib/schemas";
 import { unstable_cache } from "next/cache";
 import Link from "next/link";
+import { VSTATUS } from "@/lib/vehicleStatus";
 
 type Props = { name: string };
 
@@ -19,8 +20,8 @@ const getStats = unstable_cache(async function getStats() {
   return {
     activeRiders: rMap["active"] ?? 0,
     pendingRiders: rMap["pending"] ?? 0,
-    assignedVehicles: vMap["assigned"] ?? 0,
-    availableVehicles: vMap["available"] ?? 0,
+    assignedVehicles: vMap[VSTATUS.assigned] ?? 0,
+    availableVehicles: vMap[VSTATUS.available] ?? 0,
   };
 }, ["hub-stats"], { revalidate: 60 });
 
@@ -68,7 +69,7 @@ export default async function HubInchargeHome({ name }: Props) {
           { label: "Active Riders", value: stats.activeRiders, color: "#00D1B2", href: "/riders?status=active" },
           { label: "Pending KYC", value: stats.pendingRiders, color: "#fdcb6e", href: "/riders?status=pending" },
           { label: "Vehicles Deployed", value: stats.assignedVehicles, color: "#6C5CE7", href: "/vehicles?status=assigned" },
-          { label: "Available Vehicles", value: stats.availableVehicles, color: "#a29bfe", href: "/vehicles?status=available" },
+          { label: "Available Vehicles", value: stats.availableVehicles, color: "#a29bfe", href: `/vehicles?status=${VSTATUS.available}` },
         ].map((c) => (
           <Link key={c.label} href={c.href} className="bg-[#12121A] border border-[#1e1e2e] rounded-xl p-5 hover:border-[#333] transition-colors">
             <p className="text-[11px] text-[#555] uppercase tracking-wider mb-2">{c.label}</p>

@@ -6,6 +6,7 @@ import RidersChart from "@/components/charts/RidersChart";
 import VehicleDonut from "@/components/charts/VehicleDonut";
 import PendingPayoutsWidget from "@/components/home/PendingPayoutsWidget";
 import { getLedgerSummary } from "@/lib/rent";
+import { VSTATUS } from "@/lib/vehicleStatus";
 
 type Props = { role: string; name: string };
 
@@ -30,9 +31,9 @@ const getStats = unstable_cache(async function getStats() {
   riders.rows.forEach((r: { status: string; count: string }) => { rMap[r.status] = Number(r.count); });
 
   return {
-    assignedVehicles: vMap["assigned"] ?? 0,
-    availableVehicles: vMap["available"] ?? 0,
-    maintenanceVehicles: vMap["maintenance"] ?? 0,
+    assignedVehicles: vMap[VSTATUS.assigned] ?? 0,
+    availableVehicles: vMap[VSTATUS.available] ?? 0,
+    maintenanceVehicles: vMap[VSTATUS.maintenance] ?? 0,
     totalVehicles,
     activeRiders: rMap["active"] ?? 0,
     inactiveRiders: rMap["inactive"] ?? 0,
@@ -220,8 +221,8 @@ export default async function AdminHome({ role, name }: Props) {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             {[
               { label: "Deployed", value: stats.assignedVehicles, sub: `of ${stats.totalVehicles} total`, accent: "#00D1B2", href: "/vehicles?status=assigned" },
-              { label: "Available", value: stats.availableVehicles, sub: "ready to deploy", accent: "#a29bfe", href: "/vehicles?status=available" },
-              { label: "Maintenance", value: stats.maintenanceVehicles, sub: "under service", accent: "#fdcb6e", href: "/vehicles?status=maintenance" },
+              { label: "Available", value: stats.availableVehicles, sub: "ready to deploy", accent: "#a29bfe", href: `/vehicles?status=${VSTATUS.available}` },
+              { label: "Maintenance", value: stats.maintenanceVehicles, sub: "under service", accent: "#fdcb6e", href: `/vehicles?status=${VSTATUS.maintenance}` },
               { label: "Active Riders", value: stats.activeRiders, sub: `${stats.pendingRiders} pending KYC`, accent: "#6C5CE7", href: "/riders?status=active" },
             ].map((c) => (
               <Link key={c.label} href={c.href} className="bg-[#12121A] border border-[#1e1e2e] rounded-xl p-5 relative overflow-hidden hover:border-[#333] hover:bg-[#16161f] transition-colors block">
