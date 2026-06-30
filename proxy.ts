@@ -19,9 +19,25 @@ export async function proxy(req: NextRequest) {
     return NextResponse.next();
   }
 
+  // Mobile apps authenticate with a Bearer token (no cookie). Honour it so API
+  // routes aren't redirected to /login. Route handlers re-check via getSession().
+  const authHeader = req.headers.get("authorization");
+  if (authHeader?.startsWith("Bearer ")) {
+    try {
+      await jwtVerify(authHeader.slice(7), secret);
+      return NextResponse.next();
+    } catch {
+      // Fall through to the cookie check / redirect below.
+    }
+  }
+
   const token = req.cookies.get("mg_token")?.value;
 
   if (!token) {
+    // API clients should get a 401 (JSON), not an HTML redirect to /login.
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     return NextResponse.redirect(new URL("/login", req.url));
   }
 
@@ -29,6 +45,9 @@ export async function proxy(req: NextRequest) {
     await jwtVerify(token, secret);
     return NextResponse.next();
   } catch {
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     return NextResponse.redirect(new URL("/login", req.url));
   }
 }

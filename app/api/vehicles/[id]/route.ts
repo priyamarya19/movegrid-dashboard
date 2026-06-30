@@ -63,7 +63,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   // --- Status change ---
   if (body.status !== undefined) {
-    if (!["admin", "ops_manager"].includes(session.role)) {
+    if (!["admin", "ops_manager", "hub_incharge"].includes(session.role)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
     if (!OPS_STATUSES.includes(body.status)) {

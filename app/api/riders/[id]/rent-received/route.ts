@@ -10,21 +10,25 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   }
   const { id } = await params;
-  const { amount, period_start, period_end } = await req.json();
+  const { amount, period_start, period_end, payment_screenshot_url, vehicle_id: bodyVehicleId } = await req.json();
 
-  // Get active vehicle for this rider
-  const asgn = await pool.query(
-    `SELECT vehicle_id FROM ${schemas.ops}.rider_vehicle_assignments WHERE rider_id = $1 AND status = 'active' LIMIT 1`,
-    [id]
-  );
-  const vehicle_id = asgn.rows[0]?.vehicle_id ?? null;
+  // Vehicle for the payment: the caller may pass the week's vehicle_id (for a past
+  // period); otherwise fall back to the rider's currently active assignment.
+  let vehicle_id: string | null = bodyVehicleId ?? null;
+  if (!vehicle_id) {
+    const asgn = await pool.query(
+      `SELECT vehicle_id FROM ${schemas.ops}.rider_vehicle_assignments WHERE rider_id = $1 AND status = 'active' LIMIT 1`,
+      [id]
+    );
+    vehicle_id = asgn.rows[0]?.vehicle_id ?? null;
+  }
 
   await pool.query(
     `INSERT INTO ${schemas.ops}.rider_payments
-      (rider_id, vehicle_id, amount_collected, payment_date, rental_period_start, rental_period_end, recorded_by_employee_id)
-     VALUES ($1, $2, $3, CURRENT_DATE, $4, $5,
-       (SELECT id FROM ${schemas.auth}.users WHERE name = $6 LIMIT 1))`,
-    [id, vehicle_id, amount ?? 0, period_start, period_end, session.name]
+      (rider_id, vehicle_id, amount_collected, payment_date, rental_period_start, rental_period_end, payment_screenshot_url, recorded_by_employee_id)
+     VALUES ($1, $2, $3, CURRENT_DATE, $4, $5, $6,
+       (SELECT id FROM ${schemas.auth}.users WHERE name = $7 LIMIT 1))`,
+    [id, vehicle_id, amount ?? 0, period_start, period_end, payment_screenshot_url ?? null, session.name]
   );
 
   return NextResponse.json({ ok: true });
