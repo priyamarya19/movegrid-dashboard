@@ -7,6 +7,7 @@ import BackButton from "@/components/BackButton";
 import { getSession } from "@/lib/auth";
 import MapVehiclesPanel from "@/components/investors/MapVehiclesPanel";
 import RecordPayoutModal from "@/components/investors/RecordPayoutModal";
+import { vehicleStatusColor, vehicleStatusLabel } from "@/lib/vehicleStatus";
 
 async function getData(id: string) {
   const [investor, vehicles, payouts] = await Promise.all([
@@ -56,12 +57,6 @@ const payoutStatus: Record<string, string> = {
   paid: "bg-green-500/20 text-green-400",
   pending: "bg-yellow-500/20 text-yellow-400",
   delayed: "bg-red-500/20 text-red-400",
-};
-
-const vehicleStatus: Record<string, string> = {
-  assigned: "bg-green-500/20 text-green-400",
-  available: "bg-blue-500/20 text-blue-400",
-  maintenance: "bg-yellow-500/20 text-yellow-400",
 };
 
 export default async function InvestorDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -154,7 +149,7 @@ export default async function InvestorDetailPage({ params }: { params: Promise<{
                       ) : <span className="text-[#555] text-xs">—</span>}
                     </td>
                     <td className="px-5 py-3">
-                      <span className={`px-2 py-0.5 rounded-full text-xs capitalize ${vehicleStatus[v.status] ?? "bg-gray-500/20 text-gray-400"}`}>{v.status}</span>
+                      <span className={`px-2 py-0.5 rounded-full text-xs ${vehicleStatusColor[v.status] ?? "bg-gray-500/20 text-gray-400"}`}>{vehicleStatusLabel(v.status)}</span>
                     </td>
                   </tr>
                 ))}

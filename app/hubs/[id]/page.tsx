@@ -4,6 +4,7 @@ import DashboardLayout from "@/components/DashboardLayout";
 import pool from "@/lib/db";
 import { schemas } from "@/lib/schemas";
 import BackButton from "@/components/BackButton";
+import { vehicleStatusColor, vehicleStatusLabel } from "@/lib/vehicleStatus";
 
 async function getData(id: string) {
   const [hub, riders, vehicles] = await Promise.all([
@@ -45,11 +46,6 @@ const riderStatus: Record<string, string> = {
   pending: "bg-yellow-500/20 text-yellow-400",
 };
 
-const vehicleStatus: Record<string, string> = {
-  assigned: "bg-green-500/20 text-green-400",
-  available: "bg-blue-500/20 text-blue-400",
-  maintenance: "bg-yellow-500/20 text-yellow-400",
-};
 
 export default async function HubDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -197,7 +193,7 @@ export default async function HubDetailPage({ params }: { params: Promise<{ id: 
                     ) : <span className="text-[#555]">—</span>}
                   </td>
                   <td className="px-5 py-3">
-                    <span className={`px-2 py-0.5 rounded-full text-xs capitalize ${vehicleStatus[v.status] ?? "bg-gray-500/20 text-gray-400"}`}>{v.status}</span>
+                    <span className={`px-2 py-0.5 rounded-full text-xs ${vehicleStatusColor[v.status] ?? "bg-gray-500/20 text-gray-400"}`}>{vehicleStatusLabel(v.status)}</span>
                   </td>
                 </tr>
               ))}

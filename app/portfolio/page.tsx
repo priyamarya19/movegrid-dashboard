@@ -5,17 +5,12 @@ import { getSession } from "@/lib/auth";
 import { getPortfolioByUser } from "@/lib/portfolio";
 import { maskMobile, maskAadhaar } from "@/lib/mask";
 import RevealNumberButton from "@/components/investors/RevealNumberButton";
+import { vehicleStatusColor, vehicleStatusLabel } from "@/lib/vehicleStatus";
 
 const payoutStatus: Record<string, string> = {
   paid: "bg-green-500/20 text-green-400",
   pending: "bg-yellow-500/20 text-yellow-400",
   delayed: "bg-red-500/20 text-red-400",
-};
-
-const vehicleStatus: Record<string, string> = {
-  assigned: "bg-green-500/20 text-green-400",
-  available: "bg-blue-500/20 text-blue-400",
-  maintenance: "bg-yellow-500/20 text-yellow-400",
 };
 
 const fmtDate = (d: string | null) =>
@@ -115,7 +110,7 @@ function PortfolioView({
                   </td>
                   <td className="px-5 py-3 text-[#aaa] text-xs tabular-nums">{maskAadhaar(v.rider_aadhaar) || "—"}</td>
                   <td className="px-5 py-3">
-                    <span className={`px-2 py-0.5 rounded-full text-xs capitalize ${vehicleStatus[v.status] ?? "bg-gray-500/20 text-gray-400"}`}>{v.status}</span>
+                    <span className={`px-2 py-0.5 rounded-full text-xs ${vehicleStatusColor[v.status] ?? "bg-gray-500/20 text-gray-400"}`}>{vehicleStatusLabel(v.status)}</span>
                   </td>
                 </tr>
               ))}
