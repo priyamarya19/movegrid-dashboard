@@ -17,10 +17,12 @@ const PAID_SUBQ = (S: string) => `
       AND (rp.payment_date BETWEEN d.period_start AND d.period_end
         OR rp.rental_period_start BETWEEN d.period_start AND d.period_end)), 0)`;
 
+// A week is Overdue only once it has STARTED before today — the week that starts today is
+// still 'Pending' (its rent isn't chased yet), matching the collection sheet's cutoff.
 const STATUS_EXPR = `
   CASE WHEN paid >= amount THEN 'Collected'
        WHEN paid > 0 THEN 'Partial'
-       WHEN due_date < ${IST} THEN 'Overdue'
+       WHEN period_start < ${IST} THEN 'Overdue'
        ELSE 'Pending' END`;
 
 export type CycleWeek = {
@@ -35,14 +37,14 @@ export async function getRiderCycle(riderId: string): Promise<CycleWeek[]> {
     SELECT week_no, period_start, period_end, due_date, amount, paid, ev_number, vehicle_id,
       CASE WHEN paid >= amount THEN 'Collected'
            WHEN paid > 0 THEN 'Partial'
-           WHEN due_dt < ${IST} THEN 'Overdue'
+           WHEN ps_dt < ${IST} THEN 'Overdue'
            ELSE 'Pending' END AS status
     FROM (
       SELECT d.week_no,
         to_char(d.period_start,'YYYY-MM-DD') AS period_start,
         to_char(d.period_end,'YYYY-MM-DD') AS period_end,
         to_char(d.due_date,'YYYY-MM-DD') AS due_date,
-        d.due_date AS due_dt, d.vehicle_id,
+        d.period_start AS ps_dt, d.vehicle_id,
         d.amount, ${PAID_SUBQ(S)} AS paid, v.ev_number, a.assigned_date
       FROM ${S}.rent_dues d
       JOIN ${S}.rider_vehicle_assignments a ON a.id = d.assignment_id
@@ -61,13 +63,13 @@ export const getLedgerSummary = unstable_cache(async function getLedgerSummary()
   const S = schemas.ops;
   const res = await pool.query(`
     WITH q AS (
-      SELECT d.amount, d.due_date, ${PAID_SUBQ(S)} AS paid FROM ${S}.rent_dues d
+      SELECT d.amount, d.period_start, ${PAID_SUBQ(S)} AS paid FROM ${S}.rent_dues d
     )
     SELECT
-      COALESCE(SUM(amount) FILTER (WHERE due_date <= ${IST}), 0) AS expected_to_date,
+      COALESCE(SUM(amount) FILTER (WHERE period_start < ${IST}), 0) AS expected_to_date,
       COALESCE(SUM(LEAST(paid, amount)), 0) AS collected,
-      COALESCE(SUM(amount) FILTER (WHERE due_date < ${IST} AND paid < amount), 0) AS overdue,
-      COUNT(*) FILTER (WHERE due_date < ${IST} AND paid < amount) AS overdue_weeks
+      COALESCE(SUM(amount - LEAST(paid, amount)) FILTER (WHERE period_start < ${IST} AND paid < amount), 0) AS overdue,
+      COUNT(*) FILTER (WHERE period_start < ${IST} AND paid < amount) AS overdue_weeks
     FROM q`);
   const r = res.rows[0];
   const expected = Number(r.expected_to_date), collected = Number(r.collected);
@@ -83,14 +85,14 @@ export const getOverdueRiders = unstable_cache(async function getOverdueRiders()
   const S = schemas.ops;
   const res = await pool.query(`
     WITH q AS (
-      SELECT d.rider_id, d.amount, d.due_date, ${PAID_SUBQ(S)} AS paid FROM ${S}.rent_dues d
+      SELECT d.rider_id, d.amount, d.period_start, ${PAID_SUBQ(S)} AS paid FROM ${S}.rent_dues d
     )
     SELECT r.id AS rider_id, r.rider_code, r.name, r.mobile,
-      COUNT(*) FILTER (WHERE due_date < ${IST} AND paid < amount) AS overdue_weeks,
-      COALESCE(SUM(amount - LEAST(paid, amount)) FILTER (WHERE due_date < ${IST} AND paid < amount), 0) AS overdue_amount
+      COUNT(*) FILTER (WHERE period_start < ${IST} AND paid < amount) AS overdue_weeks,
+      COALESCE(SUM(amount - LEAST(paid, amount)) FILTER (WHERE period_start < ${IST} AND paid < amount), 0) AS overdue_amount
     FROM q JOIN ${S}.riders r ON r.id = q.rider_id
     GROUP BY r.id, r.rider_code, r.name, r.mobile
-    HAVING COUNT(*) FILTER (WHERE due_date < ${IST} AND paid < amount) > 0
+    HAVING COUNT(*) FILTER (WHERE period_start < ${IST} AND paid < amount) > 0
     ORDER BY overdue_amount DESC`);
   return res.rows.map((r) => ({
     rider_id: r.rider_id, rider_code: r.rider_code, name: r.name, mobile: r.mobile,
