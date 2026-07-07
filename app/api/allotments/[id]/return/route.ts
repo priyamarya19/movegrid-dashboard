@@ -42,6 +42,16 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       ]
     );
 
+    // Record a penalty (if any) against the rider, frozen to the submitted vehicle + assignment.
+    const hasPenaltyAmt = b.penalty_amount != null && b.penalty_amount !== "";
+    if (b.penalty_detail || hasPenaltyAmt) {
+      await client.query(
+        `INSERT INTO ${schemas.ops}.rider_penalties (rider_id, vehicle_id, assignment_id, amount, detail, status, created_by)
+         VALUES ($1, $2, $3, $4, $5, 'pending', $6)`,
+        [rider_id, vehicle_id, id, hasPenaltyAmt ? Number(b.penalty_amount) : null, b.penalty_detail || null, session.name]
+      );
+    }
+
     // Update vehicle → returned (awaiting ops inspection; not allottable until ready_to_deploy)
     await client.query(
       `UPDATE ${schemas.ops}.vehicles SET status = 'returned' WHERE id = $1`, [vehicle_id]

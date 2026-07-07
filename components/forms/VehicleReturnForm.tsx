@@ -37,6 +37,7 @@ export default function VehicleReturnForm() {
   const [form, setForm] = useState({
     rent_cleared: "" as "" | "true" | "false",
     penalty_amount: "",
+    penalty_detail: "",
     condition_on_return: [] as string[],
     return_remarks: "",
     return_photos: ["", "", ""],
@@ -87,6 +88,7 @@ export default function VehicleReturnForm() {
           returned_date: form.returned_date,
           rent_cleared: form.rent_cleared === "true" ? true : form.rent_cleared === "false" ? false : null,
           penalty_amount: form.penalty_amount ? Number(form.penalty_amount) : null,
+          penalty_detail: form.penalty_detail || null,
           condition_on_return: form.condition_on_return.length ? form.condition_on_return : null,
           return_photos: photos.length ? photos : null,
           return_remarks: form.return_remarks || null,
@@ -135,6 +137,7 @@ export default function VehicleReturnForm() {
           </select>
         </Field>
         <Field label="Penalty Amount (₹)"><input type="number" className={inp} value={form.penalty_amount} onChange={e => set("penalty_amount", e.target.value)} placeholder="0" /></Field>
+        <Field label="Penalty Details" hint="Damaged parts / reason — saved to the rider's penalties"><input className={inp} value={form.penalty_detail} onChange={e => set("penalty_detail", e.target.value)} placeholder="e.g. Front fender, handle T band" /></Field>
         <Field label="Any Remarks"><input className={inp} value={form.return_remarks} onChange={e => set("return_remarks", e.target.value)} placeholder="Notes on return..." /></Field>
 
         <Section title="Scooter Condition" />
