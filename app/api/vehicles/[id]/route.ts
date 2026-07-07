@@ -1,13 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { schemas } from "@/lib/schemas";
-import { getSession } from "@/lib/auth";
+import { requireRole, requireSession, forbiddenResponse } from "@/lib/auth";
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const session = await getSession(req);
-  if (!session || !["admin", "ops_manager", "hub_incharge"].includes(session.role)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
-  }
+  const guard = await requireRole(req);
+  if ("response" in guard) return guard.response;
 
   const { id } = await params;
 
@@ -55,8 +53,9 @@ const OPS_STATUSES = ["under_maintenance", "mechanically_ok", "ready_to_deploy"]
 
 // PATCH handles: (a) vehicle status change (admin/ops), (b) investor mapping (admin only).
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const session = await getSession(req);
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+  const guard = await requireSession(req);
+  if ("response" in guard) return guard.response;
+  const session = guard.session;
 
   const { id } = await params;
   const body = await req.json();
@@ -64,7 +63,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   // --- Status change ---
   if (body.status !== undefined) {
     if (!["admin", "ops_manager", "hub_incharge"].includes(session.role)) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+      return forbiddenResponse();
     }
     if (!OPS_STATUSES.includes(body.status)) {
       return NextResponse.json({ error: "Invalid status" }, { status: 400 });
@@ -80,7 +79,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   // --- Investor mapping (admin only) ---
   if (session.role !== "admin") {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+    return forbiddenResponse();
   }
   const investorId = body.investor_id || null;
 

@@ -1,16 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { schemas } from "@/lib/schemas";
-import { getSession } from "@/lib/auth";
+import { requireRole } from "@/lib/auth";
 
 const validDocs = ["aadhaar", "pan", "dl"] as const;
 type Doc = typeof validDocs[number];
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const session = await getSession(req);
-  if (!session || !["admin", "ops_manager", "hub_incharge"].includes(session.role)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
-  }
+  // Null session -> 401 (auth contract); valid session, wrong role -> 403.
+  const guard = await requireRole(req, ["admin", "ops_manager", "hub_incharge"]);
+  if ("response" in guard) return guard.response;
+  const session = guard.session;
 
   const { id } = await params;
   const { document, verified } = await req.json() as { document: Doc; verified: boolean };

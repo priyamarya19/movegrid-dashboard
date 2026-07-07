@@ -1,13 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { schemas } from "@/lib/schemas";
-import { getSession } from "@/lib/auth";
+import { requireRole } from "@/lib/auth";
 
 export async function POST(req: NextRequest) {
-  const session = await getSession(req);
-  if (!session || session.role !== "admin") {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
-  }
+  const guard = await requireRole(req, ["admin"]);
+  if ("response" in guard) return guard.response;
   const b = await req.json();
   if (!b.hub_name || !b.city) return NextResponse.json({ error: "Hub name and city are required" }, { status: 400 });
 
@@ -27,10 +25,8 @@ export async function POST(req: NextRequest) {
 }
 
 export async function GET(req: NextRequest) {
-  const session = await getSession(req);
-  if (!session || !["admin", "ops_manager", "hub_incharge"].includes(session.role)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
-  }
+  const guard = await requireRole(req);
+  if ("response" in guard) return guard.response;
 
   const result = await pool.query(`
     SELECT h.id, h.hub_id, h.hub_name, h.city, h.area, h.vehicle_capacity,

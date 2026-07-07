@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import { getSession } from "@/lib/auth";
+import { requireSession } from "@/lib/auth";
 
 const s3 = new S3Client({
   region: process.env.AWS_REGION!,
@@ -12,8 +12,8 @@ const s3 = new S3Client({
 });
 
 export async function GET(req: NextRequest) {
-  const session = await getSession(req);
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const guard = await requireSession(req);
+  if ("response" in guard) return guard.response;
 
   const key = req.nextUrl.searchParams.get("key");
   if (!key) return NextResponse.json({ error: "No key" }, { status: 400 });

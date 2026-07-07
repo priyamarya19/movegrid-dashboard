@@ -1,21 +1,43 @@
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { schemas } from "@/lib/schemas";
-import { getSession } from "@/lib/auth";
+import { requireRole } from "@/lib/auth";
+
+// rental_mode is constrained by riders_rental_mode_check to ('weekly','monthly').
+// Normalize known display labels; reject anything else with a 400 rather than
+// letting it hit the DB and surface as a raw 500.
+const RENTAL_MODES = new Set(["weekly", "monthly"]);
+function normalizeRentalMode(raw: unknown): string | null {
+  if (raw == null || raw === "") return "monthly";
+  const v = String(raw).trim().toLowerCase();
+  if (v === "week" || v === "weekly") return "weekly";
+  if (v === "month" || v === "monthly") return "monthly";
+  return RENTAL_MODES.has(v) ? v : null;
+}
 
 export async function POST(req: NextRequest) {
-  const session = await getSession(req);
-  if (!session || !["admin", "ops_manager", "hub_incharge"].includes(session.role)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
-  }
-  const b = await req.json();
-  if (!b.name || !b.mobile) return NextResponse.json({ error: "Name and mobile are required" }, { status: 400 });
+  const guard = await requireRole(req);
+  if ("response" in guard) return guard.response;
+  const session = guard.session;
 
-  // Check duplicate mobile
-  const dup = await pool.query(`SELECT id FROM ${schemas.ops}.riders WHERE mobile = $1`, [b.mobile]);
-  if (dup.rows[0]) return NextResponse.json({ error: "A rider with this mobile number already exists" }, { status: 409 });
+  try {
+    const b = await req.json();
+    if (!b.name || !b.mobile) return NextResponse.json({ error: "Name and mobile are required" }, { status: 400 });
 
-  const result = await pool.query(`
+    const rentalMode = normalizeRentalMode(b.rental_mode);
+    if (rentalMode === null) {
+      return NextResponse.json(
+        { error: "rental_mode must be one of: weekly, monthly", field: "rental_mode" },
+        { status: 400 }
+      );
+    }
+
+    // Pre-check duplicate mobile (fast, friendly path). The DB UNIQUE
+    // constraints below are the real guard against races.
+    const dup = await pool.query(`SELECT id FROM ${schemas.ops}.riders WHERE mobile = $1`, [b.mobile]);
+    if (dup.rows[0]) return NextResponse.json({ error: "A rider with this mobile number already exists", field: "mobile" }, { status: 409 });
+
+    const result = await pool.query(`
     INSERT INTO ${schemas.ops}.riders (
       rider_code,
       name, nickname, mobile, current_address, permanent_address, current_address_location,
@@ -41,19 +63,49 @@ export async function POST(req: NextRequest) {
       b.bank ?? null, b.ifsc ?? null, b.account_number ?? null,
       b.family_ref_name ?? null, b.family_ref_mobile ?? null, b.family_ref_aadhaar ?? null, b.family_ref_aadhaar_url ?? null,
       b.local_ref_name ?? null, b.local_ref_mobile ?? null,
-      b.rental_mode ?? "monthly", b.business_type ?? "rental", b.b2b_company ?? null, b.b2b_location ?? null, b.employer ?? null,
+      rentalMode, b.business_type ?? "rental", b.b2b_company ?? null, b.b2b_location ?? null, b.employer ?? null,
       b.onboarding_fee ?? null, b.security_deposit ?? null,
       b.profile_photo_url ?? null, b.assigned_hub_id ?? null, "pending", session.name,
     ]
-  );
-  return NextResponse.json(result.rows[0], { status: 201 });
+    );
+    return NextResponse.json(result.rows[0], { status: 201 });
+  } catch (err) {
+    const e = err as { code?: string; constraint?: string };
+    // 23505 unique_violation — name the duplicated field.
+    if (e.code === "23505") {
+      const field = e.constraint === "riders_aadhaar_key" ? "aadhaar" : "mobile";
+      const label = field === "aadhaar" ? "Aadhaar number" : "mobile number";
+      return NextResponse.json(
+        { error: `A rider with this ${label} already exists`, field },
+        { status: 409 }
+      );
+    }
+    // 23514 check_violation — e.g. rental_mode / status out of range.
+    if (e.code === "23514") {
+      const field = e.constraint === "riders_rental_mode_check" ? "rental_mode"
+        : e.constraint === "riders_status_check" ? "status" : undefined;
+      return NextResponse.json(
+        { error: "A submitted value is not allowed", field },
+        { status: 400 }
+      );
+    }
+    // 23503 foreign_key_violation — e.g. assigned_hub_id points to no hub.
+    if (e.code === "23503") {
+      const field = e.constraint === "riders_assigned_hub_id_fkey" ? "assigned_hub_id" : undefined;
+      return NextResponse.json(
+        { error: "A referenced record does not exist", field },
+        { status: 400 }
+      );
+    }
+    // Genuinely unexpected — log server-side, return a safe generic message.
+    console.error("POST /api/riders failed:", err);
+    return NextResponse.json({ error: "Failed to create rider" }, { status: 500 });
+  }
 }
 
 export async function GET(req: NextRequest) {
-  const session = await getSession(req);
-  if (!session || !["admin", "ops_manager", "hub_incharge"].includes(session.role)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
-  }
+  const guard = await requireRole(req);
+  if ("response" in guard) return guard.response;
 
   const { searchParams } = new URL(req.url);
   const status = searchParams.get("status");
@@ -88,7 +140,10 @@ export async function GET(req: NextRequest) {
             ELSE (${M} - INTERVAL '1 month' + (${D} - 1) * INTERVAL '1 day')::date
           END
         END AS last_due_date
-      FROM ${schemas.ops}.riders r WHERE r.status = 'active'
+      FROM ${schemas.ops}.riders r
+      WHERE r.status = 'active'
+        AND EXISTS (SELECT 1 FROM ${schemas.ops}.rider_vehicle_assignments rva
+                    WHERE rva.rider_id = r.id AND rva.status = 'active')
     )
   `;
 
