@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { schemas } from "@/lib/schemas";
-import { getSession } from "@/lib/auth";
+import { requireRole } from "@/lib/auth";
 
 export async function POST(req: NextRequest) {
-  const session = await getSession(req);
-  if (!session || !["admin", "ops_manager", "hub_incharge"].includes(session.role)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
-  }
+  const guard = await requireRole(req);
+  if ("response" in guard) return guard.response;
+  const session = guard.session;
 
   const b = await req.json();
   if (!b.rider_id || !b.vehicle_id) {

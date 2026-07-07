@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { schemas } from "@/lib/schemas";
-import { getSession } from "@/lib/auth";
+import { requireSession } from "@/lib/auth";
 
 // GET /api/vehicles/lookup?ev_number=MG001 — returns vehicle details for allotment form auto-fill
 export async function GET(req: NextRequest) {
-  const session = await getSession(req);
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const guard = await requireSession(req);
+  if ("response" in guard) return guard.response;
 
   const ev = req.nextUrl.searchParams.get("ev_number");
   const mobile = req.nextUrl.searchParams.get("mobile"); // rider lookup

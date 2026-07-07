@@ -1,14 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { schemas } from "@/lib/schemas";
-import { getSession } from "@/lib/auth";
+import { requireRole, requireSession } from "@/lib/auth";
 
 // Mark rent as received for the current period
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const session = await getSession(req);
-  if (!session || !["admin", "ops_manager", "hub_incharge"].includes(session.role)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
-  }
+  const guard = await requireRole(req);
+  if ("response" in guard) return guard.response;
+  const session = guard.session;
   const { id } = await params;
   const { amount, period_start, period_end, payment_screenshot_url, vehicle_id: bodyVehicleId } = await req.json();
 
@@ -36,8 +35,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
 // Check if rent is received for current period
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const session = await getSession(req);
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const guard = await requireSession(req);
+  if ("response" in guard) return guard.response;
   const { id } = await params;
 
   const today = new Date();

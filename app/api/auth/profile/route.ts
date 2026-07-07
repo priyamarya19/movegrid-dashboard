@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { schemas } from "@/lib/schemas";
-import { getSession } from "@/lib/auth";
+import { requireSession } from "@/lib/auth";
 
 // GET /api/auth/profile — the logged-in user's own profile.
 export async function GET(req: NextRequest) {
-  const session = await getSession(req);
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const guard = await requireSession(req);
+  if ("response" in guard) return guard.response;
+  const session = guard.session;
 
   const res = await pool.query(
     `SELECT u.id, u.name, u.email, u.mobile, u.photo_url, r.name AS role
@@ -21,8 +22,9 @@ export async function GET(req: NextRequest) {
 
 // PATCH /api/auth/profile — update your own name / mobile / photo.
 export async function PATCH(req: NextRequest) {
-  const session = await getSession(req);
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const guard = await requireSession(req);
+  if ("response" in guard) return guard.response;
+  const session = guard.session;
 
   const { name, mobile, photo_url } = await req.json();
 

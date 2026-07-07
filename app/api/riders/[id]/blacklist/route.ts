@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { schemas } from "@/lib/schemas";
-import { getSession } from "@/lib/auth";
+import { requireRole } from "@/lib/auth";
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const session = await getSession(req);
-  if (!session || !["admin", "ops_manager"].includes(session.role)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
-  }
+  // Null session -> 401 (auth contract); valid session, wrong role -> 403.
+  const guard = await requireRole(req, ["admin", "ops_manager"]);
+  if ("response" in guard) return guard.response;
+  const session = guard.session;
   const { id } = await params;
   const { reason } = await req.json();
 
@@ -19,10 +19,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 }
 
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const session = await getSession(req);
-  if (!session || !["admin"].includes(session.role)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
-  }
+  // Null session -> 401 (auth contract); valid session, wrong role -> 403.
+  const guard = await requireRole(req, ["admin"]);
+  if ("response" in guard) return guard.response;
   const { id } = await params;
   await pool.query(
     `UPDATE ${schemas.ops}.riders SET is_blacklisted = false, blacklist_reason = NULL, blacklisted_at = NULL, blacklisted_by = NULL WHERE id = $1`,
