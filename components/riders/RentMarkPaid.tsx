@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import PaymentProof, { PaymentProofValue, emptyProof, proofValid } from "@/components/PaymentProof";
 
 export default function RentMarkPaid({
   riderId,
@@ -21,28 +22,32 @@ export default function RentMarkPaid({
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [amount, setAmount] = useState(String(defaultAmount ?? 1610));
+  const [proof, setProof] = useState<PaymentProofValue>(emptyProof);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   async function markPaid() {
-    setLoading(true);
-    await fetch(`/api/riders/${riderId}/rent-received`, {
+    if (!proofValid(proof)) { setError("Select a payment mode and upload the proof image"); return; }
+    setLoading(true); setError("");
+    const res = await fetch(`/api/riders/${riderId}/rent-received`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ amount: Number(amount), period_start: periodStart, period_end: periodEnd }),
+      body: JSON.stringify({
+        amount: Number(amount), period_start: periodStart, period_end: periodEnd,
+        payment_mode: proof.mode, payment_utr: proof.utr || null, payment_screenshot_url: proof.proof,
+      }),
     });
     setLoading(false);
-    setOpen(false);
+    if (!res.ok) { setError((await res.json()).error || "Failed"); return; }
+    setOpen(false); setProof(emptyProof);
     router.refresh();
     onPaid?.();
   }
 
-  const urgencyColor =
-    daysLeft < 0 ? "text-red-400" : daysLeft <= 2 ? "text-[#fdcb6e]" : "text-[#aaa]";
-
   if (!open) {
     return (
       <button
-        onClick={() => setOpen(true)}
+        onClick={() => { setOpen(true); setError(""); }}
         className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-[#1e1e2e] hover:bg-[#6C5CE7]/20 hover:text-[#6C5CE7] transition-colors whitespace-nowrap"
         style={{ color: daysLeft < 0 ? "#f87171" : daysLeft <= 2 ? "#fdcb6e" : "#666" }}
       >
@@ -53,27 +58,24 @@ export default function RentMarkPaid({
   }
 
   return (
-    <div className="flex items-center gap-1.5">
-      <span className="text-[#555] text-xs">₹</span>
-      <input
-        type="number"
-        value={amount}
-        onChange={e => setAmount(e.target.value)}
-        className="w-20 bg-[#0A0A0F] border border-white/10 rounded-lg px-2 py-0.5 text-xs text-white focus:outline-none focus:border-[#6C5CE7]"
-        autoFocus
-        onKeyDown={e => e.key === "Enter" && markPaid()}
-      />
-      <button
-        onClick={markPaid}
-        disabled={loading || !amount}
-        className="px-2 py-0.5 rounded-lg text-[11px] font-semibold bg-[#6C5CE7] hover:bg-[#7c6cf7] text-white disabled:opacity-50 transition-colors whitespace-nowrap"
-      >
-        {loading ? "…" : "Mark Paid"}
-      </button>
-      <button
-        onClick={() => setOpen(false)}
-        className="text-[#444] hover:text-[#aaa] text-xs transition-colors"
-      >✕</button>
+    <div className="relative inline-block">
+      <div className="absolute right-0 top-0 z-50 w-64 p-4 rounded-xl bg-[#12121A] border border-[#2a2a3a] shadow-xl space-y-3">
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-semibold text-white">Record rent payment</span>
+          <button onClick={() => setOpen(false)} className="text-[#555] hover:text-[#aaa] text-xs">✕</button>
+        </div>
+        <div>
+          <label className="block text-[11px] text-[#555] uppercase tracking-wider mb-1">Amount ₹</label>
+          <input type="number" value={amount} onChange={e => setAmount(e.target.value)}
+            className="w-full bg-[#0A0A0F] border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-[#6C5CE7]" autoFocus />
+        </div>
+        <PaymentProof value={proof} onChange={setProof} folder="rent-payments" />
+        {error && <p className="text-red-400 text-[11px]">{error}</p>}
+        <button onClick={markPaid} disabled={loading || !amount || !proofValid(proof)}
+          className="w-full px-3 py-2 rounded-lg text-xs font-semibold bg-[#6C5CE7] hover:bg-[#7c6cf7] text-white disabled:opacity-50 transition-colors">
+          {loading ? "Saving…" : "Mark Paid"}
+        </button>
+      </div>
     </div>
   );
 }

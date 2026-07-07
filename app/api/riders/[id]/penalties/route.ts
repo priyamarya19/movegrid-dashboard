@@ -9,7 +9,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   if ("response" in guard) return guard.response;
   const { id } = await params;
   const res = await pool.query(
-    `SELECT p.id, p.amount, p.detail, p.status, p.created_by, p.created_at, v.ev_number
+    `SELECT p.id, p.amount, p.detail, p.status, p.created_by, p.created_at, v.ev_number,
+            p.payment_mode, p.payment_utr, p.payment_proof_url
        FROM ${schemas.ops}.rider_penalties p
        LEFT JOIN ${schemas.ops}.vehicles v ON v.id = p.vehicle_id
       WHERE p.rider_id = $1
@@ -46,4 +47,27 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     [id, a?.vehicle_id ?? null, a?.id ?? null, hasAmount ? Number(amount) : null, detail || null, session.name]
   );
   return NextResponse.json({ id: res.rows[0].id }, { status: 201 });
+}
+
+// PATCH /api/riders/[id]/penalties — mark a penalty paid (proof required) or waived.
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const guard = await requireRole(req);
+  if ("response" in guard) return guard.response;
+  const { id } = await params;
+  const { penalty_id, action, payment_mode, payment_utr, payment_proof_url } = await req.json();
+  if (!penalty_id || !["pay", "waive"].includes(action)) {
+    return NextResponse.json({ error: "penalty_id and a valid action are required" }, { status: 400 });
+  }
+  if (action === "pay" && (!payment_mode || !payment_proof_url)) {
+    return NextResponse.json({ error: "Payment mode and a proof image are required to mark paid" }, { status: 400 });
+  }
+  if (action === "waive") {
+    await pool.query(`UPDATE ${schemas.ops}.rider_penalties SET status='waived' WHERE id=$1 AND rider_id=$2`, [penalty_id, id]);
+  } else {
+    await pool.query(
+      `UPDATE ${schemas.ops}.rider_penalties SET status='paid', payment_mode=$1, payment_utr=$2, payment_proof_url=$3, paid_at=now() WHERE id=$4 AND rider_id=$5`,
+      [payment_mode, payment_utr || null, payment_proof_url, penalty_id, id]
+    );
+  }
+  return NextResponse.json({ ok: true });
 }

@@ -32,13 +32,18 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         condition_on_return = $4,
         return_photos = $5,
         return_remarks = $6,
-        returned_by = $7
-      WHERE id = $8`,
+        returned_by = $7,
+        rent_settlement_mode = $8,
+        rent_settlement_utr = $9,
+        rent_settlement_proof_url = $10
+      WHERE id = $11`,
       [
         b.returned_date || new Date().toISOString().split("T")[0],
         b.rent_cleared ?? null, b.penalty_amount ?? null,
         b.condition_on_return ?? null, b.return_photos ?? null,
-        b.return_remarks ?? null, session.name, id,
+        b.return_remarks ?? null, session.name,
+        b.rent_settlement_mode ?? null, b.rent_settlement_utr ?? null, b.rent_settlement_proof_url ?? null,
+        id,
       ]
     );
 

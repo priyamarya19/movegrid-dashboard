@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import ImageUpload from "@/components/ImageUpload";
+import PaymentProof, { PaymentProofValue, emptyProof, proofValid } from "@/components/PaymentProof";
 
 const CONDITIONS = ["Same as allotted", "Motor damaged", "Controller issue", "Branding issue", "Any other issue"];
 
@@ -44,6 +45,8 @@ export default function VehicleReturnForm() {
     returned_date: new Date().toISOString().split("T")[0],
   });
 
+  const [settle, setSettle] = useState<PaymentProofValue>(emptyProof);
+
   function set(k: string, v: string) { setForm(p => ({ ...p, [k]: v })); }
 
   function toggleCondition(c: string) {
@@ -78,6 +81,9 @@ export default function VehicleReturnForm() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!assignment) { setError("Please enter a valid EV number with an active allotment"); return; }
+    if (form.rent_cleared === "true" && !proofValid(settle)) {
+      setError("Rent was cleared — select a payment mode and upload the proof image"); return;
+    }
     setSubmitting(true); setError("");
     try {
       const photos = form.return_photos.filter(Boolean);
@@ -92,6 +98,9 @@ export default function VehicleReturnForm() {
           condition_on_return: form.condition_on_return.length ? form.condition_on_return : null,
           return_photos: photos.length ? photos : null,
           return_remarks: form.return_remarks || null,
+          rent_settlement_mode: form.rent_cleared === "true" ? settle.mode : null,
+          rent_settlement_utr: form.rent_cleared === "true" ? (settle.utr || null) : null,
+          rent_settlement_proof_url: form.rent_cleared === "true" ? settle.proof : null,
         }),
       });
       const data = await res.json();
@@ -136,6 +145,14 @@ export default function VehicleReturnForm() {
             <option value="false">No — pending dues</option>
           </select>
         </Field>
+        {form.rent_cleared === "true" && (
+          <div className="col-span-full">
+            <div className="max-w-xs">
+              <p className="text-xs text-[#e17055] font-semibold uppercase tracking-wider mb-2">Rent Settlement Proof</p>
+              <PaymentProof value={settle} onChange={setSettle} folder="rent-settlement" />
+            </div>
+          </div>
+        )}
         <Field label="Penalty Amount (₹)"><input type="number" className={inp} value={form.penalty_amount} onChange={e => set("penalty_amount", e.target.value)} placeholder="0" /></Field>
         <Field label="Penalty Details" hint="Damaged parts / reason — saved to the rider's penalties"><input className={inp} value={form.penalty_detail} onChange={e => set("penalty_detail", e.target.value)} placeholder="e.g. Front fender, handle T band" /></Field>
         <Field label="Any Remarks"><input className={inp} value={form.return_remarks} onChange={e => set("return_remarks", e.target.value)} placeholder="Notes on return..." /></Field>
