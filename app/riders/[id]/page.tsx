@@ -427,7 +427,7 @@ export default async function RiderDetailPage({ params }: { params: Promise<{ id
               <tbody>
                 {cycle.length === 0 ? (
                   <tr><td colSpan={7} className="px-5 py-8 text-center text-[#555]">No rent cycle yet (no allotment)</td></tr>
-                ) : cycle.map((w, i) => {
+                ) : [...cycle].reverse().map((w, i) => {
                   const color = w.status === "Collected" ? "bg-green-500/15 text-green-400"
                     : w.status === "Partial" ? "bg-orange-500/15 text-orange-400"
                     : w.status === "Overdue" ? "bg-red-500/15 text-red-400"
