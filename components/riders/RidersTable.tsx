@@ -55,7 +55,8 @@ function sortData(data: Rider[], sort: Sort): Rider[] {
 function RentToggle({ rider, onToggled }: { rider: Rider; onToggled: () => void }) {
   const [loading, setLoading] = useState(false);
 
-  if (rider.status !== "active") return <span className="text-[#333]">—</span>;
+  // No rent status for riders with no active vehicle (new/unallotted riders owe nothing).
+  if (rider.status !== "active" || !rider.vehicle_id) return <span className="text-[#333]">—</span>;
 
   async function markReceived() {
     if (rider.rent_received_this_month) return;

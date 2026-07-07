@@ -129,7 +129,7 @@ export default async function RiderDetailPage({ params }: { params: Promise<{ id
   const todayIST = toISTMidnight(new Date());
 
   // Next due date
-  const nextDueDate = rider.status === "active" && rider.rental_mode
+  const nextDueDate = rider.status === "active" && rider.rental_mode && activeAssignment
     ? calcNextDueDate(rider.created_at, rider.rental_mode)
     : null;
   const nextDueDaysLeft = nextDueDate
@@ -149,7 +149,7 @@ export default async function RiderDetailPage({ params }: { params: Promise<{ id
   const currentPeriodBalance = currentPeriodPartial ? EXPECTED_RENT - Number(currentPeriodPayment!.amount_collected) : 0;
 
   // Last (overdue) due date — only exists if past due and no full payment
-  const lastDueDate = rider.status === "active" && rider.rental_mode
+  const lastDueDate = rider.status === "active" && rider.rental_mode && activeAssignment
     ? calcLastDueDate(rider.created_at, rider.rental_mode)
     : null;
   const lastDuePeriodEndStr = lastDueDate ? lastDueDate.toISOString().split("T")[0] : null;
