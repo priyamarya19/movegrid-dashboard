@@ -8,6 +8,11 @@ import { unstable_cache } from "next/cache";
 // The ledger is rent_dues: one row per rider per week from allotment -> return (or today),
 // with NO gaps. Status is computed live from matched payments + due_date.
 
+// Canonical payment-mode vocabulary. Shared by the rent-received and return
+// settlement routes so the accepted values (and their validation) live in one place.
+export const PAYMENT_MODES = ["Cash", "Online", "Cash + Online"] as const;
+export type PaymentMode = (typeof PAYMENT_MODES)[number];
+
 const IST = "(now() AT TIME ZONE 'Asia/Kolkata')::date";
 
 // A payment counts toward a week if its payment_date OR its rental_period_start falls in that week.

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { schemas } from "@/lib/schemas";
 import { requireRole } from "@/lib/auth";
+import { PAYMENT_MODES } from "@/lib/rent";
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const guard = await requireRole(req);
@@ -10,6 +11,16 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   const { id } = await params;
   const b = await req.json();
+
+  // When rent is marked cleared, a valid settlement mode + proof are mandatory.
+  if (b.rent_cleared === true) {
+    if (!PAYMENT_MODES.includes(b.rent_settlement_mode)) {
+      return NextResponse.json({ error: "Rent settlement mode must be one of: Cash, Online, Cash + Online when rent is cleared" }, { status: 400 });
+    }
+    if (!b.rent_settlement_proof_url) {
+      return NextResponse.json({ error: "Rent settlement proof is required when rent is cleared" }, { status: 400 });
+    }
+  }
 
   const client = await pool.connect();
   try {

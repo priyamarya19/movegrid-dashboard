@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { schemas } from "@/lib/schemas";
 import { requireRole, requireSession } from "@/lib/auth";
+import { PAYMENT_MODES } from "@/lib/rent";
 
 // Mark rent as received for the current period
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -14,6 +15,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   // Proof is mandatory (screenshot for online, photo of cash for cash).
   if (!payment_mode || !payment_screenshot_url) {
     return NextResponse.json({ error: "Payment mode and a proof image are required" }, { status: 400 });
+  }
+
+  // payment_mode must be one of the canonical values the app sends.
+  if (!PAYMENT_MODES.includes(payment_mode)) {
+    return NextResponse.json({ error: "Payment mode must be one of: Cash, Online, Cash + Online" }, { status: 400 });
   }
 
   // Vehicle for the payment: the caller may pass the week's vehicle_id (for a past
