@@ -158,7 +158,11 @@ export async function GET(req: NextRequest) {
              WHERE p.rider_id = r.id
                AND p.rental_period_start >= date_trunc('month', CURRENT_DATE)
                AND p.rental_period_end <= (date_trunc('month', CURRENT_DATE) + INTERVAL '1 month - 1 day')::date
-           ) AS rent_received_this_month
+           ) AS rent_received_this_month,
+           EXISTS (
+             SELECT 1 FROM ${schemas.ops}.rider_vehicle_assignments rva_a
+             WHERE rva_a.rider_id = r.id AND rva_a.status = 'active'
+           ) AS has_active_assignment
     FROM ${schemas.ops}.riders r
     LEFT JOIN ${schemas.ops}.hubs h ON h.id = r.assigned_hub_id
     LEFT JOIN ${schemas.ops}.rider_vehicle_assignments rva ON rva.rider_id = r.id AND rva.status = 'active'

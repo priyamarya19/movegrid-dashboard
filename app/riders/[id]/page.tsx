@@ -8,6 +8,7 @@ import BackButton from "@/components/BackButton";
 import BlacklistButton from "@/components/riders/BlacklistButton";
 import RentMarkPaid from "@/components/riders/RentMarkPaid";
 import { getRiderCycle } from "@/lib/rent";
+import RiderPenalties from "@/components/riders/RiderPenalties";
 import ExportButton from "@/components/ExportButton";
 import { getSession } from "@/lib/auth";
 import { EXPECTED_RENT } from "@/lib/rentConstants";
@@ -463,6 +464,9 @@ export default async function RiderDetailPage({ params }: { params: Promise<{ id
             </table>
           </div>
         </div>
+
+        {/* Penalties — per-rider, raised at submission or ad-hoc */}
+        <RiderPenalties riderId={rider.id} />
 
       </div>
     </DashboardLayout>

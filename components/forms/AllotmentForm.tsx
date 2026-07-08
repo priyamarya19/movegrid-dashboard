@@ -35,6 +35,15 @@ export default function AllotmentForm() {
   const [evLookingUp, setEvLookingUp] = useState(false);
   const [evError, setEvError] = useState("");
   const evTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [readyList, setReadyList] = useState<VehicleInfo[]>([]);
+
+  // Only 'ready_to_deploy' vehicles are allottable — load them for the dropdown.
+  useEffect(() => {
+    fetch(`/api/vehicles?status=ready_to_deploy`)
+      .then(r => r.ok ? r.json() : [])
+      .then((rows: VehicleInfo[]) => setReadyList(rows))
+      .catch(() => setReadyList([]));
+  }, []);
 
   // Rider lookup state
   const [mobileInput, setMobileInput] = useState("");
@@ -128,9 +137,14 @@ export default function AllotmentForm() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
 
         <Section title="Vehicle" />
-        <Field label="EV / Scooter Number" required hint={evLookingUp ? "Looking up..." : vehicle ? `Found: ${vehicle.oem} ${vehicle.model_name}${vehicle.status === "ready_to_deploy" ? " — ✅ ready to deploy" : ` — ⚠️ ${vehicle.status?.replace(/_/g, " ")} (not allottable)`}` : evError}>
-          <input className={inp + (evError ? " border-red-500/50" : vehicle ? " border-green-500/30" : "")}
-            value={evInput} onChange={e => setEvInput(e.target.value)} placeholder="MG-001" required />
+        <Field label="EV / Scooter Number" required hint={evLookingUp ? "Looking up..." : vehicle ? `${vehicle.oem} ${vehicle.model_name} — ✅ ready to deploy` : readyList.length ? "Only ready-to-deploy vehicles are shown" : "No vehicles are ready to deploy yet — ops must clear one first"}>
+          <select className={sel + (vehicle ? " border-green-500/30" : "")}
+            value={evInput} onChange={e => setEvInput(e.target.value)} required>
+            <option value="">{readyList.length ? "Select a vehicle…" : "None ready to deploy"}</option>
+            {readyList.map(v => (
+              <option key={v.id} value={v.ev_number}>{v.ev_number} — {v.oem} {v.model_name}</option>
+            ))}
+          </select>
         </Field>
 
         {vehicle && (

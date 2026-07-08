@@ -32,15 +32,30 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         condition_on_return = $4,
         return_photos = $5,
         return_remarks = $6,
-        returned_by = $7
-      WHERE id = $8`,
+        returned_by = $7,
+        rent_settlement_mode = $8,
+        rent_settlement_utr = $9,
+        rent_settlement_proof_url = $10
+      WHERE id = $11`,
       [
         b.returned_date || new Date().toISOString().split("T")[0],
         b.rent_cleared ?? null, b.penalty_amount ?? null,
         b.condition_on_return ?? null, b.return_photos ?? null,
-        b.return_remarks ?? null, session.name, id,
+        b.return_remarks ?? null, session.name,
+        b.rent_settlement_mode ?? null, b.rent_settlement_utr ?? null, b.rent_settlement_proof_url ?? null,
+        id,
       ]
     );
+
+    // Record a penalty (if any) against the rider, frozen to the submitted vehicle + assignment.
+    const hasPenaltyAmt = b.penalty_amount != null && b.penalty_amount !== "";
+    if (b.penalty_detail || hasPenaltyAmt) {
+      await client.query(
+        `INSERT INTO ${schemas.ops}.rider_penalties (rider_id, vehicle_id, assignment_id, amount, detail, status, created_by)
+         VALUES ($1, $2, $3, $4, $5, 'pending', $6)`,
+        [rider_id, vehicle_id, id, hasPenaltyAmt ? Number(b.penalty_amount) : null, b.penalty_detail || null, session.name]
+      );
+    }
 
     // Update vehicle → returned (awaiting ops inspection; not allottable until ready_to_deploy)
     await client.query(

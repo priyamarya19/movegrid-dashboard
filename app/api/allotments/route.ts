@@ -30,12 +30,22 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Vehicle must be 'Ready to Deploy' before it can be allotted. Set its status first." }, { status: 409 });
     }
 
-    // Close any existing active assignment for this rider
+    // Close any existing active assignment for this rider, and free its vehicle so it
+    // doesn't get stuck 'assigned' with no rider (re-allotment / vehicle swap).
+    const prev = await client.query(
+      `SELECT vehicle_id FROM ${schemas.ops}.rider_vehicle_assignments WHERE rider_id = $1 AND status = 'active'`,
+      [b.rider_id]
+    );
     await client.query(
       `UPDATE ${schemas.ops}.rider_vehicle_assignments SET status = 'returned', returned_date = CURRENT_DATE
        WHERE rider_id = $1 AND status = 'active'`,
       [b.rider_id]
     );
+    for (const row of prev.rows) {
+      if (row.vehicle_id !== b.vehicle_id) {
+        await client.query(`UPDATE ${schemas.ops}.vehicles SET status = 'returned' WHERE id = $1`, [row.vehicle_id]);
+      }
+    }
 
     // Create new assignment
     const result = await client.query(`
