@@ -10,11 +10,17 @@ export const VSTATUS = {
   returned: "returned",
 } as const;
 
+// Pseudo-status (not a real stored value): everything that isn't assigned or
+// ready_to_deploy — maintenance, returned, retired, blocked, etc. The API special-cases
+// this to an exclusion filter instead of an exact match.
+export const NOT_AVAILABLE = "not_available";
+
 // Status filter dropdown: visible label -> real status value sent to the API
 export const VEHICLE_FILTERS: { label: string; value: string }[] = [
   { label: "All Status", value: "" },
   { label: "Assigned", value: VSTATUS.assigned },
   { label: "Available", value: VSTATUS.available },
+  { label: "Not Available", value: NOT_AVAILABLE },
   { label: "Under Maintenance", value: VSTATUS.maintenance },
   { label: "Returned", value: VSTATUS.returned },
 ];

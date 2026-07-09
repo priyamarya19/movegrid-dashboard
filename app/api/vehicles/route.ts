@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { schemas } from "@/lib/schemas";
 import { requireRole } from "@/lib/auth";
+import { VSTATUS, NOT_AVAILABLE } from "@/lib/vehicleStatus";
 
 export async function POST(req: NextRequest) {
   const guard = await requireRole(req, ["admin", "ops_manager"]);
@@ -22,7 +23,7 @@ export async function POST(req: NextRequest) {
       iot_imei, iot_partner, battery_number, battery_partner,
       model_id, hub_id, status, purchase_date, price,
       vehicle_photo_url, rc_book_url
-    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'available',$11,$12,$13,$14)
+    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'ready_to_deploy',$11,$12,$13,$14)
     RETURNING id, ev_number, status`,
     [
       b.ev_number, b.chassis_number ?? null, b.motor_number ?? null, b.controller_number ?? null,
@@ -58,7 +59,12 @@ export async function GET(req: NextRequest) {
     WHERE 1=1
   `;
   const params: string[] = [];
-  if (status) { params.push(status); query += ` AND v.status = $${params.length}`; }
+  if (status === NOT_AVAILABLE) {
+    params.push(VSTATUS.assigned, VSTATUS.available);
+    query += ` AND v.status NOT IN ($${params.length - 1}, $${params.length})`;
+  } else if (status) {
+    params.push(status); query += ` AND v.status = $${params.length}`;
+  }
   if (unassigned) { query += ` AND v.investor_id IS NULL`; }
   query += ` ORDER BY v.ev_number ASC LIMIT 500`;
 
