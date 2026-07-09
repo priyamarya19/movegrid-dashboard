@@ -4,13 +4,16 @@ import { schemas } from "@/lib/schemas";
 import { requireRole, requireSession } from "@/lib/auth";
 import { PAYMENT_MODES } from "@/lib/rent";
 
-// Mark rent as received for the current period
+// Record a rent payment of any amount. Rolling-balance model: the amount converts to
+// (amount / daily_rate) days and extends the rider's paid_through_date on their active
+// assignment — no need to tie it to a specific week. This is what makes a normal
+// on-time payment, a partial payment, and a multi-week advance top-up all "just work"
+// through the same one action, whether entered here, in the overdue list, or due-soon list.
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const guard = await requireRole(req);
   if ("response" in guard) return guard.response;
-  const session = guard.session;
   const { id } = await params;
-  const { amount, period_start, period_end, payment_screenshot_url, payment_mode, payment_utr, vehicle_id: bodyVehicleId } = await req.json();
+  const { amount, payment_screenshot_url, payment_mode, payment_utr } = await req.json();
 
   // Proof is mandatory (screenshot for online, photo of cash for cash).
   if (!payment_mode || !payment_screenshot_url) {
@@ -22,43 +25,75 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: "Payment mode must be one of: Cash, Online, Cash + Online" }, { status: 400 });
   }
 
-  // Vehicle for the payment: the caller may pass the week's vehicle_id (for a past
-  // period); otherwise fall back to the rider's currently active assignment.
-  let vehicle_id: string | null = bodyVehicleId ?? null;
-  if (!vehicle_id) {
-    const asgn = await pool.query(
-      `SELECT vehicle_id FROM ${schemas.ops}.rider_vehicle_assignments WHERE rider_id = $1 AND status = 'active' LIMIT 1`,
-      [id]
-    );
-    vehicle_id = asgn.rows[0]?.vehicle_id ?? null;
+  // A real amount is required. Previously a missing amount fell back to 0, writing
+  // a phantom ₹0 payment row that could mark a week as "paid" for zero rupees.
+  const amountNum = Number(amount);
+  if (amount == null || amount === "" || Number.isNaN(amountNum) || amountNum <= 0) {
+    return NextResponse.json({ error: "A valid payment amount is required" }, { status: 400 });
   }
 
-  await pool.query(
-    `INSERT INTO ${schemas.ops}.rider_payments
-      (rider_id, vehicle_id, amount_collected, payment_date, rental_period_start, rental_period_end, payment_screenshot_url, payment_mode, payment_utr, recorded_by_employee_id)
-     VALUES ($1, $2, $3, CURRENT_DATE, $4, $5, $6, $7, $8,
-       (SELECT id FROM ${schemas.auth}.users WHERE name = $9 LIMIT 1))`,
-    [id, vehicle_id, amount ?? 0, period_start, period_end, payment_screenshot_url, payment_mode, payment_utr ?? null, session.name]
-  );
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
 
-  return NextResponse.json({ ok: true });
+    const asgn = await client.query(
+      `SELECT id, vehicle_id, daily_rent, to_char(COALESCE(paid_through_date, assigned_date - 1), 'YYYY-MM-DD') AS paid_through_date
+       FROM ${schemas.ops}.rider_vehicle_assignments WHERE rider_id = $1 AND status = 'active' LIMIT 1 FOR UPDATE`,
+      [id]
+    );
+    const assignment = asgn.rows[0];
+    if (!assignment || !assignment.daily_rent) {
+      await client.query("ROLLBACK");
+      return NextResponse.json({ error: "Rider has no active assignment with a daily rate set" }, { status: 409 });
+    }
+
+    const daysToAdd = Math.floor(amountNum / Number(assignment.daily_rent));
+    const oldPaidThrough = assignment.paid_through_date;
+
+    const updated = await client.query(
+      `UPDATE ${schemas.ops}.rider_vehicle_assignments
+       SET paid_through_date = COALESCE(paid_through_date, assigned_date - 1) + $1::int
+       WHERE id = $2
+       RETURNING to_char(paid_through_date, 'YYYY-MM-DD') AS new_paid_through_date`,
+      [daysToAdd, assignment.id]
+    );
+    const newPaidThrough = updated.rows[0].new_paid_through_date;
+
+    // recorded_by_employee_id FKs to employee_profiles, which nothing populates today —
+    // looking up the session user in auth.users (a different table) would violate that FK
+    // for any real user. Left null, matching every existing rider_payments row.
+    await client.query(
+      `INSERT INTO ${schemas.ops}.rider_payments
+        (rider_id, vehicle_id, amount_collected, payment_date, rental_period_start, rental_period_end, payment_screenshot_url, payment_mode, payment_utr)
+       VALUES ($1, $2, $3, CURRENT_DATE, $4, $5, $6, $7, $8)`,
+      [id, assignment.vehicle_id, amountNum, oldPaidThrough, newPaidThrough, payment_screenshot_url, payment_mode, payment_utr ?? null]
+    );
+
+    await client.query("COMMIT");
+    return NextResponse.json({ ok: true, paid_through_date: newPaidThrough, days_added: daysToAdd });
+  } catch (e) {
+    await client.query("ROLLBACK");
+    throw e;
+  } finally {
+    client.release();
+  }
 }
 
-// Check if rent is received for current period
+// Check if the rider is currently paid up (rolling balance): received = their
+// paid_through_date is today or later, on their active assignment.
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const guard = await requireSession(req);
   if ("response" in guard) return guard.response;
   const { id } = await params;
-
-  const today = new Date();
-  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split("T")[0];
-  const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0).toISOString().split("T")[0];
+  const S = schemas.ops;
 
   const res = await pool.query(
-    `SELECT id FROM ${schemas.ops}.rider_payments
-     WHERE rider_id = $1 AND rental_period_start >= $2 AND rental_period_end <= $3
-     LIMIT 1`,
-    [id, monthStart, monthEnd]
+    `SELECT (COALESCE(paid_through_date, assigned_date - 1) >= (now() AT TIME ZONE 'Asia/Kolkata')::date) AS received
+     FROM ${S}.rider_vehicle_assignments WHERE rider_id = $1 AND status = 'active' LIMIT 1`,
+    [id]
   );
-  return NextResponse.json({ received: res.rows.length > 0 });
+
+  // No active assignment → nothing outstanding.
+  if (!res.rows[0]) return NextResponse.json({ received: false });
+  return NextResponse.json({ received: res.rows[0].received });
 }

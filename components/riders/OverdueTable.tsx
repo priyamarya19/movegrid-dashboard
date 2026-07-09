@@ -4,28 +4,13 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import RentMarkPaid from "./RentMarkPaid";
 
-const EXPECTED_RENT = 1610;
-
 type OverdueRider = {
   id: string; rider_code: string; name: string; mobile: string; status: string;
   hub_id: string; hub_name: string;
   vehicle_id: string; vehicle_number: string;
   employer: string; rental_mode: string;
-  last_due_date: string; period_days: number;
-  partial_paid: number | null;
+  last_due_date: string; amount_due: number; overdue_weeks: number;
 };
-
-function addDays(dateStr: string, days: number): string {
-  const d = new Date(dateStr);
-  d.setDate(d.getDate() + days);
-  return d.toISOString().split("T")[0];
-}
-
-function daysOverdue(lastDueDate: string): number {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  return Math.round((today.getTime() - new Date(lastDueDate).getTime()) / 86400000);
-}
 
 export default function OverdueTable() {
   const [riders, setRiders] = useState<OverdueRider[]>([]);
@@ -60,7 +45,7 @@ export default function OverdueTable() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-[#1e1e2e]">
-                {["User ID", "Name", "Mobile", "Hub", "Vehicle", "Overdue Since", "Days Overdue", "Partial Paid", "Action"].map(h => (
+                {["User ID", "Name", "Mobile", "Hub", "Vehicle", "Overdue Since", "Weeks Overdue", "Amount Due", "Action"].map(h => (
                   <th key={h} className="text-left px-5 py-3 text-[11px] text-[#555] uppercase tracking-wider font-medium whitespace-nowrap">{h}</th>
                 ))}
               </tr>
@@ -71,10 +56,6 @@ export default function OverdueTable() {
               ) : riders.length === 0 ? (
                 <tr><td colSpan={9} className="px-5 py-10 text-center text-[#555]">No overdue riders</td></tr>
               ) : riders.map((r) => {
-                const overdueDays = daysOverdue(r.last_due_date);
-                const periodStart = addDays(r.last_due_date, -r.period_days);
-                const partialAmt = r.partial_paid ? Number(r.partial_paid) : null;
-                const balanceAmt = partialAmt != null ? EXPECTED_RENT - partialAmt : null;
                 return (
                   <tr key={r.id} className="border-b border-[#1a1a2a] hover:bg-white/[0.02] transition-colors">
                     <td className="px-5 py-3">
@@ -95,26 +76,18 @@ export default function OverdueTable() {
                     </td>
                     <td className="px-5 py-3">
                       <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-red-500/15 text-red-400 whitespace-nowrap">
-                        {overdueDays}d overdue
+                        {r.overdue_weeks} wk{r.overdue_weeks !== 1 ? "s" : ""} overdue
                       </span>
                     </td>
-                    <td className="px-5 py-3">
-                      {partialAmt != null ? (
-                        <div className="text-xs leading-tight">
-                          <span className="text-orange-400">₹{partialAmt.toLocaleString()} paid</span>
-                          <span className="block text-red-400">₹{balanceAmt!.toLocaleString()} due</span>
-                        </div>
-                      ) : (
-                        <span className="text-[#555] text-xs">—</span>
-                      )}
+                    <td className="px-5 py-3 text-red-400 font-semibold text-xs">
+                      ₹{Math.round(r.amount_due).toLocaleString()}
                     </td>
                     <td className="px-5 py-3">
                       <RentMarkPaid
                         riderId={r.id}
-                        periodStart={periodStart}
-                        periodEnd={r.last_due_date}
-                        daysLeft={-overdueDays}
-                        defaultAmount={balanceAmt ?? undefined}
+                        label={`${r.overdue_weeks} wk${r.overdue_weeks !== 1 ? "s" : ""} overdue`}
+                        urgent
+                        defaultAmount={Math.round(r.amount_due)}
                         onPaid={fetchRiders}
                       />
                     </td>

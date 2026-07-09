@@ -10,7 +10,7 @@ export default async function PendingRentTable() {
   const riders = overdue.map((r) => ({
     rider_id: r.rider_id, rider_code: r.rider_code, name: r.name, mobile: r.mobile,
     ev_number: null as string | null, vehicle_id: null as string | null, model_name: null as string | null,
-    days: r.overdue_weeks, expected: 0, collected: 0, pending: r.overdue_amount,
+    weeks: r.overdue_weeks, expected: 0, collected: 0, pending: r.overdue_amount,
   }));
 
   return (
@@ -44,14 +44,14 @@ export default async function PendingRentTable() {
           <p className="text-white font-semibold">{riders.length} rider{riders.length !== 1 ? "s" : ""} with pending rent</p>
           <ExportButton filename="overdue-rent" rows={riders} columns={[
             { label: "User ID", key: "rider_code" }, { label: "Name", key: "name" }, { label: "Mobile", key: "mobile" },
-            { label: "Overdue weeks", key: "days" }, { label: "Overdue amount", key: "pending" },
+            { label: "Weeks overdue", key: "weeks" }, { label: "Overdue amount", key: "pending" },
           ]} />
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-[#1e1e2e]">
-                {["User ID", "Name", "Mobile", "Overdue weeks", "Overdue amount"].map((h) => (
+                {["User ID", "Name", "Mobile", "Weeks overdue", "Overdue amount"].map((h) => (
                   <th key={h} className="text-left px-5 py-3 text-[11px] text-[#555] uppercase tracking-wider font-medium whitespace-nowrap">{h}</th>
                 ))}
               </tr>
@@ -64,7 +64,7 @@ export default async function PendingRentTable() {
                   <td className="px-5 py-3"><Link href={`/riders/${r.rider_id}`} className="font-mono text-xs text-[#6C5CE7] font-semibold hover:underline">{r.rider_code ?? "—"}</Link></td>
                   <td className="px-5 py-3"><Link href={`/riders/${r.rider_id}`} className="text-white font-medium hover:text-[#6C5CE7] hover:underline transition-colors">{r.name}</Link></td>
                   <td className="px-5 py-3 text-[#aaa]">{r.mobile}</td>
-                  <td className="px-5 py-3 text-[#aaa]">{r.days}</td>
+                  <td className="px-5 py-3 text-[#aaa]">{r.weeks}</td>
                   <td className="px-5 py-3 font-semibold text-[#ff6b6b]">{rupee(r.pending)}</td>
                 </tr>
               ))}

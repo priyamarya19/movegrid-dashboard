@@ -1,87 +1,14 @@
-import pool from "@/lib/db";
-import { schemas } from "@/lib/schemas";
-import { unstable_cache } from "next/cache";
 import Link from "next/link";
-import { getLedgerSummary } from "@/lib/rent";
-import { VSTATUS } from "@/lib/vehicleStatus";
+import { getLedgerSummary, getOverdueRiders, getDueSoonRiders } from "@/lib/rent";
+import { getFleetRiderCounts } from "@/lib/fleetStats";
+import { getRecentRiders } from "@/lib/riderStats";
+import { VSTATUS, NOT_AVAILABLE } from "@/lib/vehicleStatus";
 
 const fmt = (n: number) => {
   if (n >= 100000) return "₹" + (n / 100000).toFixed(1) + "L";
   if (n >= 1000) return "₹" + (n / 1000).toFixed(0) + "K";
   return "₹" + Math.round(n);
 };
-
-const getStats = unstable_cache(async function getStats() {
-  const [riders, vehicles, recentRiders, rentAlerts] = await Promise.all([
-    pool.query(`SELECT status, COUNT(*) FROM ${schemas.ops}.riders GROUP BY status`),
-    pool.query(`SELECT status, COUNT(*) FROM ${schemas.ops}.vehicles GROUP BY status`),
-    pool.query(`
-      SELECT r.id, r.name, r.mobile, r.status, r.created_at,
-             v.ev_number, v.id AS vehicle_id, h.hub_name
-      FROM ${schemas.ops}.riders r
-      LEFT JOIN ${schemas.ops}.rider_vehicle_assignments rva ON rva.rider_id = r.id AND rva.status = 'active'
-      LEFT JOIN ${schemas.ops}.vehicles v ON v.id = rva.vehicle_id
-      LEFT JOIN ${schemas.ops}.hubs h ON h.id = r.assigned_hub_id
-      ORDER BY r.created_at DESC LIMIT 10
-    `),
-    pool.query(`
-      WITH rent_due AS (
-        SELECT r.id, r.name, r.mobile, r.rental_mode, r.created_at,
-          CASE r.rental_mode WHEN 'weekly' THEN 7 WHEN 'fortnightly' THEN 14 ELSE 30 END AS period_days,
-          (NOW() AT TIME ZONE 'Asia/Kolkata')::date AS today_ist,
-          (r.created_at AT TIME ZONE 'Asia/Kolkata')::date AS joined_ist,
-          CASE r.rental_mode
-            WHEN 'weekly'      THEN ((r.created_at AT TIME ZONE 'Asia/Kolkata')::date + (GREATEST(CEIL(((NOW() AT TIME ZONE 'Asia/Kolkata')::date - (r.created_at AT TIME ZONE 'Asia/Kolkata')::date)::float / 7),  1) *  7)::int)
-            WHEN 'fortnightly' THEN ((r.created_at AT TIME ZONE 'Asia/Kolkata')::date + (GREATEST(CEIL(((NOW() AT TIME ZONE 'Asia/Kolkata')::date - (r.created_at AT TIME ZONE 'Asia/Kolkata')::date)::float / 14), 1) * 14)::int)
-            ELSE CASE
-              WHEN (DATE_TRUNC('month', (NOW() AT TIME ZONE 'Asia/Kolkata')::date) + (EXTRACT(day FROM (r.created_at AT TIME ZONE 'Asia/Kolkata')) - 1) * INTERVAL '1 day')::date >= (NOW() AT TIME ZONE 'Asia/Kolkata')::date
-              THEN (DATE_TRUNC('month', (NOW() AT TIME ZONE 'Asia/Kolkata')::date) + (EXTRACT(day FROM (r.created_at AT TIME ZONE 'Asia/Kolkata')) - 1) * INTERVAL '1 day')::date
-              ELSE (DATE_TRUNC('month', (NOW() AT TIME ZONE 'Asia/Kolkata')::date) + INTERVAL '1 month' + (EXTRACT(day FROM (r.created_at AT TIME ZONE 'Asia/Kolkata')) - 1) * INTERVAL '1 day')::date
-            END
-          END AS next_due_date,
-          CASE r.rental_mode
-            WHEN 'weekly'      THEN ((r.created_at AT TIME ZONE 'Asia/Kolkata')::date + (FLOOR(((NOW() AT TIME ZONE 'Asia/Kolkata')::date - (r.created_at AT TIME ZONE 'Asia/Kolkata')::date)::float / 7)  *  7)::int)
-            WHEN 'fortnightly' THEN ((r.created_at AT TIME ZONE 'Asia/Kolkata')::date + (FLOOR(((NOW() AT TIME ZONE 'Asia/Kolkata')::date - (r.created_at AT TIME ZONE 'Asia/Kolkata')::date)::float / 14) * 14)::int)
-            ELSE CASE
-              WHEN (DATE_TRUNC('month', (NOW() AT TIME ZONE 'Asia/Kolkata')::date) + (EXTRACT(day FROM (r.created_at AT TIME ZONE 'Asia/Kolkata')) - 1) * INTERVAL '1 day')::date <= (NOW() AT TIME ZONE 'Asia/Kolkata')::date
-              THEN (DATE_TRUNC('month', (NOW() AT TIME ZONE 'Asia/Kolkata')::date) + (EXTRACT(day FROM (r.created_at AT TIME ZONE 'Asia/Kolkata')) - 1) * INTERVAL '1 day')::date
-              ELSE (DATE_TRUNC('month', (NOW() AT TIME ZONE 'Asia/Kolkata')::date) - INTERVAL '1 month' + (EXTRACT(day FROM (r.created_at AT TIME ZONE 'Asia/Kolkata')) - 1) * INTERVAL '1 day')::date
-            END
-          END AS last_due_date
-        FROM ${schemas.ops}.riders r
-        WHERE r.status = 'active'
-      )
-      SELECT id, name, mobile, rental_mode, next_due_date, last_due_date,
-        CASE
-          WHEN last_due_date < today_ist AND last_due_date > joined_ist
-            AND NOT EXISTS (SELECT 1 FROM ${schemas.ops}.rider_payments p WHERE p.rider_id = rent_due.id AND p.rental_period_start >= rent_due.last_due_date - rent_due.period_days * INTERVAL '1 day' AND p.amount_collected >= 1610)
-          THEN 'overdue'
-          WHEN next_due_date BETWEEN today_ist AND today_ist + 2 THEN 'due_soon'
-          ELSE 'ok'
-        END AS rent_status
-      FROM rent_due
-      WHERE (
-        (last_due_date < today_ist AND last_due_date > joined_ist
-         AND NOT EXISTS (SELECT 1 FROM ${schemas.ops}.rider_payments p WHERE p.rider_id = rent_due.id AND p.rental_period_start >= rent_due.last_due_date - rent_due.period_days * INTERVAL '1 day' AND p.amount_collected >= 1610))
-        OR
-        (next_due_date BETWEEN today_ist AND today_ist + 2
-         AND NOT EXISTS (SELECT 1 FROM ${schemas.ops}.rider_payments p WHERE p.rider_id = rent_due.id AND p.rental_period_start >= rent_due.next_due_date - rent_due.period_days * INTERVAL '1 day' AND p.amount_collected >= 1610))
-      )
-      ORDER BY next_due_date ASC
-      LIMIT 50
-    `),
-  ]);
-
-  const rMap: Record<string, number> = {};
-  riders.rows.forEach((r: { status: string; count: string }) => { rMap[r.status] = Number(r.count); });
-  const vMap: Record<string, number> = {};
-  vehicles.rows.forEach((r: { status: string; count: string }) => { vMap[r.status] = Number(r.count); });
-
-  const overdueCount = rentAlerts.rows.filter((r: { rent_status: string }) => r.rent_status === "overdue").length;
-  const dueSoonCount = rentAlerts.rows.filter((r: { rent_status: string }) => r.rent_status === "due_soon").length;
-
-  return { rMap, vMap, recentRiders: recentRiders.rows, overdueCount, dueSoonCount };
-}, ["ops-stats-v3"], { revalidate: 60 });
 
 const statusColor: Record<string, string> = {
   active: "bg-green-500/20 text-green-400",
@@ -91,8 +18,11 @@ const statusColor: Record<string, string> = {
 };
 
 export default async function OpsManagerHome() {
-  const [{ rMap, vMap, recentRiders, overdueCount, dueSoonCount }, ledger] = await Promise.all([getStats(), getLedgerSummary()]);
-  const totalVehicles = Object.values(vMap).reduce((a, b) => a + b, 0);
+  const [fleet, recentRiders, ledger, overdueRiders, dueSoonRiders] = await Promise.all([
+    getFleetRiderCounts(), getRecentRiders(), getLedgerSummary(), getOverdueRiders(), getDueSoonRiders(),
+  ]);
+  const overdueCount = overdueRiders.length;
+  const dueSoonCount = dueSoonRiders.length;
   // Single source: identical to Admin & Investor dashboards.
   const collection = { collected: ledger.collected, expected: ledger.expectedToDate, pending: ledger.overdue, pct: ledger.pct };
   const pctColor = collection.pct >= 80 ? "#00D1B2" : collection.pct >= 50 ? "#fdcb6e" : "#ff6b6b";
@@ -107,10 +37,10 @@ export default async function OpsManagerHome() {
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
         {[
-          { label: "Active Riders", value: rMap["active"] ?? 0, color: "#00D1B2", href: "/riders?status=active" },
-          { label: "Pending KYC", value: rMap["pending"] ?? 0, color: "#fdcb6e", href: "/riders?status=pending" },
-          { label: "Vehicles Deployed", value: vMap[VSTATUS.assigned] ?? 0, color: "#6C5CE7", href: `/vehicles?status=${VSTATUS.assigned}` },
-          { label: "Available Vehicles", value: vMap[VSTATUS.available] ?? 0, color: "#a29bfe", href: `/vehicles?status=${VSTATUS.available}` },
+          { label: "Available Riders", value: fleet.pendingRiders, color: "#fdcb6e", href: "/riders?status=pending" },
+          { label: "Vehicles Deployed", value: fleet.assignedVehicles, color: "#6C5CE7", href: `/vehicles?status=${VSTATUS.assigned}` },
+          { label: "Available Vehicles", value: fleet.availableVehicles, color: "#a29bfe", href: `/vehicles?status=${VSTATUS.available}` },
+          { label: "Not Available", value: fleet.notAvailableVehicles, color: "#fdcb6e", href: `/vehicles?status=${NOT_AVAILABLE}` },
           { label: "Overdue Rent", value: overdueCount, color: "#ff6b6b", href: "/riders/overdue" },
           { label: "Due in 2 Days", value: dueSoonCount, color: "#fdcb6e", href: "/riders/due-soon" },
         ].map((c) => (
@@ -152,14 +82,14 @@ export default async function OpsManagerHome() {
         <p className="text-white font-semibold mb-4">Fleet Utilisation</p>
         <div className="space-y-3">
           {[
-            { label: "Assigned", color: "#00D1B2", val: vMap[VSTATUS.assigned] ?? 0 },
-            { label: "Available", color: "#a29bfe", val: vMap[VSTATUS.available] ?? 0 },
-            { label: "Maintenance", color: "#fdcb6e", val: vMap[VSTATUS.maintenance] ?? 0 },
+            { label: "Assigned", color: "#00D1B2", val: fleet.assignedVehicles },
+            { label: "Available", color: "#a29bfe", val: fleet.availableVehicles },
+            { label: "Not Available", color: "#fdcb6e", val: fleet.notAvailableVehicles },
           ].map((row) => (
             <div key={row.label} className="flex items-center gap-3 text-sm">
               <span className="w-24 text-sm shrink-0" style={{ color: row.color }}>{row.label}</span>
               <div className="flex-1 h-2 bg-[#1e1e2e] rounded-full overflow-hidden">
-                <div className="h-full rounded-full transition-all" style={{ width: totalVehicles ? `${Math.round(row.val / totalVehicles * 100)}%` : "0%", background: row.color }} />
+                <div className="h-full rounded-full transition-all" style={{ width: fleet.totalVehicles ? `${Math.round(row.val / fleet.totalVehicles * 100)}%` : "0%", background: row.color }} />
               </div>
               <span className="w-8 text-right text-white font-semibold text-xs shrink-0">{row.val}</span>
             </div>

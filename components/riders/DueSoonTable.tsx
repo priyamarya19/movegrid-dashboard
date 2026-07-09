@@ -9,14 +9,8 @@ type DueSoonRider = {
   hub_id: string; hub_name: string;
   vehicle_id: string; vehicle_number: string;
   employer: string; rental_mode: string;
-  next_due_date: string; period_days: number;
+  next_due_date: string; amount_due: number;
 };
-
-function addDays(dateStr: string, days: number): string {
-  const d = new Date(dateStr);
-  d.setDate(d.getDate() + days);
-  return d.toISOString().split("T")[0];
-}
 
 function daysUntil(dateStr: string): number {
   const today = new Date();
@@ -69,7 +63,6 @@ export default function DueSoonTable() {
                 <tr><td colSpan={8} className="px-5 py-10 text-center text-[#555]">No riders due in the next 2 days</td></tr>
               ) : riders.map((r) => {
                 const left = daysUntil(r.next_due_date);
-                const periodStart = addDays(r.next_due_date, -r.period_days);
                 const urgencyColor = left === 0 ? "bg-[#fdcb6e]/15 text-[#fdcb6e]" : "bg-[#aaa]/10 text-[#aaa]";
                 const urgencyLabel = left === 0 ? "Due today" : `${left}d left`;
                 return (
@@ -98,9 +91,9 @@ export default function DueSoonTable() {
                     <td className="px-5 py-3">
                       <RentMarkPaid
                         riderId={r.id}
-                        periodStart={periodStart}
-                        periodEnd={r.next_due_date}
-                        daysLeft={left}
+                        label={urgencyLabel}
+                        urgent={left === 0}
+                        defaultAmount={Math.round(r.amount_due)}
                         onPaid={fetchRiders}
                       />
                     </td>
