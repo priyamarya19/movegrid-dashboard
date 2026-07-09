@@ -36,26 +36,58 @@ export type CycleWeek = {
 };
 
 // Full unbroken weekly cycle for one rider (across all their assignments) — per-week
-// history for the rider profile page. The only function here that reads rent_dues.
+// history for the rider profile page. Reads rent_dues for everything already generated,
+// but ALSO synthesizes any week that's started (or is due to start within 2 days) but
+// hasn't been written to rent_dues yet by the daily regeneration job — so a rider's
+// current/upcoming week never goes missing just because that job hasn't run yet.
+// Synthesized rows use the exact same math as getDueSoonRiders/getOverdueRiders, so a
+// week appears here at the same moment it would in those lists (2 days before it starts,
+// the same 2-day grace before Overdue), and are seamlessly replaced once rent_dues
+// catches up (matched by period_start, so no duplicates).
 export async function getRiderCycle(riderId: string): Promise<CycleWeek[]> {
   const S = schemas.ops;
   const res = await pool.query(`
+    WITH existing AS (
+      SELECT d.assignment_id, d.week_no, d.period_start, d.period_end, d.due_date, d.amount
+      FROM ${S}.rent_dues d
+      WHERE d.rider_id = $1
+    ),
+    gaps AS (
+      SELECT a.id AS assignment_id, a.daily_rent,
+        COALESCE((SELECT MAX(e.period_end) FROM existing e WHERE e.assignment_id = a.id), a.assigned_date - 1) AS last_covered,
+        COALESCE((SELECT MAX(e.week_no) FROM existing e WHERE e.assignment_id = a.id), 0) AS last_week_no
+      FROM ${S}.rider_vehicle_assignments a
+      WHERE a.rider_id = $1 AND a.status = 'active'
+    ),
+    synthesized AS (
+      SELECT g.assignment_id,
+        (g.last_week_no + row_number() OVER (PARTITION BY g.assignment_id ORDER BY gs))::int AS week_no,
+        gs::date AS period_start, (gs::date + 6) AS period_end, (gs::date - 1) AS due_date,
+        g.daily_rent * 7 AS amount
+      FROM gaps g, LATERAL generate_series((g.last_covered + 1)::timestamp, (${IST} + 2)::timestamp, interval '7 days') AS gs
+    ),
+    weeks AS (
+      SELECT * FROM existing
+      UNION ALL
+      SELECT * FROM synthesized
+    )
     SELECT week_no, period_start, period_end, due_date, amount, paid, ev_number, vehicle_id,
       CASE WHEN paid >= amount THEN 'Collected'
            WHEN paid > 0 THEN 'Partial'
            WHEN asgn_status = 'active' AND ps_dt < ${OVERDUE_CUTOFF} THEN 'Overdue'
            ELSE 'Pending' END AS status
     FROM (
-      SELECT d.week_no,
-        to_char(d.period_start,'YYYY-MM-DD') AS period_start,
-        to_char(d.period_end,'YYYY-MM-DD') AS period_end,
-        to_char(d.due_date,'YYYY-MM-DD') AS due_date,
-        d.period_start AS ps_dt, d.vehicle_id, a.status AS asgn_status,
-        d.amount, ${PAID_FROM_BALANCE} AS paid, v.ev_number, a.assigned_date
-      FROM ${S}.rent_dues d
-      JOIN ${S}.rider_vehicle_assignments a ON a.id = d.assignment_id
-      LEFT JOIN ${S}.vehicles v ON v.id = d.vehicle_id
-      WHERE d.rider_id = $1
+      SELECT w.week_no,
+        to_char(w.period_start,'YYYY-MM-DD') AS period_start,
+        to_char(w.period_end,'YYYY-MM-DD') AS period_end,
+        to_char(w.due_date,'YYYY-MM-DD') AS due_date,
+        w.period_start AS ps_dt, a.vehicle_id, a.status AS asgn_status,
+        w.amount,
+        GREATEST(0, LEAST(COALESCE(a.paid_through_date, a.assigned_date - 1), w.period_end) - w.period_start + 1) * a.daily_rent AS paid,
+        v.ev_number, a.assigned_date
+      FROM weeks w
+      JOIN ${S}.rider_vehicle_assignments a ON a.id = w.assignment_id
+      LEFT JOIN ${S}.vehicles v ON v.id = a.vehicle_id
     ) q
     ORDER BY assigned_date, period_start`, [riderId]);
   return res.rows.map((r) => ({
@@ -116,8 +148,10 @@ export const getOverdueRiders = unstable_cache(async function getOverdueRiders()
   }));
 }, ["overdue-riders-v3"], { revalidate: 60 });
 
-// Riders whose paid-through date lapses within the next 2 days (but aren't Overdue
-// yet) — computed directly from paid_through_date. Shared everywhere.
+// Riders whose next rental week starts within 2 days (but aren't Overdue yet) —
+// computed directly from paid_through_date. Shared everywhere. Next week's
+// period_start = paid_through_date + 1, so "starts within 2 days" means
+// paid_through_date <= today + 1.
 export const getDueSoonRiders = unstable_cache(async function getDueSoonRiders() {
   const S = schemas.ops;
   const res = await pool.query(`
@@ -127,10 +161,10 @@ export const getDueSoonRiders = unstable_cache(async function getDueSoonRiders()
     JOIN ${S}.riders r ON r.id = a.rider_id
     WHERE a.status = 'active'
       AND COALESCE(a.paid_through_date, a.assigned_date - 1) >= ${OVERDUE_CUTOFF}
-      AND COALESCE(a.paid_through_date, a.assigned_date - 1) <= ${IST} + 2
+      AND COALESCE(a.paid_through_date, a.assigned_date - 1) <= ${IST} + 1
     ORDER BY next_due_date ASC`);
   return res.rows.map((r) => ({
     rider_id: r.rider_id, rider_code: r.rider_code, name: r.name, mobile: r.mobile,
     next_due_date: r.next_due_date,
   }));
-}, ["due-soon-riders-v2"], { revalidate: 60 });
+}, ["due-soon-riders-v3"], { revalidate: 60 });
