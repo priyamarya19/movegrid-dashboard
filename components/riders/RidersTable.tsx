@@ -90,10 +90,12 @@ function RentToggle({ rider, onToggled }: { rider: Rider; onToggled: () => void 
   );
 }
 
-export default function RidersTable({ rentFilter }: { rentFilter?: string | null }) {
+export default function RidersTable({ rentFilter, statusFilter: initialStatus }: { rentFilter?: string | null; statusFilter?: string | null }) {
   const [riders, setRiders] = useState<Rider[]>([]);
   const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState("");
+  // Seed the status filter from the URL (e.g. /riders?status=pending from the KYC badge).
+  const [statusFilter, setStatusFilter] = useState(initialStatus ?? "");
+  const [search, setSearch] = useState("");
   const [sort, setSort] = useState<Sort>({ key: "created_at", dir: "desc" });
 
   const fetchRiders = async () => {
@@ -111,7 +113,14 @@ export default function RidersTable({ rentFilter }: { rentFilter?: string | null
   const toggleSort = (key: string) =>
     setSort(s => s.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: "asc" });
 
-  const sorted = sortData(riders, sort);
+  // Search by user ID or name only.
+  const q = search.trim().toLowerCase();
+  const filtered = q
+    ? riders.filter((r) =>
+        r.name?.toLowerCase().includes(q) ||
+        r.rider_code?.toLowerCase().includes(q))
+    : riders;
+  const sorted = sortData(filtered, sort);
   const counts = riders.reduce((acc, r) => { acc[r.status] = (acc[r.status] || 0) + 1; return acc; }, {} as Record<string, number>);
 
   return (
@@ -124,6 +133,13 @@ export default function RidersTable({ rentFilter }: { rentFilter?: string | null
           <p className="text-[#666] text-sm mt-1">{riders.length} riders • {counts["active"] || 0} active · {counts["inactive"] || 0} inactive</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by name or user ID"
+            className="bg-[#12121A] border border-[#1e1e2e] rounded-xl px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-[#6C5CE7] w-48"
+          />
           <ExportButton filename="riders" columns={cols} rows={sorted} />
           <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
             className="bg-[#12121A] border border-[#1e1e2e] rounded-xl px-3 py-2 text-sm text-gray-300 focus:outline-none focus:border-[#6C5CE7]">

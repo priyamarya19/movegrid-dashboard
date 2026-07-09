@@ -5,7 +5,7 @@ export default async function RidersPage({ searchParams }: { searchParams: Promi
   const params = await searchParams;
   return (
     <DashboardLayout allowedRoles={["admin", "ops_manager", "hub_incharge"]}>
-      <RidersTable rentFilter={params.rent ?? null} />
+      <RidersTable rentFilter={params.rent ?? null} statusFilter={params.status ?? null} />
     </DashboardLayout>
   );
 }

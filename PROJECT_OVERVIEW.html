@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MoveGrid Dashboard — Complete Tech Overview</title>
+<style>
+  :root { --ink:#1a1a2e; --muted:#555; --line:#e5e7eb; --accent:#00a884; --bg:#fff; --soft:#f7f8fa; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: var(--ink); background: #eef0f3; margin: 0; line-height: 1.6; font-size: 15px;
+  }
+  .page {
+    max-width: 900px; margin: 28px auto; background: var(--bg);
+    padding: 46px 56px; border-radius: 10px; box-shadow: 0 2px 20px rgba(0,0,0,.07);
+  }
+  h1 { font-size: 27px; margin: 0 0 4px; letter-spacing: -.3px; }
+  .sub { color: var(--muted); margin: 0 0 10px; font-style: italic; }
+  h2 {
+    font-size: 18px; margin: 34px 0 12px; padding-bottom: 6px;
+    border-bottom: 2px solid var(--accent); display: inline-block;
+  }
+  p { margin: 10px 0; }
+  table { border-collapse: collapse; width: 100%; margin: 12px 0 6px; font-size: 13.5px; }
+  th, td { border: 1px solid var(--line); padding: 8px 11px; text-align: left; vertical-align: top; }
+  th { background: var(--soft); font-weight: 600; }
+  ol, ul { padding-left: 20px; margin: 10px 0; }
+  li { margin: 7px 0; }
+  code {
+    background: var(--soft); padding: 1.5px 5px; border-radius: 4px;
+    font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 12.5px; color: #b1267a;
+  }
+  pre {
+    background: #0f1220; color: #cdd3e0; padding: 16px 18px; border-radius: 8px;
+    overflow-x: auto; font-size: 12px; line-height: 1.45; font-family: "SF Mono", Menlo, Consolas, monospace;
+  }
+  .flow {
+    background: var(--soft); border-left: 3px solid var(--accent);
+    padding: 10px 14px; border-radius: 0 6px 6px 0; margin: 14px 0; font-size: 14px;
+  }
+  .note { color: var(--muted); font-size: 13.5px; }
+  @media print {
+    body { background: #fff; } .page { box-shadow: none; margin: 0; max-width: none; border-radius: 0; padding: 0; }
+    h2 { page-break-after: avoid; } table, pre { page-break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <h1>MoveGrid Dashboard — Complete Tech Overview</h1>
+  <p class="sub">A plain‑English guide to what the system is, how it's built, how it works, and why these technologies were chosen.</p>
+
+  <h2>1. What this project is</h2>
+  <p>MoveGrid Dashboard is the internal web application that runs an <b>electric‑scooter rental business</b>. It replaces spreadsheets and manual tracking with one organised system that manages:</p>
+  <ul>
+    <li><b>Riders</b> — the customers who rent scooters (onboarding, KYC documents, rent dues).</li>
+    <li><b>Vehicles</b> — the scooter fleet (status, hub, owner, assignment history).</li>
+    <li><b>Hubs</b> — the physical locations where scooters are parked and handed over.</li>
+    <li><b>Leads</b> — prospective riders/investors in the sales pipeline.</li>
+    <li><b>Investors</b> — people who fund scooters and receive monthly payouts, with their own self‑service portal.</li>
+  </ul>
+  <p>It serves <b>four types of users</b>, and each only sees what's relevant to their job:</p>
+  <table>
+    <tr><th>Role</th><th>What they manage</th></tr>
+    <tr><td><b>Admin</b></td><td>Everything — full control, investors, audit logs, user accounts</td></tr>
+    <tr><td><b>Ops Manager</b></td><td>Day‑to‑day operations: riders, vehicles, hubs, leads</td></tr>
+    <tr><td><b>Hub Incharge</b></td><td>Their hub's riders and vehicles</td></tr>
+    <tr><td><b>Investor</b></td><td>Only their own portfolio, profile, and support — a self‑service portal</td></tr>
+  </table>
+  <p>So the app is really <b>two things in one</b>: a <b>back‑office</b> for staff, and a <b>customer (investor) portal</b>.</p>
+
+  <h2>2. The big picture (how the parts fit together)</h2>
+  <pre>        ┌─────────────┐      ┌──────────────────────────┐      ┌──────────────┐
+        │  Browser    │ ───▶ │   MoveGrid app (Next.js) │ ───▶ │  PostgreSQL  │
+        │ (the user)  │ ◀─── │   running on AWS EC2     │ ◀─── │  (AWS RDS)   │
+        └─────────────┘      └───────────┬──────────────┘      └──────────────┘
+                                         │
+                              ┌──────────┴──────────┐
+                              ▼                     ▼
+                        ┌──────────┐          ┌──────────┐
+                        │  AWS S3  │          │ AWS SES  │
+                        │ (files)  │          │ (email)  │
+                        └──────────┘          └──────────┘</pre>
+  <ul>
+    <li>The <b>browser</b> shows the screens and is what users click around in.</li>
+    <li>The <b>MoveGrid app</b> is a single program (built with <b>Next.js</b>) that does <i>both</i> jobs: it builds the screens <b>and</b> runs the business logic on the server.</li>
+    <li>The <b>database</b> (PostgreSQL on AWS RDS) permanently stores all the data.</li>
+    <li><b>S3</b> stores uploaded files (photos, documents); <b>SES</b> sends emails.</li>
+  </ul>
+  <p>A key idea: most apps split into a separate "frontend" and "backend" written in different languages. Here, <b>one app and one language (TypeScript) does both</b>, which keeps things simpler.</p>
+
+  <h2>3. Languages and tools (and what each one is)</h2>
+  <table>
+    <tr><th>Tool / Language</th><th>Type</th><th>What it does</th><th>Plain explanation</th></tr>
+    <tr><td><b>TypeScript</b></td><td>Language</td><td>All app logic — screens & server</td><td>JavaScript with "types" (labels that catch mistakes early). The main language. </td></tr>
+    <tr><td><b>React</b></td><td>Library</td><td>Builds the screens</td><td>Builds the UI from small reusable pieces ("components"), like Lego blocks.</td></tr>
+    <tr><td><b>Next.js</b></td><td>Framework</td><td>Ties everything together</td><td>The framework around React adding routing, server rendering, and a built‑in backend.</td></tr>
+    <tr><td><b>Tailwind CSS</b></td><td>Styling</td><td>Colours, spacing, layout</td><td>Styles screens by adding small classes directly in the markup.</td></tr>
+    <tr><td><b>SQL / PostgreSQL</b></td><td>Language / DB</td><td>Reading & writing data</td><td>SQL is the language for asking the database; PostgreSQL is the database itself.</td></tr>
+    <tr><td><b>pg</b></td><td>Library</td><td>App ↔ database</td><td>The "driver" that lets our app run SQL on PostgreSQL.</td></tr>
+    <tr><td><b>jose</b></td><td>Library</td><td>Login tokens</td><td>Creates & verifies the secure token that proves you're logged in.</td></tr>
+    <tr><td><b>bcryptjs</b></td><td>Library</td><td>Password security</td><td>Scrambles (hashes) passwords so the real password is never stored.</td></tr>
+    <tr><td><b>Chart.js</b></td><td>Library</td><td>Graphs</td><td>Draws the charts on the dashboards.</td></tr>
+    <tr><td><b>AWS SDK</b></td><td>Library</td><td>Talks to AWS</td><td>Official toolkit to use S3 (files) and SES (email) from our code.</td></tr>
+    <tr><td><b>pm2</b></td><td>Tool</td><td>Keeps the app alive</td><td>Runs the app on the server and restarts it automatically if it stops.</td></tr>
+  </table>
+  <p class="note"><b>Language vs framework vs library:</b> a <b>language</b> is what you write in (TypeScript, SQL); a <b>framework</b> is the big structure you build inside (Next.js); a <b>library</b> is a smaller helper for one job (Chart.js, bcrypt). The only two actual <i>languages</i> here are <b>TypeScript</b> and <b>SQL</b>.</p>
+
+  <h2>4. How the project is organised (the folders)</h2>
+  <table>
+    <tr><th>Folder</th><th>What's inside</th></tr>
+    <tr><td><code>app/</code></td><td>Every page and every backend endpoint. Folder names become web addresses (<code>app/portfolio</code> → <code>/portfolio</code>).</td></tr>
+    <tr><td><code>app/api/</code></td><td>Backend endpoints that save/return data (e.g. <code>app/api/investors</code> handles creating an investor).</td></tr>
+    <tr><td><code>components/</code></td><td>Reusable UI pieces — tables, forms, the sidebar, modals — shared across pages.</td></tr>
+    <tr><td><code>lib/</code></td><td>The "brains": database connection, login, which DB to use, data queries, email, helpers.</td></tr>
+    <tr><td><code>scripts/</code></td><td>One‑off helper scripts — database migrations (adding a column) and data seeding.</td></tr>
+    <tr><td><code>public/</code></td><td>Static files like logos and images.</td></tr>
+    <tr><td><b>config files</b></td><td><code>package.json</code> (tools used), <code>ecosystem.config.js</code> (how the server runs the app), Tailwind/TS settings.</td></tr>
+  </table>
+
+  <h2>5. What each page does</h2>
+  <table>
+    <tr><th>Page (URL)</th><th>Who sees it</th><th>What it does</th></tr>
+    <tr><td><b>Login / Forgot / Reset</b></td><td>Everyone</td><td>Sign in; reset a forgotten password by email link</td></tr>
+    <tr><td><b>Dashboard</b> <code>/</code></td><td>All roles (varies)</td><td>Landing page with that role's key numbers and charts</td></tr>
+    <tr><td><b>Leads</b> <code>/leads</code></td><td>Admin, Ops</td><td>Sales pipeline of prospects; detail per lead</td></tr>
+    <tr><td><b>Riders</b> <code>/riders</code></td><td>Admin, Ops, Hub</td><td>Rider list; <b>+ New</b> to onboard; profile per rider; <b>Due‑soon / Overdue</b> rent views</td></tr>
+    <tr><td><b>Vehicles</b> <code>/vehicles</code></td><td>Admin, Ops, Hub</td><td>Fleet list; <b>+ New</b>; detail showing hub, investor, current rider, payout history</td></tr>
+    <tr><td><b>Hubs</b> <code>/hubs</code></td><td>Admin, Ops, Hub</td><td>Hub locations; <b>+ New</b>; detail with that hub's riders & vehicles</td></tr>
+    <tr><td><b>Allotments</b> <code>/allotments</code></td><td>Admin, Ops, Hub</td><td>Assign a vehicle to a rider, and record returns</td></tr>
+    <tr><td><b>Investors</b> <code>/investors</code></td><td>Admin only</td><td>Investor list; <b>+ Add Investor</b> (creates login); detail to map vehicles, record payouts, verify bank changes</td></tr>
+    <tr><td><b>My Portfolio</b> <code>/portfolio</code></td><td>Investor</td><td>Their vehicles, earnings, payouts remaining (24‑month plan), ROI, next due date, CO₂/impact</td></tr>
+    <tr><td><b>My Profile</b> <code>/profile</code></td><td>Investor</td><td>Personal & bank details (bank changes need admin approval), Aadhaar image</td></tr>
+    <tr><td><b>Support</b> <code>/support</code></td><td>Investor</td><td>Send a query — emails both the team and the investor</td></tr>
+    <tr><td><b>Forms</b> <code>/forms</code></td><td>Admin, Ops, Hub</td><td>A shortcut hub linking to the onboarding/allotment forms</td></tr>
+    <tr><td><b>Audit Logs</b> <code>/logs</code></td><td>Admin only</td><td>A record of who changed what</td></tr>
+    <tr><td><b>Settings</b> <code>/settings</code></td><td>All roles</td><td>Change password; admins manage user accounts</td></tr>
+  </table>
+
+  <h2>6. How it works — following one real request</h2>
+  <p>The clearest way to understand it is to follow what happens when <b>an investor opens "My Portfolio":</b></p>
+  <ol>
+    <li><b>The web address maps to a folder.</b> <code>/portfolio</code> → <code>app/portfolio</code>. Next.js runs that page.</li>
+    <li><b>A security gatekeeper runs first.</b> Before the page loads, a check (the "middleware") reads the login token from the cookie. No valid token → redirected to login.</li>
+    <li><b>The page builds itself on the server.</b> This is a "<b>Server Component</b>" — it runs on the server. It runs <b>SQL</b> to fetch <i>only this investor's</i> vehicles, payouts and totals from PostgreSQL.</li>
+    <li><b>The numbers are calculated</b> — earnings, payouts remaining, ROI, and the environmental‑impact figures.</li>
+    <li><b>A finished screen is sent to the browser</b> — assembled on the server, so it appears quickly and already filled in.</li>
+    <li><b>Interactive bits run in the browser.</b> The "edit bank details" form or "request full number" popup are "<b>Client Components</b>" — they run in the browser to react instantly to clicks.</li>
+    <li><b>Saving goes through an API endpoint.</b> A submitted form is sent to a backend endpoint under <code>app/api/...</code>, which checks who you are, validates input, runs SQL to save, and replies. The screen refreshes.</li>
+  </ol>
+  <div class="flow"><b>One line:</b> open a page → login is checked → the server fetches data with SQL → a ready‑made screen loads → forms save back through API endpoints.</div>
+  <p class="note"><b>Server‑rendered vs browser‑rendered:</b> pages are built on the <b>server</b> so they load fast and securely (database access never leaves the server). Only the interactive parts run in the <b>browser</b>. We get the speed of server rendering <i>and</i> the slickness of an interactive app.</p>
+
+  <h2>7. The database</h2>
+  <ul>
+    <li><b>PostgreSQL</b> (on AWS RDS) is the single source of truth — everything is stored here.</li>
+    <li>Data is organised into <b>schemas</b> (labelled sections): one for <b>operations</b> (riders, vehicles, hubs, investors, payouts), one for <b>logins/users</b>, one for <b>leads</b>, one for <b>audit logs</b>.</li>
+    <li>Main tables include: <code>riders</code>, <code>vehicles</code>, <code>hubs</code>, <code>rider_vehicle_assignments</code> (who has which scooter), <code>rider_payments</code>, <code>investor_profiles</code>, <code>investor_payouts</code>, <code>leads</code>, <code>users</code>+<code>roles</code>, <code>audit_logs</code>.</li>
+    <li>We write <b>SQL directly</b> (rather than an automatic translator called an "ORM"), for precise control and performance on heavier calculations — like who's overdue on rent, or totalling investor payouts.</li>
+  </ul>
+
+  <h2>8. Security & access control</h2>
+  <ul>
+    <li><b>Passwords are never stored as text</b> — they're hashed with <b>bcrypt</b>, a one‑way scramble.</li>
+    <li><b>Logins use a secure token (JWT)</b> stored in a protected cookie, re‑checked on every request, expiring after 8 hours.</li>
+    <li><b>A gatekeeper (middleware)</b> blocks every page for anyone not logged in.</li>
+    <li><b>Role‑based access</b> — each page and endpoint checks your role, so an investor can never reach admin data.</li>
+    <li><b>Sensitive data is masked</b> — an investor sees a rider's phone as <code>98XXXXXX10</code> and Aadhaar with only the last 4 digits; the full number needs a logged, emailed request.</li>
+    <li><b>Bank‑detail changes require approval</b> — an investor's edit is marked "pending" until an admin verifies it.</li>
+    <li><b>Files are served via short‑lived secure links</b> — S3 documents aren't public; links expire in an hour.</li>
+    <li><b>Live and test data are kept in separate databases.</b></li>
+  </ul>
+
+  <h2>9. AWS services used (and how each works)</h2>
+  <table>
+    <tr><th>Service</th><th>What it is</th><th>How we use it</th></tr>
+    <tr><td><b>EC2</b></td><td>A virtual server in the cloud</td><td>Runs the app continuously via pm2. Two copies: <b>live</b> (dash.movegrid.in) and <b>testing</b> (dash‑uat.movegrid.in).</td></tr>
+    <tr><td><b>RDS</b> <span class="note">(PostgreSQL)</span></td><td>A managed database (AWS runs, secures & backs it up)</td><td>Stores all data. Two separate databases — <b>live</b> and <b>testing</b> — fully isolated.</td></tr>
+    <tr><td><b>S3</b></td><td>Object/file storage</td><td>Holds uploaded photos & documents (KYC, receipts, Aadhaar), shown via short‑lived secure links.</td></tr>
+    <tr><td><b>SES</b></td><td>Email‑sending service</td><td>Sends emails from a verified company address — support replies, investor notifications, lead alerts.</td></tr>
+  </table>
+  <p class="note">"Managed" means AWS handles the hard infrastructure — backups, security patches, uptime — so we don't run that ourselves.</p>
+
+  <h2>10. Environments & how we ship changes</h2>
+  <p>There are <b>two environments</b>, deliberately separated:</p>
+  <ul>
+    <li><b>UAT (testing)</b> — <code>dash‑uat.movegrid.in</code>, uses the <b>test database</b>. Every change is tried here first.</li>
+    <li><b>Production (live)</b> — <code>dash.movegrid.in</code>, uses the <b>live database</b> with real customers.</li>
+  </ul>
+  <p>Both run on the same server but are told which database to use by one setting (<code>RDS_ENV</code>) configured per app in <code>ecosystem.config.js</code> — this is what keeps live and test data apart.</p>
+  <p>A <b>deployment</b> is: push the code → on the server pull it, install any new tools, run any database updates ("migrations"), rebuild, and restart with pm2. Changes are verified on UAT before production.</p>
+
+  <h2>11. Why this technology — industry standard & easy to hire for</h2>
+  <p>Every piece of this stack is a current <b>industry standard</b> with a huge community. That matters practically: more documentation, fewer dead ends, proven reliability, and — importantly — <b>a large pool of developers who already know these tools, so hiring is easier, faster and cheaper.</b></p>
+  <ul>
+    <li><b>JavaScript / TypeScript</b> is the world's most widely used programming language, year after year — the biggest talent pool of any language. It runs both the screens and the server, so one developer can work across the whole app.</li>
+    <li><b>React</b> is the most popular way to build web interfaces, and <b>Next.js</b> is its leading framework — used by <b>Netflix, TikTok and Notion</b>. Proven at very large scale, heavily documented, easy to find answers for.</li>
+    <li><b>PostgreSQL</b> is the most popular and most‑loved open‑source database — extremely reliable, free, widely known.</li>
+    <li><b>AWS</b> is the market‑leading cloud platform — a standard skill most infrastructure engineers already have.</li>
+    <li><b>Tailwind CSS</b> is today's dominant styling approach, so the UI is quick to build and consistent.</li>
+  </ul>
+  <p><b>Why it's the right call:</b> the stack is <b>modern</b> (current best practice, not legacy), <b>fast</b> for users (server‑rendered), <b>scalable</b> (the same tools power some of the largest sites in the world), <b>future‑proof</b> (actively maintained, growing adoption), and <b>easy to staff</b>. Nothing here is niche or unusual that would make it hard to maintain or hand over.</p>
+
+  <h2>12. Glossary (plain English)</h2>
+  <table>
+    <tr><th>Term</th><th>Meaning</th></tr>
+    <tr><td><b>Framework</b></td><td>The big structure you build an app inside (here: Next.js).</td></tr>
+    <tr><td><b>Library</b></td><td>A smaller plug‑in helper for one job (e.g. Chart.js for graphs).</td></tr>
+    <tr><td><b>Component</b></td><td>A reusable building block of the UI (a table, a form, a button).</td></tr>
+    <tr><td><b>Server Component</b></td><td>A page/piece built on the server, then sent to the browser ready‑made.</td></tr>
+    <tr><td><b>Client Component</b></td><td>A piece that runs in the browser so it can react to clicks instantly.</td></tr>
+    <tr><td><b>API / endpoint</b></td><td>A backend address the app calls to fetch or save data.</td></tr>
+    <tr><td><b>SQL</b></td><td>The language used to ask the database for, or save, data.</td></tr>
+    <tr><td><b>Schema</b></td><td>A labelled section of the database that groups related tables.</td></tr>
+    <tr><td><b>Migration</b></td><td>A script that updates the database structure (e.g. adds a new column).</td></tr>
+    <tr><td><b>ORM</b></td><td>An automatic SQL translator. We <i>don't</i> use one — we write SQL directly for control.</td></tr>
+    <tr><td><b>JWT (token)</b></td><td>A signed digital pass that proves you're logged in.</td></tr>
+    <tr><td><b>Hashing</b></td><td>A one‑way scramble (used for passwords) that can't be reversed.</td></tr>
+    <tr><td><b>Presigned URL</b></td><td>A temporary secure link to a private file in S3 that expires.</td></tr>
+    <tr><td><b>Environment</b></td><td>A copy of the app — e.g. <i>testing</i> (UAT) vs <i>live</i> (production).</td></tr>
+    <tr><td><b>Deployment</b></td><td>The act of publishing a code change to a running environment.</td></tr>
+    <tr><td><b>pm2</b></td><td>The tool that keeps the app running on the server and restarts it if needed.</td></tr>
+    <tr><td><b>EC2 / RDS / S3 / SES</b></td><td>AWS services: a server / a database / file storage / email sending.</td></tr>
+  </table>
+
+</div>
+</body>
+</html>

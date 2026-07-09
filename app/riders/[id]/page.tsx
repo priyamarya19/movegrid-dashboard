@@ -6,12 +6,11 @@ import { schemas } from "@/lib/schemas";
 import KycVerifyButton from "@/components/riders/KycVerifyButton";
 import BackButton from "@/components/BackButton";
 import BlacklistButton from "@/components/riders/BlacklistButton";
-import RentMarkPaid from "@/components/riders/RentMarkPaid";
+import RecordPayment from "@/components/riders/RecordPayment";
 import { getRiderCycle } from "@/lib/rent";
 import RiderPenalties from "@/components/riders/RiderPenalties";
 import ExportButton from "@/components/ExportButton";
 import { getSession } from "@/lib/auth";
-import { EXPECTED_RENT } from "@/lib/rentConstants";
 
 function toISTMidnight(d: Date): Date {
   // Returns a Date whose y/m/d components (in local time) match the IST date of d
@@ -19,54 +18,6 @@ function toISTMidnight(d: Date): Date {
   const [datePart] = s.split(",");
   const [m, day, y] = datePart.split("/").map(Number);
   return new Date(y, m - 1, day); // local midnight = UTC midnight on server
-}
-
-function calcLastDueDate(createdAt: string, rentalMode: string): Date | null {
-  const joined = toISTMidnight(new Date(createdAt));
-  const today = toISTMidnight(new Date());
-  const periodLen = rentalMode === "weekly" ? 7 : rentalMode === "fortnightly" ? 14 : 30;
-
-  if (rentalMode === "weekly" || rentalMode === "fortnightly") {
-    const days = Math.round((today.getTime() - joined.getTime()) / 86400000);
-    const periods = Math.floor(days / periodLen);
-    if (periods <= 0) return null;
-    const d = new Date(joined);
-    d.setDate(joined.getDate() + periods * periodLen);
-    if (d.getTime() >= today.getTime()) return null; // due today is handled by next_due
-    return d;
-  }
-  // monthly
-  const joinDay = joined.getDate();
-  const thisMonthDue = new Date(today.getFullYear(), today.getMonth(), joinDay);
-  if (thisMonthDue.getTime() < today.getTime() && thisMonthDue.getTime() > joined.getTime()) return thisMonthDue;
-  const lastMonthDue = new Date(today.getFullYear(), today.getMonth() - 1, joinDay);
-  if (lastMonthDue.getTime() > joined.getTime()) return lastMonthDue;
-  return null;
-}
-
-function calcNextDueDate(createdAt: string, rentalMode: string): Date {
-  const joined = toISTMidnight(new Date(createdAt));
-  const today = toISTMidnight(new Date());
-
-  if (rentalMode === "weekly") {
-    const days = Math.round((today.getTime() - joined.getTime()) / 86400000);
-    const weeks = Math.max(Math.ceil(days / 7), 1);
-    const d = new Date(joined);
-    d.setDate(joined.getDate() + weeks * 7);
-    return d;
-  }
-  if (rentalMode === "fortnightly") {
-    const days = Math.round((today.getTime() - joined.getTime()) / 86400000);
-    const fortnights = Math.max(Math.ceil(days / 14), 1);
-    const d = new Date(joined);
-    d.setDate(joined.getDate() + fortnights * 14);
-    return d;
-  }
-  // monthly — same day-of-month as IST join date
-  const joinDay = joined.getDate();
-  const thisMonth = new Date(today.getFullYear(), today.getMonth(), joinDay);
-  if (thisMonth >= today) return thisMonth;
-  return new Date(today.getFullYear(), today.getMonth() + 1, joinDay);
 }
 
 async function getData(id: string) {
@@ -91,6 +42,7 @@ async function getData(id: string) {
 
     pool.query(`
       SELECT rva.assigned_date, rva.status AS assignment_status,
+             rva.daily_rent, to_char(rva.paid_through_date, 'YYYY-MM-DD') AS paid_through_date,
              v.ev_number, v.id AS vehicle_id,
              m.model_name, m.oem
       FROM ${schemas.ops}.rider_vehicle_assignments rva
@@ -126,52 +78,7 @@ export default async function RiderDetailPage({ params }: { params: Promise<{ id
   const activeAssignment = assignments.find((a: { assignment_status: string }) => a.assignment_status === "active");
   const cycle = await getRiderCycle(rider.id); // unbroken weekly ledger (no gaps; stops at return)
 
-  const periodLen = rider.rental_mode === "weekly" ? 7 : rider.rental_mode === "fortnightly" ? 14 : 30;
   const todayIST = toISTMidnight(new Date());
-
-  // Next due date
-  const nextDueDate = rider.status === "active" && rider.rental_mode && activeAssignment
-    ? calcNextDueDate(rider.created_at, rider.rental_mode)
-    : null;
-  const nextDueDaysLeft = nextDueDate
-    ? Math.round((nextDueDate.getTime() - todayIST.getTime()) / 86400000)
-    : null;
-  const periodEndStr = nextDueDate ? nextDueDate.toISOString().split("T")[0] : null;
-  const periodStartStr = nextDueDate
-    ? new Date(nextDueDate.getTime() - periodLen * 86400000).toISOString().split("T")[0]
-    : null;
-  // Find the actual payment object for the current period, then check if it's full or partial
-  const currentPeriodPayment = periodStartStr != null
-    ? payments.find((p: { rental_period_start: string; amount_collected: number }) =>
-        p.rental_period_start != null && p.rental_period_start >= periodStartStr!)
-    : undefined;
-  const currentPeriodPaid = !!currentPeriodPayment && Number(currentPeriodPayment.amount_collected) >= EXPECTED_RENT;
-  const currentPeriodPartial = !!currentPeriodPayment && Number(currentPeriodPayment.amount_collected) < EXPECTED_RENT;
-  const currentPeriodBalance = currentPeriodPartial ? EXPECTED_RENT - Number(currentPeriodPayment!.amount_collected) : 0;
-
-  // Last (overdue) due date — only exists if past due and no full payment
-  const lastDueDate = rider.status === "active" && rider.rental_mode && activeAssignment
-    ? calcLastDueDate(rider.created_at, rider.rental_mode)
-    : null;
-  const lastDuePeriodEndStr = lastDueDate ? lastDueDate.toISOString().split("T")[0] : null;
-  const lastDuePeriodStartStr = lastDueDate
-    ? new Date(lastDueDate.getTime() - periodLen * 86400000).toISOString().split("T")[0]
-    : null;
-  // A period is paid only if a full payment (>= EXPECTED_RENT) exists for it
-  const lastPeriodFullPayment = lastDuePeriodStartStr != null
-    ? payments.find((p: { rental_period_start: string; amount_collected: number }) =>
-        p.rental_period_start != null && p.rental_period_start >= lastDuePeriodStartStr! && Number(p.amount_collected) >= EXPECTED_RENT)
-    : undefined;
-  const lastPeriodPartialPayment = lastDuePeriodStartStr != null && !lastPeriodFullPayment
-    ? payments.find((p: { rental_period_start: string; amount_collected: number }) =>
-        p.rental_period_start != null && p.rental_period_start >= lastDuePeriodStartStr! && Number(p.amount_collected) < EXPECTED_RENT)
-    : undefined;
-  const isOverdueUnpaid = lastDueDate !== null && !lastPeriodFullPayment;
-  const lastDuePeriodPartialAmt = isOverdueUnpaid && lastPeriodPartialPayment ? Number(lastPeriodPartialPayment.amount_collected) : null;
-  const lastDuePeriodBalance = lastDuePeriodPartialAmt != null ? EXPECTED_RENT - lastDuePeriodPartialAmt : null;
-  const lastDueDaysOverdue = lastDueDate
-    ? Math.round((todayIST.getTime() - lastDueDate.getTime()) / 86400000)
-    : 0;
 
   return (
     <DashboardLayout allowedRoles={["admin", "ops_manager", "hub_incharge"]}>
@@ -405,8 +312,15 @@ export default async function RiderDetailPage({ params }: { params: Promise<{ id
 
         {/* Rent cycle — full unbroken weekly ledger (no gaps; stops at return) */}
         <div className="bg-[#12121A] border border-[#1e1e2e] rounded-xl overflow-hidden">
-          <div className="px-5 py-4 border-b border-[#1e1e2e] flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-white font-semibold">Rent Cycle</h2>
+          <div className="px-5 py-4 border-b border-[#1e1e2e] flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-white font-semibold">Rent Cycle</h2>
+              {activeAssignment?.paid_through_date && (
+                <p className="text-[11px] text-[#00D1B2] mt-0.5">
+                  Paid through {new Date(activeAssignment.paid_through_date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                </p>
+              )}
+            </div>
             <div className="flex items-center gap-3">
               <span className="text-[11px] text-[#555]">{cycle.length} week{cycle.length !== 1 ? "s" : ""} · shown until the bike is returned</span>
               <ExportButton filename={`rent-cycle-${rider.rider_code ?? rider.mobile}`} rows={cycle} columns={[
@@ -414,6 +328,9 @@ export default async function RiderDetailPage({ params }: { params: Promise<{ id
                 { label: "Due date", key: "due_date" }, { label: "Vehicle", key: "ev_number" }, { label: "Rent", key: "amount" },
                 { label: "Paid", key: "paid" }, { label: "Status", key: "status" },
               ]} />
+              {activeAssignment && (
+                <RecordPayment riderId={rider.id} dailyRent={activeAssignment.daily_rent ? Number(activeAssignment.daily_rent) : null} />
+              )}
             </div>
           </div>
           <div className="overflow-x-auto">
@@ -447,14 +364,12 @@ export default async function RiderDetailPage({ params }: { params: Promise<{ id
                       <td className="px-5 py-3">
                         {w.status === "Collected" ? (
                           <span className="text-[#00D1B2] text-xs font-semibold">₹{Math.round(w.paid).toLocaleString("en-IN")} paid</span>
+                        ) : w.status === "Partial" ? (
+                          <span className="text-orange-400 text-xs font-semibold">₹{Math.round(w.paid).toLocaleString("en-IN")} of ₹{Math.round(w.amount).toLocaleString("en-IN")}</span>
                         ) : (
-                          <RentMarkPaid
-                            riderId={rider.id}
-                            periodStart={w.period_start}
-                            periodEnd={w.period_end}
-                            daysLeft={daysLeft}
-                            defaultAmount={w.status === "Partial" ? balance : Math.round(w.amount)}
-                          />
+                          <span className="text-[11px]" style={{ color: daysLeft < 0 ? "#f87171" : daysLeft <= 2 ? "#fdcb6e" : "#666" }}>
+                            {daysLeft < 0 ? `Overdue ${Math.abs(daysLeft)}d` : daysLeft === 0 ? "Due today" : `Due in ${daysLeft}d`} · ₹{balance.toLocaleString("en-IN")}
+                          </span>
                         )}
                       </td>
                     </tr>

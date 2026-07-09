@@ -1,25 +1,13 @@
 "use client";
 
-// Reusable "download table as Excel (CSV)" button.
-// CSV opens natively in Excel/Google Sheets; the UTF-8 BOM keeps unicode intact.
+// Reusable "download table as Excel" button — hands formatted rows to
+// /api/export/xlsx, which returns a real .xlsx via exceljs.
 export type ExportColumn<T = Record<string, unknown>> = {
   label: string;
   key: string;
   // optional formatter for derived/boolean/date values
   value?: (row: T) => unknown;
 };
-
-function toCsv<T>(columns: ExportColumn<T>[], rows: T[]): string {
-  const esc = (v: unknown) => {
-    const s = v === null || v === undefined ? "" : String(v);
-    return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
-  };
-  const header = columns.map((c) => esc(c.label)).join(",");
-  const body = rows.map((r) =>
-    columns.map((c) => esc(c.value ? c.value(r) : (r as Record<string, unknown>)[c.key])).join(",")
-  ).join("\r\n");
-  return header + "\r\n" + body;
-}
 
 export default function ExportButton<T>({
   filename, columns, rows, label = "Export",
@@ -29,14 +17,28 @@ export default function ExportButton<T>({
   rows: T[];
   label?: string;
 }) {
-  function download() {
-    const csv = toCsv(columns, rows);
-    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
+  async function download() {
+    const flatRows = rows.map((r) =>
+      Object.fromEntries(
+        columns.map((c) => [c.key, c.value ? c.value(r) : (r as Record<string, unknown>)[c.key]])
+      )
+    );
+    const res = await fetch("/api/export/xlsx", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        filename,
+        columns: columns.map((c) => ({ label: c.label, key: c.key })),
+        rows: flatRows,
+      }),
+    });
+    if (!res.ok) return;
+    const blob = await res.blob();
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     const stamp = new Date().toISOString().slice(0, 10);
     a.href = url;
-    a.download = `${filename}-${stamp}.csv`;
+    a.download = `${filename}-${stamp}.xlsx`;
     document.body.appendChild(a);
     a.click();
     a.remove();
@@ -48,7 +50,7 @@ export default function ExportButton<T>({
       type="button"
       onClick={download}
       disabled={!rows.length}
-      title={rows.length ? "Download as Excel/CSV" : "Nothing to export"}
+      title={rows.length ? "Download as Excel" : "Nothing to export"}
       className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-[#2a2a3a] text-[#aaa] hover:border-[#00D1B2]/50 hover:text-[#00D1B2] transition-colors disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
     >
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

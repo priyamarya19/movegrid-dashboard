@@ -2,13 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import pool from "@/lib/db";
 import { schemas } from "@/lib/schemas";
-import { getSession } from "@/lib/auth";
+import { requireRole } from "@/lib/auth";
 
 export async function GET(req: NextRequest) {
-  const session = await getSession(req);
-  if (!session || session.role !== "admin") {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
-  }
+  const guard = await requireRole(req, ["admin"]);
+  if ("response" in guard) return guard.response;
 
   const result = await pool.query(`
     SELECT ip.id, u.name, u.email, u.mobile,
@@ -30,10 +28,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const session = await getSession(req);
-  if (!session || session.role !== "admin") {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
-  }
+  const guard = await requireRole(req, ["admin"]);
+  if ("response" in guard) return guard.response;
 
   const body = await req.json();
   const name = body.name?.trim();

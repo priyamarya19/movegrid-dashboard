@@ -10,6 +10,9 @@ const PUBLIC_PATHS = [
   "/api/auth/login",
   "/api/auth/forgot-password",
   "/api/auth/reset-password",
+  // Cron-triggered report sends: no user session, gated by their own X-Cron-Secret check instead.
+  "/api/reports/fleet-status/send",
+  "/api/reports/rent-due/send",
 ];
 
 export async function proxy(req: NextRequest) {

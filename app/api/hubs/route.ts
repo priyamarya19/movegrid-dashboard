@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
     SELECT h.id, h.hub_id, h.hub_name, h.city, h.area, h.vehicle_capacity,
            COUNT(DISTINCT r.id) FILTER (WHERE r.status = 'active') AS active_riders,
            COUNT(DISTINCT v.id) FILTER (WHERE v.status = 'assigned') AS assigned_vehicles,
-           COUNT(DISTINCT v.id) FILTER (WHERE v.status = 'available') AS available_vehicles
+           COUNT(DISTINCT v.id) FILTER (WHERE v.status = 'ready_to_deploy') AS available_vehicles
     FROM ${schemas.ops}.hubs h
     LEFT JOIN ${schemas.ops}.riders r ON r.assigned_hub_id = h.id
     LEFT JOIN ${schemas.ops}.vehicles v ON v.hub_id = h.id

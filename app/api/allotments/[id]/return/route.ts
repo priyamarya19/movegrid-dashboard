@@ -30,7 +30,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const asgn = await client.query(
       `SELECT vehicle_id, rider_id FROM ${schemas.ops}.rider_vehicle_assignments WHERE id = $1`, [id]
     );
-    if (!asgn.rows[0]) return NextResponse.json({ error: "Assignment not found" }, { status: 404 });
+    if (!asgn.rows[0]) {
+      await client.query("ROLLBACK");
+      return NextResponse.json({ error: "Assignment not found" }, { status: 404 });
+    }
     const { vehicle_id, rider_id } = asgn.rows[0];
 
     // Update assignment

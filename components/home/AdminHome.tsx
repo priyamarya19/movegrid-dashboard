@@ -6,47 +6,11 @@ import RidersChart from "@/components/charts/RidersChart";
 import VehicleDonut from "@/components/charts/VehicleDonut";
 import PendingPayoutsWidget from "@/components/home/PendingPayoutsWidget";
 import { getLedgerSummary } from "@/lib/rent";
-import { VSTATUS } from "@/lib/vehicleStatus";
+import { getFleetRiderCounts } from "@/lib/fleetStats";
+import { getFinancialStats } from "@/lib/financialStats";
+import { VSTATUS, NOT_AVAILABLE } from "@/lib/vehicleStatus";
 
 type Props = { role: string; name: string };
-
-const getStats = unstable_cache(async function getStats() {
-  const [vehicles, riders, rentMTD, onboardMTD, securityMTD, totalCollected, totalInvestments, payoutsDone, payoutsPending] = await Promise.all([
-    pool.query(`SELECT status, COUNT(*) FROM ${schemas.ops}.vehicles GROUP BY status`),
-    pool.query(`SELECT status, COUNT(*) FROM ${schemas.ops}.riders GROUP BY status`),
-    pool.query(`SELECT COALESCE(SUM(amount_collected),0) AS total FROM ${schemas.ops}.rider_payments WHERE DATE_TRUNC('month', payment_date) = DATE_TRUNC('month', CURRENT_DATE)`),
-    pool.query(`SELECT COALESCE(SUM(onboarding_fee),0) AS total FROM ${schemas.ops}.riders WHERE DATE_TRUNC('month', created_at) = DATE_TRUNC('month', CURRENT_DATE)`),
-    pool.query(`SELECT COALESCE(SUM(security_deposit),0) AS total FROM ${schemas.ops}.riders WHERE DATE_TRUNC('month', created_at) = DATE_TRUNC('month', CURRENT_DATE)`),
-    pool.query(`SELECT COALESCE(SUM(amount_collected),0) AS total FROM ${schemas.ops}.rider_payments`),
-    pool.query(`SELECT COALESCE(SUM(total_invested),0) AS total FROM ${schemas.ops}.investor_profiles`),
-    pool.query(`SELECT COALESCE(SUM(amount),0) AS total FROM ${schemas.ops}.investor_payouts WHERE status = 'paid'`),
-    pool.query(`SELECT COALESCE(SUM(amount),0) AS total FROM ${schemas.ops}.investor_payouts WHERE status = 'pending'`),
-  ]);
-
-  const vMap: Record<string, number> = {};
-  vehicles.rows.forEach((r: { status: string; count: string }) => { vMap[r.status] = Number(r.count); });
-  const totalVehicles = Object.values(vMap).reduce((a, b) => a + b, 0);
-
-  const rMap: Record<string, number> = {};
-  riders.rows.forEach((r: { status: string; count: string }) => { rMap[r.status] = Number(r.count); });
-
-  return {
-    assignedVehicles: vMap[VSTATUS.assigned] ?? 0,
-    availableVehicles: vMap[VSTATUS.available] ?? 0,
-    maintenanceVehicles: vMap[VSTATUS.maintenance] ?? 0,
-    totalVehicles,
-    activeRiders: rMap["active"] ?? 0,
-    inactiveRiders: rMap["inactive"] ?? 0,
-    pendingRiders: rMap["pending"] ?? 0,
-    rentMTD: Number(rentMTD.rows[0].total),
-    onboardMTD: Number(onboardMTD.rows[0].total),
-    securityMTD: Number(securityMTD.rows[0].total),
-    totalCollected: Number(totalCollected.rows[0].total),
-    totalInvestments: Number(totalInvestments.rows[0].total),
-    payoutsDone: Number(payoutsDone.rows[0].total),
-    payoutsPending: Number(payoutsPending.rows[0].total),
-  };
-}, ["admin-stats-v3"], { revalidate: 60 });
 
 const getMonthlyOnboarding = unstable_cache(async function getMonthlyOnboarding() {
   const res = await pool.query(`
@@ -192,9 +156,10 @@ function activityText(log: { action: string; details: unknown }) {
 }
 
 export default async function AdminHome({ role, name }: Props) {
-  const [stats, onboardingData, leads, logs, pendingPayouts, revenueSummary, ledger] = await Promise.all([
-    getStats(), getMonthlyOnboarding(), getRecentLeads(), getAuditLogs(), getPendingPayouts(), getRevenueSummary(), getLedgerSummary(),
+  const [fleet, financial, onboardingData, leads, logs, pendingPayouts, revenueSummary, ledger] = await Promise.all([
+    getFleetRiderCounts(), getFinancialStats(), getMonthlyOnboarding(), getRecentLeads(), getAuditLogs(), getPendingPayouts(), getRevenueSummary(), getLedgerSummary(),
   ]);
+  const stats = { ...fleet, ...financial };
   // Single source: same ledger figures used by Ops & Investor dashboards.
   const collection = { collected: ledger.collected, expected: ledger.expectedToDate, pending: ledger.overdue, pct: ledger.pct };
 
@@ -205,7 +170,7 @@ export default async function AdminHome({ role, name }: Props) {
   return (
     <div>
       {/* Topbar */}
-      <div className="flex items-center justify-between px-4 py-4 lg:px-7 lg:py-5 border-b border-[#1e1e2e] bg-[#0A0A0F] sticky top-0 z-10">
+      <div className="flex items-center justify-between px-4 py-4 lg:px-7 lg:py-5 border-b border-[#1e1e2e] bg-[#0A0A0F]">
         <div>
           <h2 className="text-lg font-semibold text-white">Good morning, {name} 👋</h2>
           <p className="text-[#666] text-sm mt-0.5">Business overview — {currentMonth}</p>
@@ -222,8 +187,8 @@ export default async function AdminHome({ role, name }: Props) {
             {[
               { label: "Deployed", value: stats.assignedVehicles, sub: `of ${stats.totalVehicles} total`, accent: "#00D1B2", href: "/vehicles?status=assigned" },
               { label: "Available", value: stats.availableVehicles, sub: "ready to deploy", accent: "#a29bfe", href: `/vehicles?status=${VSTATUS.available}` },
-              { label: "Maintenance", value: stats.maintenanceVehicles, sub: "under service", accent: "#fdcb6e", href: `/vehicles?status=${VSTATUS.maintenance}` },
-              { label: "Active Riders", value: stats.activeRiders, sub: `${stats.pendingRiders} pending KYC`, accent: "#6C5CE7", href: "/riders?status=active" },
+              { label: "Not Available", value: stats.notAvailableVehicles, sub: "maintenance, returned, etc.", accent: "#fdcb6e", href: `/vehicles?status=${NOT_AVAILABLE}` },
+              { label: "Available Riders", value: stats.pendingRiders, sub: "not yet allotted a vehicle", accent: "#6C5CE7", href: "/riders?status=pending" },
             ].map((c) => (
               <Link key={c.label} href={c.href} className="bg-[#12121A] border border-[#1e1e2e] rounded-xl p-5 relative overflow-hidden hover:border-[#333] hover:bg-[#16161f] transition-colors block">
                 <div className="absolute top-0 left-0 right-0 h-[3px]" style={{ background: c.accent }} />
@@ -295,12 +260,12 @@ export default async function AdminHome({ role, name }: Props) {
           <div className="bg-[#12121A] border border-[#1e1e2e] rounded-xl p-5">
             <p className="text-sm font-semibold text-white mb-1">Fleet Allocation</p>
             <p className="text-xs text-[#555] mb-4">{stats.totalVehicles} total vehicles</p>
-            <VehicleDonut assigned={stats.assignedVehicles} available={stats.availableVehicles} maintenance={stats.maintenanceVehicles} />
+            <VehicleDonut assigned={stats.assignedVehicles} available={stats.availableVehicles} notAvailable={stats.notAvailableVehicles} />
             <div className="mt-4 space-y-2">
               {[
                 { label: "Deployed", color: "#00D1B2", val: stats.assignedVehicles, pct: stats.totalVehicles ? Math.round(stats.assignedVehicles / stats.totalVehicles * 100) : 0 },
                 { label: "Available", color: "#a29bfe", val: stats.availableVehicles, pct: stats.totalVehicles ? Math.round(stats.availableVehicles / stats.totalVehicles * 100) : 0 },
-                { label: "Maintenance", color: "#fdcb6e", val: stats.maintenanceVehicles, pct: stats.totalVehicles ? Math.round(stats.maintenanceVehicles / stats.totalVehicles * 100) : 0 },
+                { label: "Not Available", color: "#fdcb6e", val: stats.notAvailableVehicles, pct: stats.totalVehicles ? Math.round(stats.notAvailableVehicles / stats.totalVehicles * 100) : 0 },
               ].map((row) => (
                 <div key={row.label} className="flex items-center gap-3 text-sm">
                   <span className="w-20 text-xs shrink-0" style={{ color: row.color }}>{row.label}</span>

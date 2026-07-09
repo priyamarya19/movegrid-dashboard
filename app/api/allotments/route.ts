@@ -21,12 +21,17 @@ export async function POST(req: NextRequest) {
     const vCheck = await client.query(
       `SELECT id, status FROM ${schemas.ops}.vehicles WHERE id = $1`, [b.vehicle_id]
     );
-    if (!vCheck.rows[0]) return NextResponse.json({ error: "Vehicle not found" }, { status: 404 });
+    if (!vCheck.rows[0]) {
+      await client.query("ROLLBACK");
+      return NextResponse.json({ error: "Vehicle not found" }, { status: 404 });
+    }
     if (vCheck.rows[0].status === "assigned") {
+      await client.query("ROLLBACK");
       return NextResponse.json({ error: "Vehicle is already assigned to another rider" }, { status: 409 });
     }
     // Only vehicles cleared by ops (Ready to Deploy) can be allotted.
     if (vCheck.rows[0].status !== "ready_to_deploy") {
+      await client.query("ROLLBACK");
       return NextResponse.json({ error: "Vehicle must be 'Ready to Deploy' before it can be allotted. Set its status first." }, { status: 409 });
     }
 
@@ -47,20 +52,49 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Daily rent comes from the vehicle's model — the single source of truth for rent
+    // math (rent_dues, paid_through_date). Falls back to ₹240/day if a model has none set.
+    const rateRes = await client.query(
+      `SELECT COALESCE(m.rental_per_day, 240) AS rate
+       FROM ${schemas.ops}.vehicles v JOIN ${schemas.ops}.vehicle_models m ON m.id = v.model_id
+       WHERE v.id = $1`,
+      [b.vehicle_id]
+    );
+    const dailyRent = Number(rateRes.rows[0]?.rate ?? 240);
+    const assignedDate = b.assigned_date || new Date().toISOString().split("T")[0];
+
+    // Rent is always collected one week in advance at allotment (see RENT_SHEET_GUIDE.md).
+    // Whatever cash amount ops records as "amount_collected" (rent + deposit + fees bundled
+    // together) always covers at least week 1, so week 1 counts as paid — unless nothing was
+    // collected at all, in which case don't fabricate a payment that didn't happen.
+    const week1Paid = b.amount_collected != null && Number(b.amount_collected) > 0;
+    const paidThroughDate = week1Paid ? `$4::date + 6` : `$4::date - 1`;
+
     // Create new assignment
     const result = await client.query(`
       INSERT INTO ${schemas.ops}.rider_vehicle_assignments (
         rider_id, vehicle_id, hub_id, assigned_date, status,
-        amount_collected, payment_screenshot_url, undertaking_url, allotment_pics, allotted_by
-      ) VALUES ($1,$2,$3,$4,'active',$5,$6,$7,$8,$9)
+        amount_collected, payment_screenshot_url, undertaking_url, allotment_pics, allotted_by,
+        daily_rent, paid_through_date
+      ) VALUES ($1,$2,$3,$4,'active',$5,$6,$7,$8,$9,$10,${paidThroughDate})
       RETURNING id`,
       [
-        b.rider_id, b.vehicle_id, b.hub_id ?? null,
-        b.assigned_date || new Date().toISOString().split("T")[0],
+        b.rider_id, b.vehicle_id, b.hub_id ?? null, assignedDate,
         b.amount_collected ?? null, b.payment_screenshot_url ?? null,
         b.undertaking_url ?? null, b.allotment_pics ?? null, session.name,
+        dailyRent,
       ]
     );
+
+    // Record the week-1 prepaid advance so it shows up in the rider's payment history
+    // (same convention as every past onboarding — one week's rent, not the raw cash figure).
+    if (week1Paid) {
+      await client.query(
+        `INSERT INTO ${schemas.ops}.rider_payments (rider_id, vehicle_id, amount_collected, payment_date, rental_period_start, rental_period_end)
+         VALUES ($1, $2, $3, $4::date + 6, $4, $4::date + 6)`,
+        [b.rider_id, b.vehicle_id, dailyRent * 7, assignedDate]
+      );
+    }
 
     // Update rider: status → active, rental_mode, onboarding_fee, security_deposit
     await client.query(

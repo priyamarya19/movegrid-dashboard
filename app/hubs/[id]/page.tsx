@@ -55,7 +55,7 @@ export default async function HubDetailPage({ params }: { params: Promise<{ id: 
   const { hub, riders, vehicles } = data;
   const activeRiders = riders.filter((r: { status: string }) => r.status === "active").length;
   const assignedVehicles = vehicles.filter((v: { status: string }) => v.status === "assigned").length;
-  const availableVehicles = vehicles.filter((v: { status: string }) => v.status === "available").length;
+  const availableVehicles = vehicles.filter((v: { status: string }) => v.status === "ready_to_deploy").length;
 
   return (
     <DashboardLayout allowedRoles={["admin", "ops_manager", "hub_incharge"]}>

@@ -6,22 +6,20 @@ import PaymentProof, { PaymentProofValue, emptyProof, proofValid } from "@/compo
 
 export default function RentMarkPaid({
   riderId,
-  periodStart,
-  periodEnd,
-  daysLeft,
+  label,
+  urgent = false,
   defaultAmount,
   onPaid,
 }: {
   riderId: string;
-  periodStart: string;
-  periodEnd: string;
-  daysLeft: number;
+  label: string;
+  urgent?: boolean;
   defaultAmount?: number;
   onPaid?: () => void;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [amount, setAmount] = useState(String(defaultAmount ?? 1610));
+  const [amount, setAmount] = useState(String(defaultAmount ?? ""));
   const [proof, setProof] = useState<PaymentProofValue>(emptyProof);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -33,7 +31,7 @@ export default function RentMarkPaid({
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        amount: Number(amount), period_start: periodStart, period_end: periodEnd,
+        amount: Number(amount),
         payment_mode: proof.mode, payment_utr: proof.utr || null, payment_screenshot_url: proof.proof,
       }),
     });
@@ -49,10 +47,10 @@ export default function RentMarkPaid({
       <button
         onClick={() => { setOpen(true); setError(""); }}
         className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-[#1e1e2e] hover:bg-[#6C5CE7]/20 hover:text-[#6C5CE7] transition-colors whitespace-nowrap"
-        style={{ color: daysLeft < 0 ? "#f87171" : daysLeft <= 2 ? "#fdcb6e" : "#666" }}
+        style={{ color: urgent ? "#f87171" : "#fdcb6e" }}
       >
         <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-        {daysLeft < 0 ? `Overdue ${Math.abs(daysLeft)}d` : daysLeft === 0 ? "Due today" : `Due in ${daysLeft}d`}
+        {label}
       </button>
     );
   }

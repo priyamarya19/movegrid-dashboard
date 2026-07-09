@@ -1,15 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { schemas } from "@/lib/schemas";
-import { getSession } from "@/lib/auth";
+import { requireRole } from "@/lib/auth";
 
 // Investor updates their own bank details. The change is applied immediately but
 // flagged bank_status='pending' until an admin verifies it.
 export async function POST(req: NextRequest) {
-  const session = await getSession(req);
-  if (!session || session.role !== "investor") {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
-  }
+  const guard = await requireRole(req, ["investor"]);
+  if ("response" in guard) return guard.response;
+  const { session } = guard;
 
   const body = await req.json();
   const bank = body.bank?.trim();

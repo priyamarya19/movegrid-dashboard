@@ -112,38 +112,28 @@ export async function GET(req: NextRequest) {
   const hub = searchParams.get("hub");
   const rent = searchParams.get("rent"); // "overdue" | "due_soon"
 
-  // Use IST-aware dates — all created_at values are stored as IST midnight (18:30 UTC prev day)
+  // Use IST-aware dates
   const T = `(NOW() AT TIME ZONE 'Asia/Kolkata')::date`;           // IST today
-  const J = `(r.created_at AT TIME ZONE 'Asia/Kolkata')::date`;    // IST join date
-  const D = `EXTRACT(day FROM (r.created_at AT TIME ZONE 'Asia/Kolkata'))`; // IST join day-of-month
-  const M = `DATE_TRUNC('month', ${T})`;                            // IST month start
 
+  // Rolling-balance model (matches lib/rent.ts / lib/reports.ts): computed directly
+  // from paid_through_date on the assignment — NOT from rent_dues, which is a
+  // periodically-regenerated display ledger that can go stale between runs.
+  // paid_through_date is always current, so this can never drift from what the
+  // dashboards/reports show.
   const rentDueCTE = `
     WITH rent_due AS (
-      SELECT r.id,
-        CASE r.rental_mode WHEN 'weekly' THEN 7 WHEN 'fortnightly' THEN 14 ELSE 30 END AS period_days,
-        CASE r.rental_mode
-          WHEN 'weekly'      THEN (${J} + (GREATEST(CEIL((${T} - ${J})::float / 7),  1) *  7)::int)
-          WHEN 'fortnightly' THEN (${J} + (GREATEST(CEIL((${T} - ${J})::float / 14), 1) * 14)::int)
-          ELSE CASE
-            WHEN (${M} + (${D} - 1) * INTERVAL '1 day')::date >= ${T}
-            THEN (${M} + (${D} - 1) * INTERVAL '1 day')::date
-            ELSE (${M} + INTERVAL '1 month' + (${D} - 1) * INTERVAL '1 day')::date
-          END
-        END AS next_due_date,
-        CASE r.rental_mode
-          WHEN 'weekly'      THEN (${J} + (FLOOR((${T} - ${J})::float / 7)  *  7)::int)
-          WHEN 'fortnightly' THEN (${J} + (FLOOR((${T} - ${J})::float / 14) * 14)::int)
-          ELSE CASE
-            WHEN (${M} + (${D} - 1) * INTERVAL '1 day')::date <= ${T}
-            THEN (${M} + (${D} - 1) * INTERVAL '1 day')::date
-            ELSE (${M} - INTERVAL '1 month' + (${D} - 1) * INTERVAL '1 day')::date
-          END
-        END AS last_due_date
-      FROM ${schemas.ops}.riders r
-      WHERE r.status = 'active'
-        AND EXISTS (SELECT 1 FROM ${schemas.ops}.rider_vehicle_assignments rva
-                    WHERE rva.rider_id = r.id AND rva.status = 'active')
+      SELECT rva.rider_id,
+        7 AS period_days,
+        (rva.daily_rent * 7) AS period_amount,
+        (${T} - COALESCE(rva.paid_through_date, rva.assigned_date - 1)) AS days_behind,
+        (COALESCE(rva.paid_through_date, rva.assigned_date - 1) + 1) AS next_due_date,
+        (COALESCE(rva.paid_through_date, rva.assigned_date - 1) + 1) AS last_due_date,
+        -- Rent is billed weekly — round up to a whole week even if only partway
+        -- into an unpaid one (the day-precise paid_through_date stays exact internally).
+        CEIL(GREATEST(${T} - COALESCE(rva.paid_through_date, rva.assigned_date - 1), 1) / 7.0) AS overdue_weeks,
+        (CEIL(GREATEST(${T} - COALESCE(rva.paid_through_date, rva.assigned_date - 1), 1) / 7.0) * rva.daily_rent * 7) AS amount_due
+      FROM ${schemas.ops}.rider_vehicle_assignments rva
+      WHERE rva.status = 'active'
     )
   `;
 
@@ -173,31 +163,19 @@ export async function GET(req: NextRequest) {
   const params: string[] = [];
 
   if (rent === "overdue" || rent === "due_soon") {
-    const overdueWhere = `rd.last_due_date < ${T} AND rd.last_due_date > ${J}
-      AND NOT EXISTS (SELECT 1 FROM ${schemas.ops}.rider_payments p WHERE p.rider_id = r.id AND p.rental_period_start >= rd.last_due_date - rd.period_days * INTERVAL '1 day' AND p.amount_collected >= 1610)`;
-    const dueSoonWhere = `rd.next_due_date BETWEEN ${T} AND ${T} + 2
-      AND NOT EXISTS (SELECT 1 FROM ${schemas.ops}.rider_payments p WHERE p.rider_id = r.id AND p.rental_period_start >= rd.next_due_date - rd.period_days * INTERVAL '1 day' AND p.amount_collected >= 1610)`;
-
-    // Subquery to fetch any partial payment for the relevant period
-    const partialPaidSubquery = rent === "overdue"
-      ? `(SELECT p2.amount_collected FROM ${schemas.ops}.rider_payments p2
-           WHERE p2.rider_id = r.id
-             AND p2.rental_period_start >= rd.last_due_date - rd.period_days * INTERVAL '1 day'
-             AND p2.amount_collected < 1610
-           ORDER BY p2.payment_date DESC LIMIT 1) AS partial_paid`
-      : `(SELECT p2.amount_collected FROM ${schemas.ops}.rider_payments p2
-           WHERE p2.rider_id = r.id
-             AND p2.rental_period_start >= rd.next_due_date - rd.period_days * INTERVAL '1 day'
-             AND p2.amount_collected < 1610
-           ORDER BY p2.payment_date DESC LIMIT 1) AS partial_paid`;
+    // 2-day grace: not chased as Overdue until paid_through_date is > 2 days stale.
+    // Due-soon: lapsing within the next 2 days but not yet past grace (matches
+    // getOverdueRiders/getDueSoonRiders in lib/rent.ts exactly).
+    const overdueWhere = `rd.days_behind > 2`;
+    const dueSoonWhere = `rd.days_behind BETWEEN -2 AND 2`;
 
     const rentSelect = baseSelect.replace(
       `FROM ${schemas.ops}.riders r`,
-      `, rd.next_due_date, rd.last_due_date, rd.period_days, ${partialPaidSubquery}\n    FROM ${schemas.ops}.riders r`
+      `, rd.next_due_date, rd.last_due_date, rd.period_days, rd.period_amount, rd.amount_due, rd.overdue_weeks, NULL::numeric AS partial_paid\n    FROM ${schemas.ops}.riders r`
     );
     query = `${rentDueCTE}
     ${rentSelect}
-    JOIN rent_due rd ON rd.id = r.id
+    JOIN rent_due rd ON rd.rider_id = r.id
     WHERE ${rent === "overdue" ? overdueWhere : dueSoonWhere}
     `;
   } else {
