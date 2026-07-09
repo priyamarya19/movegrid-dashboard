@@ -34,11 +34,11 @@ export default function FinanceDetail({ source, bucket }: { source: string; buck
       <div className="flex items-center justify-between">
         <div>
           <div className="flex items-center gap-3">
-            <Link href="/finance" className="text-[#555] hover:text-[#aaa] text-sm transition-colors">← Finance</Link>
-            <span className="text-[#333]">/</span>
-            <h1 className="text-white text-2xl font-bold">{sourceLabel[source] ?? source} — {bucketLabel[bucket] ?? bucket}</h1>
+            <Link href="/finance" className="text-muted hover:text-secondary text-sm transition-colors">← Finance</Link>
+            <span className="text-faint">/</span>
+            <h1 className="text-primary text-2xl font-bold">{sourceLabel[source] ?? source} — {bucketLabel[bucket] ?? bucket}</h1>
           </div>
-          <p className="text-[#666] text-sm mt-1">
+          <p className="text-muted text-sm mt-1">
             {loading ? "Loading…" : `${rows.length} payment${rows.length !== 1 ? "s" : ""} · ${inr(total)} total`}
           </p>
         </div>
@@ -54,33 +54,33 @@ export default function FinanceDetail({ source, bucket }: { source: string; buck
         />
       </div>
 
-      <div className="bg-[#12121A] border border-[#1e1e2e] rounded-2xl overflow-hidden">
+      <div className="bg-surface border border-default rounded-2xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-[#1e1e2e]">
+              <tr className="border-b border-default">
                 {["Date", "Source", "Rider", "Amount"].map((h) => (
-                  <th key={h} className="text-left px-5 py-3 text-[11px] text-[#555] uppercase tracking-wider font-medium whitespace-nowrap">{h}</th>
+                  <th key={h} className="text-left px-5 py-3 text-[11px] text-muted uppercase tracking-wider font-medium whitespace-nowrap">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={4} className="px-5 py-10 text-center text-[#555]">Loading…</td></tr>
+                <tr><td colSpan={4} className="px-5 py-10 text-center text-muted">Loading…</td></tr>
               ) : rows.length === 0 ? (
-                <tr><td colSpan={4} className="px-5 py-10 text-center text-[#555]">No payments in this period</td></tr>
+                <tr><td colSpan={4} className="px-5 py-10 text-center text-muted">No payments in this period</td></tr>
               ) : rows.map((r, i) => (
-                <tr key={i} className="border-b border-[#1a1a2a] hover:bg-white/[0.02] transition-colors">
-                  <td className="px-5 py-3 text-[#aaa] whitespace-nowrap">
+                <tr key={i} className="border-b border-subtle hover:bg-overlay-hover transition-colors">
+                  <td className="px-5 py-3 text-secondary whitespace-nowrap">
                     {new Date(r.date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
                   </td>
-                  <td className="px-5 py-3 text-[#aaa]">{r.source}</td>
+                  <td className="px-5 py-3 text-secondary">{r.source}</td>
                   <td className="px-5 py-3">
-                    <Link href={`/riders/${r.rider_id}`} className="text-white font-medium hover:text-[#6C5CE7] hover:underline transition-colors">
+                    <Link href={`/riders/${r.rider_id}`} className="text-primary font-medium hover:text-accent-purple hover:underline transition-colors">
                       {r.rider_name}
                     </Link>
                   </td>
-                  <td className="px-5 py-3 text-[#00D1B2] font-semibold">{inr(r.amount)}</td>
+                  <td className="px-5 py-3 text-accent-teal font-semibold">{inr(r.amount)}</td>
                 </tr>
               ))}
             </tbody>

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { useTheme } from "@/lib/theme";
 
 type NavItem = {
   label: string;
@@ -100,6 +101,7 @@ type Props = {
 export default function Sidebar({ role, name, onClose }: Props) {
   const pathname = usePathname();
   const router = useRouter();
+  const { theme, toggleTheme } = useTheme();
 
   const visibleItems = navItems.filter((item) => item.roles.includes(role));
 
@@ -116,19 +118,19 @@ export default function Sidebar({ role, name, onClose }: Props) {
   };
 
   return (
-    <aside className="w-56 shrink-0 bg-[#111118] border-r border-white/10 flex flex-col h-screen sticky top-0">
+    <aside className="w-56 shrink-0 bg-surface-alt border-r border-default flex flex-col h-screen sticky top-0">
       {/* Logo */}
-      <div className="px-5 py-5 border-b border-white/10 flex items-center justify-between">
+      <div className="px-5 py-5 border-b border-default flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 bg-[#00C48C] rounded-lg flex items-center justify-center">
+          <div className="w-7 h-7 bg-accent-success rounded-lg flex items-center justify-center">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="white">
               <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
             </svg>
           </div>
-          <span className="text-white font-bold text-base tracking-tight">MoveGrid</span>
+          <span className="text-primary font-bold text-base tracking-tight">MoveGrid</span>
         </div>
         {onClose && (
-          <button onClick={onClose} className="lg:hidden text-gray-500 hover:text-white p-1 transition-colors">
+          <button onClick={onClose} className="lg:hidden text-faint hover:text-primary p-1 transition-colors">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
               <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
             </svg>
@@ -146,8 +148,8 @@ export default function Sidebar({ role, name, onClose }: Props) {
               href={item.href}
               className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
                 active
-                  ? "bg-[#00C48C]/15 text-[#00C48C]"
-                  : "text-gray-400 hover:text-white hover:bg-white/5"
+                  ? "bg-accent-success/15 text-accent-success"
+                  : "text-muted hover:text-primary hover:bg-overlay-hover"
               }`}
             >
               {item.icon}
@@ -158,19 +160,42 @@ export default function Sidebar({ role, name, onClose }: Props) {
       </nav>
 
       {/* User */}
-      <div className="px-4 py-4 border-t border-white/10">
+      <div className="px-4 py-4 border-t border-default">
         <div className="flex items-center gap-3 mb-3">
-          <div className="w-8 h-8 rounded-full bg-[#00C48C]/20 flex items-center justify-center text-[#00C48C] text-xs font-bold">
+          <div className="w-8 h-8 rounded-full bg-accent-success/20 flex items-center justify-center text-accent-success text-xs font-bold">
             {name.charAt(0).toUpperCase()}
           </div>
-          <div className="overflow-hidden">
-            <p className="text-white text-xs font-semibold truncate">{name}</p>
-            <p className="text-gray-500 text-xs">{roleLabel[role] ?? role}</p>
+          <div className="overflow-hidden flex-1">
+            <p className="text-primary text-xs font-semibold truncate">{name}</p>
+            <p className="text-faint text-xs">{roleLabel[role] ?? role}</p>
           </div>
+          <button
+            onClick={toggleTheme}
+            aria-label="Toggle theme"
+            className="w-8 h-8 shrink-0 rounded-lg border border-default text-secondary hover:text-primary hover:border-strong transition-colors flex items-center justify-center"
+          >
+            {theme === "dark" ? (
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="5" />
+                <line x1="12" y1="1" x2="12" y2="3" />
+                <line x1="12" y1="21" x2="12" y2="23" />
+                <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+                <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+                <line x1="1" y1="12" x2="3" y2="12" />
+                <line x1="21" y1="12" x2="23" y2="12" />
+                <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+                <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+              </svg>
+            ) : (
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+              </svg>
+            )}
+          </button>
         </div>
         <button
           onClick={handleLogout}
-          className="w-full text-left text-xs text-gray-500 hover:text-red-400 transition-colors flex items-center gap-2 px-1"
+          className="w-full text-left text-xs text-faint hover:text-accent-danger-alt transition-colors flex items-center gap-2 px-1"
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>

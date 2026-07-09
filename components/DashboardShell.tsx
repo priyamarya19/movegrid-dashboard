@@ -32,7 +32,7 @@ export default function DashboardShell({ role, name, children }: Props) {
   }, [router]);
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[#0A0A0F]">
+    <div className="flex h-screen overflow-hidden bg-base">
 
       {/* Mobile overlay */}
       {sidebarOpen && (
@@ -55,10 +55,10 @@ export default function DashboardShell({ role, name, children }: Props) {
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
 
         {/* Mobile top bar */}
-        <header className="lg:hidden flex items-center gap-3 px-4 py-3 bg-[#111118] border-b border-white/10 shrink-0">
+        <header className="lg:hidden flex items-center gap-3 px-4 py-3 bg-surface-alt border-b border-default shrink-0">
           <button
             onClick={() => setSidebarOpen(true)}
-            className="text-gray-400 hover:text-white transition-colors p-1"
+            className="text-muted hover:text-primary transition-colors p-1"
             aria-label="Open menu"
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
@@ -68,10 +68,10 @@ export default function DashboardShell({ role, name, children }: Props) {
             </svg>
           </button>
           <div className="flex items-center gap-2">
-            <div className="w-6 h-6 bg-[#00C48C] rounded-md flex items-center justify-center">
+            <div className="w-6 h-6 bg-accent-success rounded-md flex items-center justify-center">
               <svg width="11" height="11" viewBox="0 0 24 24" fill="white"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
             </div>
-            <span className="text-white font-bold text-sm tracking-tight">MoveGrid</span>
+            <span className="text-primary font-bold text-sm tracking-tight">MoveGrid</span>
           </div>
         </header>
 

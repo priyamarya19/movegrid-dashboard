@@ -7,22 +7,22 @@ import ImageUpload from "@/components/ImageUpload";
 function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
   return (
     <div>
-      <label className="block text-xs text-[#555] uppercase tracking-wider mb-1.5">
-        {label}{required && <span className="text-red-400 ml-0.5">*</span>}
+      <label className="block text-xs text-muted uppercase tracking-wider mb-1.5">
+        {label}{required && <span className="text-accent-danger-alt-text ml-0.5">*</span>}
       </label>
       {children}
     </div>
   );
 }
 
-const inp = "w-full bg-[#0A0A0F] border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-[#a29bfe] transition-colors";
+const inp = "w-full bg-base border border-default rounded-xl px-4 py-2.5 text-primary text-sm placeholder-faint focus:outline-none focus:border-accent-purple-2 transition-colors";
 
 const Section = ({ title }: { title: string }) => (
   <div className="col-span-full">
     <div className="flex items-center gap-3 mb-1">
-      <div className="h-px flex-1 bg-[#1e1e2e]" />
-      <span className="text-xs font-semibold uppercase tracking-widest text-[#a29bfe]">{title}</span>
-      <div className="h-px flex-1 bg-[#1e1e2e]" />
+      <div className="h-px flex-1 bg-default" />
+      <span className="text-xs font-semibold uppercase tracking-widest text-accent-purple-2">{title}</span>
+      <div className="h-px flex-1 bg-default" />
     </div>
   </div>
 );
@@ -96,15 +96,15 @@ export default function InvestorForm() {
 
       </div>
 
-      {error && <p className="text-red-400 text-sm">{error}</p>}
+      {error && <p className="text-accent-danger-alt-text text-sm">{error}</p>}
 
       <div className="flex items-center gap-3 pt-2">
         <button type="submit" disabled={submitting}
-          className="px-6 py-2.5 rounded-xl bg-[#a29bfe] hover:bg-[#b3aeff] text-white text-sm font-semibold disabled:opacity-60 transition-colors">
+          className="px-6 py-2.5 rounded-xl bg-accent-purple-2 hover:bg-accent-purple-2 text-primary text-sm font-semibold disabled:opacity-60 transition-colors">
           {submitting ? "Saving..." : "Add Investor"}
         </button>
         <button type="button" onClick={() => router.back()}
-          className="px-4 py-2.5 rounded-xl border border-white/10 text-gray-400 hover:text-white text-sm transition-colors">
+          className="px-4 py-2.5 rounded-xl border border-default text-muted hover:text-primary text-sm transition-colors">
           Cancel
         </button>
       </div>

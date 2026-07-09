@@ -11,12 +11,12 @@ type Log = {
 type Sort = { key: string; dir: "asc" | "desc" };
 
 const dotColor: Record<string, string> = {
-  onboard_rider: "#00D1B2",
-  assign_vehicle: "#6C5CE7",
-  record_payment: "#fdcb6e",
-  update_lead: "#e17055",
-  payout_marked: "#a29bfe",
-  new_lead: "#00D1B2",
+  onboard_rider: "var(--accent-teal)",
+  assign_vehicle: "var(--accent-purple)",
+  record_payment: "var(--accent-warning)",
+  update_lead: "var(--accent-danger)",
+  payout_marked: "var(--accent-purple-2)",
+  new_lead: "var(--accent-teal)",
 };
 
 function timeAgo(date: string) {
@@ -74,27 +74,27 @@ export default function LogsTable() {
     <div className="space-y-5">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="text-white text-2xl font-bold">Audit Logs</h1>
-          <p className="text-[#666] text-sm mt-1">{logs.length} entries — complete activity trail</p>
+          <h1 className="text-primary text-2xl font-bold">Audit Logs</h1>
+          <p className="text-muted text-sm mt-1">{logs.length} entries — complete activity trail</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <ExportButton filename="audit-logs" columns={cols} rows={sorted} />
         <select value={filter} onChange={(e) => setFilter(e.target.value)}
-          className="bg-[#12121A] border border-[#1e1e2e] rounded-xl px-3 py-2 text-sm text-gray-300 focus:outline-none focus:border-[#6C5CE7]">
+          className="bg-surface border border-default rounded-xl px-3 py-2 text-sm text-secondary focus:outline-none focus:border-accent-purple">
           <option value="">All Actions</option>
           {actions.map((a) => <option key={a} value={a}>{a.replace(/_/g, " ")}</option>)}
         </select>
         </div>
       </div>
 
-      <div className="bg-[#12121A] border border-[#1e1e2e] rounded-2xl overflow-hidden">
+      <div className="bg-surface border border-default rounded-2xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-[#1e1e2e]">
+              <tr className="border-b border-default">
                 {cols.map((c) => (
                   <th key={c.key} onClick={() => toggleSort(c.key)}
-                    className="text-left px-5 py-3 text-[11px] text-[#555] uppercase tracking-wider font-medium cursor-pointer select-none hover:text-[#aaa] transition-colors">
+                    className="text-left px-5 py-3 text-[11px] text-muted uppercase tracking-wider font-medium cursor-pointer select-none hover:text-secondary transition-colors">
                     {c.label}
                     <span className="ml-1 opacity-60">{sort.key === c.key ? (sort.dir === "asc" ? "↑" : "↓") : "↕"}</span>
                   </th>
@@ -103,27 +103,27 @@ export default function LogsTable() {
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={5} className="px-5 py-10 text-center text-[#555]">Loading...</td></tr>
+                <tr><td colSpan={5} className="px-5 py-10 text-center text-muted">Loading...</td></tr>
               ) : sorted.length === 0 ? (
-                <tr><td colSpan={5} className="px-5 py-10 text-center text-[#555]">No logs found</td></tr>
+                <tr><td colSpan={5} className="px-5 py-10 text-center text-muted">No logs found</td></tr>
               ) : sorted.map((log) => (
-                <tr key={log.id} className="border-b border-[#1a1a2a] hover:bg-white/[0.02] transition-colors">
+                <tr key={log.id} className="border-b border-subtle hover:bg-overlay-hover transition-colors">
                   <td className="px-5 py-3">
                     <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full shrink-0" style={{ background: dotColor[log.action] ?? "#666" }} />
-                      <span className="text-white capitalize">{log.action.replace(/_/g, " ")}</span>
+                      <div className="w-2 h-2 rounded-full shrink-0" style={{ background: dotColor[log.action] ?? "var(--text-muted)" }} />
+                      <span className="text-primary capitalize">{log.action.replace(/_/g, " ")}</span>
                     </div>
                   </td>
-                  <td className="px-5 py-3 text-[#6C5CE7] capitalize">{log.entity}</td>
-                  <td className="px-5 py-3 text-[#aaa] text-xs max-w-xs truncate">
+                  <td className="px-5 py-3 text-accent-purple capitalize">{log.entity}</td>
+                  <td className="px-5 py-3 text-secondary text-xs max-w-xs truncate">
                     {log.details
                       ? typeof log.details === "object"
                         ? Object.entries(log.details as Record<string, unknown>).map(([k, v]) => `${k}: ${v}`).join(" · ")
                         : String(log.details)
                       : "—"}
                   </td>
-                  <td className="px-5 py-3 text-[#555] text-xs">{log.ip_address ?? "—"}</td>
-                  <td className="px-5 py-3 text-[#555] text-xs">
+                  <td className="px-5 py-3 text-muted text-xs">{log.ip_address ?? "—"}</td>
+                  <td className="px-5 py-3 text-muted text-xs">
                     <span title={new Date(log.created_at).toLocaleString("en-IN")}>{timeAgo(log.created_at)}</span>
                   </td>
                 </tr>

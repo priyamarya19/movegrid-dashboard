@@ -18,9 +18,9 @@ const roleLabel: Record<string, string> = {
 
 const statusColor: Record<string, string> = {
   new: "bg-blue-500/20 text-blue-400",
-  contacted: "bg-yellow-500/20 text-yellow-400",
-  converted: "bg-green-500/20 text-green-400",
-  rejected: "bg-red-500/20 text-red-400",
+  contacted: "bg-accent-warning/20 text-accent-warning-text",
+  converted: "bg-accent-success/20 text-accent-success-text",
+  rejected: "bg-accent-danger-alt/20 text-accent-danger-alt-text",
 };
 
 const quickNotes = [
@@ -90,8 +90,8 @@ export default function LeadComments({ leadId, initialStatus, statusOptions, ini
           <button key={s} disabled={updatingStatus} onClick={() => updateStatus(s)}
             className={`px-3 py-1 rounded-full text-xs font-medium capitalize border transition-all
               ${status === s
-                ? (statusColor[s] ?? "bg-gray-500/20 text-gray-400") + " border-transparent"
-                : "border-[#1e1e2e] text-[#555] hover:text-white"
+                ? (statusColor[s] ?? "bg-muted/20 text-muted") + " border-transparent"
+                : "border-default text-muted hover:text-primary"
               }`}>
             {s}
           </button>
@@ -99,39 +99,39 @@ export default function LeadComments({ leadId, initialStatus, statusOptions, ini
       </div>
 
       {/* Comments timeline */}
-      <div className="bg-[#12121A] border border-[#1e1e2e] rounded-xl overflow-hidden">
-        <div className="px-5 py-4 border-b border-[#1e1e2e] flex items-center justify-between">
-          <h2 className="text-white font-semibold">Activity & Notes</h2>
-          <span className="text-[#555] text-xs">{comments.length} note{comments.length !== 1 ? "s" : ""}</span>
+      <div className="bg-surface border border-default rounded-xl overflow-hidden">
+        <div className="px-5 py-4 border-b border-default flex items-center justify-between">
+          <h2 className="text-primary font-semibold">Activity & Notes</h2>
+          <span className="text-muted text-xs">{comments.length} note{comments.length !== 1 ? "s" : ""}</span>
         </div>
 
-        <div className="divide-y divide-[#1a1a2a] max-h-80 overflow-y-auto">
+        <div className="divide-y divide-subtle max-h-80 overflow-y-auto">
           {comments.length === 0 ? (
-            <p className="px-5 py-8 text-center text-[#555] text-sm">No notes yet. Add the first one below.</p>
+            <p className="px-5 py-8 text-center text-muted text-sm">No notes yet. Add the first one below.</p>
           ) : comments.map((c) => (
             <div key={c.id} className="px-5 py-4">
               <div className="flex items-start justify-between mb-1">
                 <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 rounded-full bg-[#6C5CE720] flex items-center justify-center text-[#6C5CE7] text-[10px] font-bold shrink-0">
+                  <div className="w-6 h-6 rounded-full bg-accent-purple/13 flex items-center justify-center text-accent-purple text-[10px] font-bold shrink-0">
                     {c.author_name.charAt(0).toUpperCase()}
                   </div>
-                  <span className="text-[#aaa] text-xs font-medium">{c.author_name}</span>
-                  <span className="text-[#444] text-xs">{roleLabel[c.author_role] ?? c.author_role}</span>
+                  <span className="text-secondary text-xs font-medium">{c.author_name}</span>
+                  <span className="text-faint text-xs">{roleLabel[c.author_role] ?? c.author_role}</span>
                 </div>
-                <span className="text-[#444] text-xs shrink-0">{timeStr(c.created_at)}</span>
+                <span className="text-faint text-xs shrink-0">{timeStr(c.created_at)}</span>
               </div>
-              <p className="text-[#ccc] text-sm ml-8 leading-relaxed">{c.comment}</p>
+              <p className="text-secondary text-sm ml-8 leading-relaxed">{c.comment}</p>
             </div>
           ))}
         </div>
 
         {/* Quick notes */}
-        <div className="px-5 py-3 border-t border-[#1e1e2e] border-b">
-          <p className="text-[#555] text-xs mb-2">Quick notes</p>
+        <div className="px-5 py-3 border-t border-default border-b">
+          <p className="text-muted text-xs mb-2">Quick notes</p>
           <div className="flex flex-wrap gap-1.5">
             {quickNotes.map((note) => (
               <button key={note} onClick={() => addComment(note)} disabled={submitting}
-                className="px-2.5 py-1 rounded-lg text-xs text-[#555] border border-[#1e1e2e] hover:border-[#6C5CE7] hover:text-[#6C5CE7] transition-colors">
+                className="px-2.5 py-1 rounded-lg text-xs text-muted border border-default hover:border-accent-purple hover:text-accent-purple transition-colors">
                 {note}
               </button>
             ))}
@@ -143,11 +143,11 @@ export default function LeadComments({ leadId, initialStatus, statusOptions, ini
           <textarea value={text} onChange={(e) => setText(e.target.value)}
             placeholder="Add a note — what happened on this call?"
             rows={3}
-            className="w-full bg-[#0A0A0F] border border-[#1e1e2e] rounded-xl px-4 py-3 text-sm text-[#ccc] placeholder-[#444] resize-none focus:outline-none focus:border-[#6C5CE7] transition-colors"
+            className="w-full bg-base border border-default rounded-xl px-4 py-3 text-sm text-secondary placeholder-faint resize-none focus:outline-none focus:border-accent-purple transition-colors"
           />
           <div className="flex justify-end mt-2">
             <button onClick={() => addComment()} disabled={submitting || !text.trim()}
-              className="px-4 py-2 bg-[#6C5CE7] text-white text-sm font-medium rounded-xl hover:bg-[#5a4bd1] disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+              className="px-4 py-2 bg-accent-purple text-primary text-sm font-medium rounded-xl hover:bg-accent-purple disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
               {submitting ? "Saving..." : "Add Note"}
             </button>
           </div>

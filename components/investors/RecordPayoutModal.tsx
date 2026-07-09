@@ -11,7 +11,7 @@ type Props = {
   vehicles: VehicleOption[];
 };
 
-const inp = "w-full bg-[#0A0A0F] border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-[#00D1B2] transition-colors";
+const inp = "w-full bg-base border border-default rounded-xl px-3 py-2.5 text-primary text-sm placeholder-faint focus:outline-none focus:border-accent-teal transition-colors";
 
 function thisMonth() {
   const d = new Date();
@@ -62,7 +62,7 @@ export default function RecordPayoutModal({ investorId, vehicles }: Props) {
   if (!open) {
     return (
       <button onClick={() => setOpen(true)}
-        className="px-4 py-2 rounded-lg bg-[#00D1B2] hover:bg-[#13e0c2] text-[#06231f] text-xs font-semibold transition-colors">
+        className="px-4 py-2 rounded-lg bg-accent-teal hover:bg-accent-teal text-on-dark text-xs font-semibold transition-colors">
         + Record Payout
       </button>
     );
@@ -71,31 +71,31 @@ export default function RecordPayoutModal({ investorId, vehicles }: Props) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/60" onClick={() => setOpen(false)} />
-      <div className="relative bg-[#12121A] border border-[#1e1e2e] rounded-2xl w-full max-w-md max-h-[88vh] overflow-y-auto">
-        <div className="px-5 py-4 border-b border-[#1e1e2e] flex items-center justify-between sticky top-0 bg-[#12121A]">
-          <h2 className="text-white font-semibold">Record Payout</h2>
-          <button onClick={() => setOpen(false)} className="text-[#555] hover:text-white">✕</button>
+      <div className="relative bg-surface border border-default rounded-2xl w-full max-w-md max-h-[88vh] overflow-y-auto">
+        <div className="px-5 py-4 border-b border-default flex items-center justify-between sticky top-0 bg-surface">
+          <h2 className="text-primary font-semibold">Record Payout</h2>
+          <button onClick={() => setOpen(false)} className="text-muted hover:text-primary">✕</button>
         </div>
 
         <form onSubmit={submit} className="p-5 space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs text-[#555] uppercase tracking-wider mb-1.5">Month <span className="text-red-400">*</span></label>
+              <label className="block text-xs text-muted uppercase tracking-wider mb-1.5">Month <span className="text-accent-danger-alt-text">*</span></label>
               <input type="month" className={inp} value={form.period_month} onChange={(e) => set("period_month", e.target.value)} required />
             </div>
             <div>
-              <label className="block text-xs text-[#555] uppercase tracking-wider mb-1.5">Amount (₹) <span className="text-red-400">*</span></label>
+              <label className="block text-xs text-muted uppercase tracking-wider mb-1.5">Amount (₹) <span className="text-accent-danger-alt-text">*</span></label>
               <input type="number" min="1" className={inp} value={form.amount} onChange={(e) => set("amount", e.target.value)} placeholder="12000" required />
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs text-[#555] uppercase tracking-wider mb-1.5">Paid Date</label>
+              <label className="block text-xs text-muted uppercase tracking-wider mb-1.5">Paid Date</label>
               <input type="date" className={inp} value={form.paid_date} onChange={(e) => set("paid_date", e.target.value)} />
             </div>
             <div>
-              <label className="block text-xs text-[#555] uppercase tracking-wider mb-1.5">Vehicle (optional)</label>
+              <label className="block text-xs text-muted uppercase tracking-wider mb-1.5">Vehicle (optional)</label>
               <select className={inp} value={form.vehicle_id} onChange={(e) => set("vehicle_id", e.target.value)}>
                 <option value="">All / general</option>
                 {vehicles.map((v) => <option key={v.id} value={v.id}>{v.ev_number}</option>)}
@@ -106,19 +106,19 @@ export default function RecordPayoutModal({ investorId, vehicles }: Props) {
           <ImageUpload label="Payment Proof *" folder="investor-payouts" value={form.proof_url} onChange={(key) => set("proof_url", key)} />
 
           <div>
-            <label className="block text-xs text-[#555] uppercase tracking-wider mb-1.5">Note (optional)</label>
+            <label className="block text-xs text-muted uppercase tracking-wider mb-1.5">Note (optional)</label>
             <input className={inp} value={form.note} onChange={(e) => set("note", e.target.value)} placeholder="e.g. UPI ref / remarks" />
           </div>
 
-          {error && <p className="text-red-400 text-sm">{error}</p>}
+          {error && <p className="text-accent-danger-alt-text text-sm">{error}</p>}
 
           <div className="flex items-center gap-2 pt-1">
             <button type="submit" disabled={saving}
-              className="px-5 py-2 rounded-lg bg-[#00D1B2] hover:bg-[#13e0c2] text-[#06231f] text-sm font-semibold disabled:opacity-60 transition-colors">
+              className="px-5 py-2 rounded-lg bg-accent-teal hover:bg-accent-teal text-on-dark text-sm font-semibold disabled:opacity-60 transition-colors">
               {saving ? "Saving…" : "Record Payout"}
             </button>
             <button type="button" onClick={() => setOpen(false)}
-              className="px-4 py-2 rounded-lg border border-white/10 text-gray-400 hover:text-white text-sm transition-colors">
+              className="px-4 py-2 rounded-lg border border-default text-muted hover:text-primary text-sm transition-colors">
               Cancel
             </button>
           </div>

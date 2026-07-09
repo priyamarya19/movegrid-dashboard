@@ -19,10 +19,10 @@ type Rider = {
 type Sort = { key: string; dir: "asc" | "desc" };
 
 const statusColor: Record<string, string> = {
-  active: "bg-green-500/20 text-green-400",
-  inactive: "bg-gray-500/20 text-gray-400",
-  pending: "bg-yellow-500/20 text-yellow-400",
-  suspended: "bg-red-500/20 text-red-400",
+  active: "bg-accent-success/20 text-accent-success-text",
+  inactive: "bg-muted/20 text-muted",
+  pending: "bg-accent-warning/20 text-accent-warning-text",
+  suspended: "bg-accent-danger-alt/20 text-accent-danger-alt-text",
 };
 
 const cols: { label: string; key: string }[] = [
@@ -56,7 +56,7 @@ function RentToggle({ rider, onToggled }: { rider: Rider; onToggled: () => void 
   const [loading, setLoading] = useState(false);
 
   // No rent status for riders with no active vehicle (new/unallotted riders owe nothing).
-  if (rider.status !== "active" || !rider.vehicle_id) return <span className="text-[#333]">—</span>;
+  if (rider.status !== "active" || !rider.vehicle_id) return <span className="text-faint">—</span>;
 
   async function markReceived() {
     if (rider.rent_received_this_month) return;
@@ -74,7 +74,7 @@ function RentToggle({ rider, onToggled }: { rider: Rider; onToggled: () => void 
   }
 
   return rider.rent_received_this_month ? (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-green-500/15 text-green-400 whitespace-nowrap">
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-accent-success/15 text-accent-success-text whitespace-nowrap">
       <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>
       Received
     </span>
@@ -82,7 +82,7 @@ function RentToggle({ rider, onToggled }: { rider: Rider; onToggled: () => void 
     <button
       onClick={markReceived}
       disabled={loading}
-      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-[#1e1e2e] text-[#555] hover:bg-[#fdcb6e20] hover:text-[#fdcb6e] transition-colors whitespace-nowrap disabled:opacity-50"
+      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-default text-muted hover:bg-accent-warning/13 hover:text-accent-warning transition-colors whitespace-nowrap disabled:opacity-50"
     >
       <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
       {loading ? "..." : "Due"}
@@ -127,10 +127,10 @@ export default function RidersTable({ rentFilter, statusFilter: initialStatus }:
     <div className="space-y-5">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="text-white text-2xl font-bold">
+          <h1 className="text-primary text-2xl font-bold">
             Riders{rentFilter === "overdue" ? " — Overdue Rent" : rentFilter === "due_soon" ? " — Due in 2 Days" : ""}
           </h1>
-          <p className="text-[#666] text-sm mt-1">{riders.length} riders • {counts["active"] || 0} active · {counts["inactive"] || 0} inactive</p>
+          <p className="text-muted text-sm mt-1">{riders.length} riders • {counts["active"] || 0} active · {counts["inactive"] || 0} inactive</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <input
@@ -138,11 +138,11 @@ export default function RidersTable({ rentFilter, statusFilter: initialStatus }:
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by name or user ID"
-            className="bg-[#12121A] border border-[#1e1e2e] rounded-xl px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-[#6C5CE7] w-48"
+            className="bg-surface border border-default rounded-xl px-3 py-2 text-sm text-primary placeholder-faint focus:outline-none focus:border-accent-purple w-48"
           />
           <ExportButton filename="riders" columns={cols} rows={sorted} />
           <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
-            className="bg-[#12121A] border border-[#1e1e2e] rounded-xl px-3 py-2 text-sm text-gray-300 focus:outline-none focus:border-[#6C5CE7]">
+            className="bg-surface border border-default rounded-xl px-3 py-2 text-sm text-secondary focus:outline-none focus:border-accent-purple">
             <option value="">All Status</option>
             <option value="active">Active</option>
             <option value="inactive">Inactive</option>
@@ -150,21 +150,21 @@ export default function RidersTable({ rentFilter, statusFilter: initialStatus }:
             <option value="suspended">Suspended</option>
           </select>
           <Link href="/riders/new"
-            className="inline-flex items-center gap-2 bg-[#6C5CE7] hover:bg-[#7c6cf7] text-white text-sm font-medium px-4 py-2 rounded-xl transition-colors">
+            className="inline-flex items-center gap-2 bg-accent-purple hover:bg-accent-purple text-primary text-sm font-medium px-4 py-2 rounded-xl transition-colors">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             Add Rider
           </Link>
         </div>
       </div>
 
-      <div className="bg-[#12121A] border border-[#1e1e2e] rounded-2xl overflow-hidden">
+      <div className="bg-surface border border-default rounded-2xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-[#1e1e2e]">
+              <tr className="border-b border-default">
                 {cols.map((c) => (
                   <th key={c.key} onClick={() => toggleSort(c.key)}
-                    className="text-left px-5 py-3 text-[11px] text-[#555] uppercase tracking-wider font-medium cursor-pointer select-none hover:text-[#aaa] transition-colors whitespace-nowrap">
+                    className="text-left px-5 py-3 text-[11px] text-muted uppercase tracking-wider font-medium cursor-pointer select-none hover:text-secondary transition-colors whitespace-nowrap">
                     {c.label}
                     <span className="ml-1 opacity-60">{sort.key === c.key ? (sort.dir === "asc" ? "↑" : "↓") : "↕"}</span>
                   </th>
@@ -173,45 +173,45 @@ export default function RidersTable({ rentFilter, statusFilter: initialStatus }:
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={11} className="px-5 py-10 text-center text-[#555]">Loading...</td></tr>
+                <tr><td colSpan={11} className="px-5 py-10 text-center text-muted">Loading...</td></tr>
               ) : sorted.length === 0 ? (
-                <tr><td colSpan={11} className="px-5 py-10 text-center text-[#555]">No riders found</td></tr>
+                <tr><td colSpan={11} className="px-5 py-10 text-center text-muted">No riders found</td></tr>
               ) : sorted.map((r) => (
-                <tr key={r.id} className="border-b border-[#1a1a2a] hover:bg-white/[0.02] transition-colors">
+                <tr key={r.id} className="border-b border-subtle hover:bg-overlay-hover transition-colors">
                   <td className="px-5 py-3">
-                    <Link href={`/riders/${r.id}`} className="font-mono text-xs text-[#6C5CE7] font-semibold hover:underline">{r.rider_code ?? "—"}</Link>
+                    <Link href={`/riders/${r.id}`} className="font-mono text-xs text-accent-purple font-semibold hover:underline">{r.rider_code ?? "—"}</Link>
                   </td>
                   <td className="px-5 py-3">
-                    <Link href={`/riders/${r.id}`} className="text-white font-medium hover:text-[#6C5CE7] hover:underline transition-colors">{r.name}</Link>
+                    <Link href={`/riders/${r.id}`} className="text-primary font-medium hover:text-accent-purple hover:underline transition-colors">{r.name}</Link>
                   </td>
-                  <td className="px-5 py-3 text-[#aaa]">{r.mobile}</td>
+                  <td className="px-5 py-3 text-secondary">{r.mobile}</td>
                   <td className="px-5 py-3">
-                    {r.hub_id ? <Link href={`/hubs/${r.hub_id}`} className="text-[#aaa] hover:text-[#6C5CE7] hover:underline transition-colors">{r.hub_name}</Link> : <span className="text-[#555]">—</span>}
+                    {r.hub_id ? <Link href={`/hubs/${r.hub_id}`} className="text-secondary hover:text-accent-purple hover:underline transition-colors">{r.hub_name}</Link> : <span className="text-muted">—</span>}
                   </td>
                   <td className="px-5 py-3">
-                    {r.vehicle_id ? <Link href={`/vehicles/${r.vehicle_id}`} className="text-[#6C5CE7] font-medium hover:underline">{r.vehicle_number}</Link> : <span className="text-[#555]">—</span>}
+                    {r.vehicle_id ? <Link href={`/vehicles/${r.vehicle_id}`} className="text-accent-purple font-medium hover:underline">{r.vehicle_number}</Link> : <span className="text-muted">—</span>}
                   </td>
-                  <td className="px-5 py-3 text-[#aaa] text-xs">{r.employer || "—"}</td>
-                  <td className="px-5 py-3 text-[#aaa] capitalize">{r.rental_mode ?? "—"}</td>
+                  <td className="px-5 py-3 text-secondary text-xs">{r.employer || "—"}</td>
+                  <td className="px-5 py-3 text-secondary capitalize">{r.rental_mode ?? "—"}</td>
                   <td className="px-5 py-3">
                     {r.aadhaar_verified && r.pan_verified && r.dl_verified ? (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-[#00D1B220] text-[#00D1B2]">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-accent-teal/13 text-accent-teal">
                         <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>
                         Verified
                       </span>
                     ) : (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-[#fdcb6e20] text-[#fdcb6e]">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-accent-warning/13 text-accent-warning">
                         Unverified
                       </span>
                     )}
                   </td>
                   <td className="px-5 py-3">
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize ${statusColor[r.status] ?? "bg-gray-500/20 text-gray-400"}`}>{r.status}</span>
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize ${statusColor[r.status] ?? "bg-muted/20 text-muted"}`}>{r.status}</span>
                   </td>
                   <td className="px-5 py-3">
                     <RentToggle rider={r} onToggled={fetchRiders} />
                   </td>
-                  <td className="px-5 py-3 text-[#555] text-xs whitespace-nowrap">
+                  <td className="px-5 py-3 text-muted text-xs whitespace-nowrap">
                     {new Date(r.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "2-digit" })}
                   </td>
                 </tr>

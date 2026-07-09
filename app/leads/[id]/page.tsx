@@ -24,16 +24,16 @@ async function getData(id: string) {
 }
 
 const typeColor: Record<string, string> = {
-  investor: "bg-[#00D1B220] text-[#00D1B2]",
-  rider: "bg-[#6C5CE720] text-[#6C5CE7]",
-  fleet: "bg-[#fdcb6e20] text-[#fdcb6e]",
+  investor: "bg-accent-teal/13 text-accent-teal",
+  rider: "bg-accent-purple/13 text-accent-purple",
+  fleet: "bg-accent-warning/13 text-accent-warning",
 };
 
 const statusColor: Record<string, string> = {
   new: "bg-blue-500/20 text-blue-400",
-  contacted: "bg-yellow-500/20 text-yellow-400",
-  converted: "bg-green-500/20 text-green-400",
-  rejected: "bg-red-500/20 text-red-400",
+  contacted: "bg-accent-warning/20 text-accent-warning-text",
+  converted: "bg-accent-success/20 text-accent-success-text",
+  rejected: "bg-accent-danger-alt/20 text-accent-danger-alt-text",
 };
 
 const statusOptions = ["new", "contacted", "converted", "rejected"];
@@ -56,33 +56,33 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
         {/* Breadcrumb */}
         <div className="flex items-center gap-3">
           <BackButton fallback="/leads" label="Leads" />
-          <span className="text-[#333]">/</span>
-          <span className="text-white text-sm">{lead.name}</span>
+          <span className="text-faint">/</span>
+          <span className="text-primary text-sm">{lead.name}</span>
         </div>
 
         {/* Header */}
         <div className="flex items-start justify-between">
           <div>
             <div className="flex items-center gap-3 mb-1">
-              <h1 className="text-white text-2xl font-bold">{lead.name}</h1>
-              <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold capitalize ${typeColor[lead.type] ?? "bg-gray-500/20 text-gray-400"}`}>{lead.type}</span>
+              <h1 className="text-primary text-2xl font-bold">{lead.name}</h1>
+              <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold capitalize ${typeColor[lead.type] ?? "bg-muted/20 text-muted"}`}>{lead.type}</span>
             </div>
-            <p className="text-[#666] text-sm">
+            <p className="text-muted text-sm">
               {lead.phone && <span>{lead.phone}</span>}
               {lead.email && <span> · {lead.email}</span>}
               {lead.city && <span> · {lead.city}</span>}
             </p>
-            <p className="text-[#555] text-xs mt-1">
+            <p className="text-muted text-xs mt-1">
               Received {new Date(lead.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" })}
             </p>
           </div>
-          <span className={`px-3 py-1 rounded-full text-sm font-medium capitalize ${statusColor[lead.status] ?? "bg-gray-500/20 text-gray-400"}`}>{lead.status}</span>
+          <span className={`px-3 py-1 rounded-full text-sm font-medium capitalize ${statusColor[lead.status] ?? "bg-muted/20 text-muted"}`}>{lead.status}</span>
         </div>
 
         {/* Info cards */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <div className="bg-[#12121A] border border-[#1e1e2e] rounded-xl p-5">
-            <h2 className="text-white font-semibold mb-4">Contact Details</h2>
+          <div className="bg-surface border border-default rounded-xl p-5">
+            <h2 className="text-primary font-semibold mb-4">Contact Details</h2>
             {[
               { label: "Name", value: lead.name },
               { label: "Phone", value: lead.phone ?? "—" },
@@ -91,37 +91,37 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
               { label: "Lead Type", value: lead.type },
               { label: "Received On", value: new Date(lead.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) },
             ].map((row) => (
-              <div key={row.label} className="flex justify-between py-2 border-b border-[#1e1e2e] last:border-0">
-                <span className="text-[#555] text-sm">{row.label}</span>
-                <span className="text-[#ccc] text-sm">{row.value}</span>
+              <div key={row.label} className="flex justify-between py-2 border-b border-default last:border-0">
+                <span className="text-muted text-sm">{row.label}</span>
+                <span className="text-secondary text-sm">{row.value}</span>
               </div>
             ))}
           </div>
 
-          <div className="bg-[#12121A] border border-[#1e1e2e] rounded-xl p-5">
-            <h2 className="text-white font-semibold mb-4">
+          <div className="bg-surface border border-default rounded-xl p-5">
+            <h2 className="text-primary font-semibold mb-4">
               {lead.type === "investor" ? "Investment Details" : lead.type === "fleet" ? "Fleet Details" : "Rider Details"}
             </h2>
             {lead.type === "investor" && (
-              <div className="flex justify-between py-2 border-b border-[#1e1e2e]">
-                <span className="text-[#555] text-sm">Investment Range</span>
-                <span className="text-[#00D1B2] text-sm font-semibold">{lead.amount ? "₹" + lead.amount : "—"}</span>
+              <div className="flex justify-between py-2 border-b border-default">
+                <span className="text-muted text-sm">Investment Range</span>
+                <span className="text-accent-teal text-sm font-semibold">{lead.amount ? "₹" + lead.amount : "—"}</span>
               </div>
             )}
             {lead.type === "fleet" && (
               <>
-                <div className="flex justify-between py-2 border-b border-[#1e1e2e]">
-                  <span className="text-[#555] text-sm">Fleet Size</span>
-                  <span className="text-[#fdcb6e] text-sm font-semibold">{lead.fleet_size ?? "—"} vehicles</span>
+                <div className="flex justify-between py-2 border-b border-default">
+                  <span className="text-muted text-sm">Fleet Size</span>
+                  <span className="text-accent-warning text-sm font-semibold">{lead.fleet_size ?? "—"} vehicles</span>
                 </div>
-                <div className="flex justify-between py-2 border-b border-[#1e1e2e]">
-                  <span className="text-[#555] text-sm">City</span>
-                  <span className="text-[#ccc] text-sm">{lead.city ?? "—"}</span>
+                <div className="flex justify-between py-2 border-b border-default">
+                  <span className="text-muted text-sm">City</span>
+                  <span className="text-secondary text-sm">{lead.city ?? "—"}</span>
                 </div>
               </>
             )}
             <div className="mt-4">
-              <p className="text-[#555] text-xs uppercase tracking-wider mb-3">Update Status</p>
+              <p className="text-muted text-xs uppercase tracking-wider mb-3">Update Status</p>
               <LeadComments leadId={id} initialStatus={lead.status} statusOptions={statusOptions} initialComments={comments} />
             </div>
           </div>

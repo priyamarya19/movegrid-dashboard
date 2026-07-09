@@ -44,17 +44,17 @@ async function getData(id: string) {
 }
 
 const statusColor: Record<string, string> = {
-  assigned: "bg-green-500/20 text-green-400",
+  assigned: "bg-accent-success/20 text-accent-success-text",
   available: "bg-blue-500/20 text-blue-400",
-  maintenance: "bg-yellow-500/20 text-yellow-400",
-  retired: "bg-gray-500/20 text-gray-400",
-  blocked: "bg-red-500/20 text-red-400",
+  maintenance: "bg-accent-warning/20 text-accent-warning-text",
+  retired: "bg-muted/20 text-muted",
+  blocked: "bg-accent-danger-alt/20 text-accent-danger-alt-text",
 };
 
 const payoutStatus: Record<string, string> = {
-  paid: "bg-green-500/20 text-green-400",
-  pending: "bg-yellow-500/20 text-yellow-400",
-  delayed: "bg-red-500/20 text-red-400",
+  paid: "bg-accent-success/20 text-accent-success-text",
+  pending: "bg-accent-warning/20 text-accent-warning-text",
+  delayed: "bg-accent-danger-alt/20 text-accent-danger-alt-text",
 };
 
 export default async function VehicleDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -74,35 +74,35 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
 
         <div className="flex items-center gap-3">
           <BackButton fallback="/vehicles" label="Vehicles" />
-          <span className="text-[#333]">/</span>
-          <span className="text-white text-sm">{vehicle.ev_number}</span>
+          <span className="text-faint">/</span>
+          <span className="text-primary text-sm">{vehicle.ev_number}</span>
         </div>
 
         <div className="flex items-start justify-between">
           <div>
-            <h1 className="text-white text-2xl font-bold">{vehicle.ev_number}</h1>
-            <p className="text-[#666] text-sm mt-1">{vehicle.model_name} · {vehicle.oem}</p>
+            <h1 className="text-primary text-2xl font-bold">{vehicle.ev_number}</h1>
+            <p className="text-muted text-sm mt-1">{vehicle.model_name} · {vehicle.oem}</p>
           </div>
           <VehicleStatusControl vehicleId={vehicle.id} status={vehicle.status} canEdit={canEditStatus} />
         </div>
 
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[
-            { label: "Purchase Price", value: vehicle.price ? "₹" + Number(vehicle.price).toLocaleString() : "—", color: "#6C5CE7" },
-            { label: "Daily Rental", value: vehicle.rental_per_day ? "₹" + vehicle.rental_per_day : "—", color: "#00D1B2" },
-            { label: "Total Payouts", value: "₹" + Number(totalPayouts).toLocaleString(), color: "#fdcb6e" },
-            { label: "Assignments", value: assignments.length.toString(), color: "#a29bfe" },
+            { label: "Purchase Price", value: vehicle.price ? "₹" + Number(vehicle.price).toLocaleString() : "—", color: "var(--accent-purple)" },
+            { label: "Daily Rental", value: vehicle.rental_per_day ? "₹" + vehicle.rental_per_day : "—", color: "var(--accent-teal)" },
+            { label: "Total Payouts", value: "₹" + Number(totalPayouts).toLocaleString(), color: "var(--accent-warning)" },
+            { label: "Assignments", value: assignments.length.toString(), color: "var(--accent-purple-2)" },
           ].map((c) => (
-            <div key={c.label} className="bg-[#12121A] border border-[#1e1e2e] rounded-xl p-5">
-              <p className="text-[11px] text-[#555] uppercase tracking-wider mb-2">{c.label}</p>
+            <div key={c.label} className="bg-surface border border-default rounded-xl p-5">
+              <p className="text-[11px] text-muted uppercase tracking-wider mb-2">{c.label}</p>
               <p className="text-2xl font-bold" style={{ color: c.color }}>{c.value}</p>
             </div>
           ))}
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <div className="bg-[#12121A] border border-[#1e1e2e] rounded-xl p-5">
-            <h2 className="text-white font-semibold mb-4">Vehicle Details</h2>
+          <div className="bg-surface border border-default rounded-xl p-5">
+            <h2 className="text-primary font-semibold mb-4">Vehicle Details</h2>
             {[
               { label: "EV Number", value: vehicle.ev_number },
               { label: "Chassis No.", value: vehicle.chassis_number ?? "—" },
@@ -111,23 +111,23 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
               { label: "Model", value: `${vehicle.model_name} (${vehicle.oem})` },
               { label: "Purchase Date", value: vehicle.purchase_date ? new Date(vehicle.purchase_date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "—" },
             ].map((row) => (
-              <div key={row.label} className="flex justify-between py-2 border-b border-[#1e1e2e] last:border-0">
-                <span className="text-[#555] text-sm">{row.label}</span>
-                <span className="text-[#ccc] text-sm">{row.value}</span>
+              <div key={row.label} className="flex justify-between py-2 border-b border-default last:border-0">
+                <span className="text-muted text-sm">{row.label}</span>
+                <span className="text-secondary text-sm">{row.value}</span>
               </div>
             ))}
             {(vehicle.battery_number || vehicle.battery_partner || vehicle.iot_imei || vehicle.iot_partner) && (
               <div className="pt-3">
-                <p className="text-[#555] text-xs uppercase tracking-wider mb-2">Hardware</p>
+                <p className="text-muted text-xs uppercase tracking-wider mb-2">Hardware</p>
                 {[
                   { label: "Battery No.", value: vehicle.battery_number ?? "—" },
                   { label: "Battery Partner", value: vehicle.battery_partner ?? "—" },
                   { label: "IOT IMEI", value: vehicle.iot_imei ?? "—" },
                   { label: "IOT Partner", value: vehicle.iot_partner ?? "—" },
                 ].map((row) => (
-                  <div key={row.label} className="flex justify-between py-2 border-b border-[#1e1e2e] last:border-0">
-                    <span className="text-[#555] text-sm">{row.label}</span>
-                    <span className="text-[#ccc] text-sm">{row.value}</span>
+                  <div key={row.label} className="flex justify-between py-2 border-b border-default last:border-0">
+                    <span className="text-muted text-sm">{row.label}</span>
+                    <span className="text-secondary text-sm">{row.value}</span>
                   </div>
                 ))}
               </div>
@@ -135,17 +135,17 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
           </div>
 
           <div className="space-y-4">
-            <div className="bg-[#12121A] border border-[#1e1e2e] rounded-xl p-5">
-              <h2 className="text-white font-semibold mb-3">Hub</h2>
+            <div className="bg-surface border border-default rounded-xl p-5">
+              <h2 className="text-primary font-semibold mb-3">Hub</h2>
               {vehicle.hub_id ? (
                 <Link href={`/hubs/${vehicle.hub_id}`} className="flex items-center justify-between group">
                   <div>
-                    <p className="text-[#6C5CE7] font-medium group-hover:underline">{vehicle.hub_name}</p>
-                    <p className="text-[#555] text-xs">{vehicle.hub_city}</p>
+                    <p className="text-accent-purple font-medium group-hover:underline">{vehicle.hub_name}</p>
+                    <p className="text-muted text-xs">{vehicle.hub_city}</p>
                   </div>
-                  <span className="text-[#555] group-hover:text-white">→</span>
+                  <span className="text-muted group-hover:text-primary">→</span>
                 </Link>
-              ) : <p className="text-[#555] text-sm">No hub assigned</p>}
+              ) : <p className="text-muted text-sm">No hub assigned</p>}
             </div>
 
             <VehicleInvestorCard
@@ -156,72 +156,72 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
               canEdit={isAdmin}
             />
 
-            <div className="bg-[#12121A] border border-[#1e1e2e] rounded-xl p-5">
-              <h2 className="text-white font-semibold mb-3">Current Rider</h2>
+            <div className="bg-surface border border-default rounded-xl p-5">
+              <h2 className="text-primary font-semibold mb-3">Current Rider</h2>
               {activeAssignment ? (
                 <Link href={`/riders/${activeAssignment.rider_id}`} className="flex items-center justify-between group">
                   <div>
-                    <p className="text-[#fdcb6e] font-medium group-hover:underline">{activeAssignment.rider_name}</p>
-                    <p className="text-[#555] text-xs">{activeAssignment.rider_mobile}</p>
+                    <p className="text-accent-warning font-medium group-hover:underline">{activeAssignment.rider_name}</p>
+                    <p className="text-muted text-xs">{activeAssignment.rider_mobile}</p>
                   </div>
-                  <span className="text-[#555] group-hover:text-white">→</span>
+                  <span className="text-muted group-hover:text-primary">→</span>
                 </Link>
-              ) : <p className="text-[#555] text-sm">Not assigned</p>}
+              ) : <p className="text-muted text-sm">Not assigned</p>}
             </div>
           </div>
         </div>
 
-        <div className="bg-[#12121A] border border-[#1e1e2e] rounded-xl overflow-hidden">
-          <div className="px-5 py-4 border-b border-[#1e1e2e]">
-            <h2 className="text-white font-semibold">Assignment History</h2>
+        <div className="bg-surface border border-default rounded-xl overflow-hidden">
+          <div className="px-5 py-4 border-b border-default">
+            <h2 className="text-primary font-semibold">Assignment History</h2>
           </div>
           <div className="overflow-x-auto"><table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-[#1e1e2e]">
+              <tr className="border-b border-default">
                 {["Rider", "From", "To", "Status"].map((h) => (
-                  <th key={h} className="text-left px-5 py-3 text-[11px] text-[#555] uppercase tracking-wider">{h}</th>
+                  <th key={h} className="text-left px-5 py-3 text-[11px] text-muted uppercase tracking-wider">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {assignments.length === 0 ? (
-                <tr><td colSpan={4} className="px-5 py-8 text-center text-[#555]">No assignments yet</td></tr>
+                <tr><td colSpan={4} className="px-5 py-8 text-center text-muted">No assignments yet</td></tr>
               ) : assignments.map((a: { rider_id: string; rider_name: string; rider_mobile: string; assigned_date: string; returned_date: string; status: string }, i: number) => (
-                <tr key={i} className="border-b border-[#1a1a2a]">
+                <tr key={i} className="border-b border-subtle">
                   <td className="px-5 py-3">
-                    <Link href={`/riders/${a.rider_id}`} className="text-[#6C5CE7] hover:underline">{a.rider_name}</Link>
-                    <p className="text-[#555] text-xs">{a.rider_mobile}</p>
+                    <Link href={`/riders/${a.rider_id}`} className="text-accent-purple hover:underline">{a.rider_name}</Link>
+                    <p className="text-muted text-xs">{a.rider_mobile}</p>
                   </td>
-                  <td className="px-5 py-3 text-[#aaa] text-xs">{new Date(a.assigned_date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</td>
-                  <td className="px-5 py-3 text-[#aaa] text-xs">{a.returned_date ? new Date(a.returned_date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "Active"}</td>
-                  <td className="px-5 py-3"><span className={`px-2 py-0.5 rounded-full text-xs capitalize ${statusColor[a.status] ?? "bg-gray-500/20 text-gray-400"}`}>{a.status}</span></td>
+                  <td className="px-5 py-3 text-secondary text-xs">{new Date(a.assigned_date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</td>
+                  <td className="px-5 py-3 text-secondary text-xs">{a.returned_date ? new Date(a.returned_date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "Active"}</td>
+                  <td className="px-5 py-3"><span className={`px-2 py-0.5 rounded-full text-xs capitalize ${statusColor[a.status] ?? "bg-muted/20 text-muted"}`}>{a.status}</span></td>
                 </tr>
               ))}
             </tbody>
           </table></div>
         </div>
 
-        <div className="bg-[#12121A] border border-[#1e1e2e] rounded-xl overflow-hidden">
-          <div className="px-5 py-4 border-b border-[#1e1e2e]">
-            <h2 className="text-white font-semibold">Investor Payout History</h2>
+        <div className="bg-surface border border-default rounded-xl overflow-hidden">
+          <div className="px-5 py-4 border-b border-default">
+            <h2 className="text-primary font-semibold">Investor Payout History</h2>
           </div>
           <div className="overflow-x-auto"><table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-[#1e1e2e]">
+              <tr className="border-b border-default">
                 {["Due Date", "Paid Date", "Amount", "Status"].map((h) => (
-                  <th key={h} className="text-left px-5 py-3 text-[11px] text-[#555] uppercase tracking-wider">{h}</th>
+                  <th key={h} className="text-left px-5 py-3 text-[11px] text-muted uppercase tracking-wider">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {payouts.length === 0 ? (
-                <tr><td colSpan={4} className="px-5 py-8 text-center text-[#555]">No payouts yet</td></tr>
+                <tr><td colSpan={4} className="px-5 py-8 text-center text-muted">No payouts yet</td></tr>
               ) : payouts.map((p: { due_date: string; paid_date: string; amount: number; status: string }, i: number) => (
-                <tr key={i} className="border-b border-[#1a1a2a]">
-                  <td className="px-5 py-3 text-[#aaa]">{new Date(p.due_date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</td>
-                  <td className="px-5 py-3 text-[#aaa]">{p.paid_date ? new Date(p.paid_date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "—"}</td>
-                  <td className="px-5 py-3 text-[#00D1B2] font-semibold">₹{Number(p.amount).toLocaleString()}</td>
-                  <td className="px-5 py-3"><span className={`px-2 py-0.5 rounded-full text-xs capitalize ${payoutStatus[p.status] ?? "bg-gray-500/20 text-gray-400"}`}>{p.status}</span></td>
+                <tr key={i} className="border-b border-subtle">
+                  <td className="px-5 py-3 text-secondary">{new Date(p.due_date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</td>
+                  <td className="px-5 py-3 text-secondary">{p.paid_date ? new Date(p.paid_date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "—"}</td>
+                  <td className="px-5 py-3 text-accent-teal font-semibold">₹{Number(p.amount).toLocaleString()}</td>
+                  <td className="px-5 py-3"><span className={`px-2 py-0.5 rounded-full text-xs capitalize ${payoutStatus[p.status] ?? "bg-muted/20 text-muted"}`}>{p.status}</span></td>
                 </tr>
               ))}
             </tbody>

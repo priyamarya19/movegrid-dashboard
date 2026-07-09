@@ -16,32 +16,32 @@ export default async function PendingRentTable() {
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-3">
-        <Link href="/" className="text-[#555] hover:text-[#aaa] text-sm transition-colors">← Dashboard</Link>
-        <span className="text-[#333]">/</span>
-        <h1 className="text-white text-2xl font-bold">Pending Rent</h1>
+        <Link href="/" className="text-muted hover:text-secondary text-sm transition-colors">← Dashboard</Link>
+        <span className="text-faint">/</span>
+        <h1 className="text-primary text-2xl font-bold">Pending Rent</h1>
       </div>
-      <p className="text-[#666] text-sm -mt-3">
+      <p className="text-muted text-sm -mt-3">
         From the rent ledger — every overdue week per rider. Same figures the admin, ops and investor dashboards use.
       </p>
 
       {/* Totals strip */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {[
-          { label: "Expected", value: rupee(totals.expected), color: "#a29bfe" },
-          { label: "Collected", value: rupee(totals.collected), color: "#00D1B2" },
-          { label: "Pending", value: rupee(totals.pending), color: "#ff6b6b" },
-          { label: "Collection %", value: totals.pct + "%", color: totals.pct >= 80 ? "#00D1B2" : totals.pct >= 50 ? "#fdcb6e" : "#ff6b6b" },
+          { label: "Expected", value: rupee(totals.expected), color: "var(--accent-purple-2)" },
+          { label: "Collected", value: rupee(totals.collected), color: "var(--accent-teal)" },
+          { label: "Pending", value: rupee(totals.pending), color: "var(--accent-danger-alt)" },
+          { label: "Collection %", value: totals.pct + "%", color: totals.pct >= 80 ? "var(--accent-teal)" : totals.pct >= 50 ? "var(--accent-warning)" : "var(--accent-danger-alt)" },
         ].map((c) => (
-          <div key={c.label} className="bg-[#12121A] border border-[#1e1e2e] rounded-xl p-4">
-            <p className="text-[11px] text-[#666] uppercase tracking-wider mb-1">{c.label}</p>
+          <div key={c.label} className="bg-surface border border-default rounded-xl p-4">
+            <p className="text-[11px] text-muted uppercase tracking-wider mb-1">{c.label}</p>
             <p className="text-2xl font-bold" style={{ color: c.color }}>{c.value}</p>
           </div>
         ))}
       </div>
 
-      <div className="bg-[#12121A] border border-[#1e1e2e] rounded-2xl overflow-hidden">
-        <div className="px-5 py-4 border-b border-[#1e1e2e] flex items-center justify-between gap-3">
-          <p className="text-white font-semibold">{riders.length} rider{riders.length !== 1 ? "s" : ""} with pending rent</p>
+      <div className="bg-surface border border-default rounded-2xl overflow-hidden">
+        <div className="px-5 py-4 border-b border-default flex items-center justify-between gap-3">
+          <p className="text-primary font-semibold">{riders.length} rider{riders.length !== 1 ? "s" : ""} with pending rent</p>
           <ExportButton filename="overdue-rent" rows={riders} columns={[
             { label: "User ID", key: "rider_code" }, { label: "Name", key: "name" }, { label: "Mobile", key: "mobile" },
             { label: "Weeks overdue", key: "weeks" }, { label: "Overdue amount", key: "pending" },
@@ -50,22 +50,22 @@ export default async function PendingRentTable() {
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-[#1e1e2e]">
+              <tr className="border-b border-default">
                 {["User ID", "Name", "Mobile", "Weeks overdue", "Overdue amount"].map((h) => (
-                  <th key={h} className="text-left px-5 py-3 text-[11px] text-[#555] uppercase tracking-wider font-medium whitespace-nowrap">{h}</th>
+                  <th key={h} className="text-left px-5 py-3 text-[11px] text-muted uppercase tracking-wider font-medium whitespace-nowrap">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {riders.length === 0 ? (
-                <tr><td colSpan={5} className="px-5 py-10 text-center text-[#555]">No overdue rent — fully collected 🎉</td></tr>
+                <tr><td colSpan={5} className="px-5 py-10 text-center text-muted">No overdue rent — fully collected 🎉</td></tr>
               ) : riders.map((r) => (
-                <tr key={r.rider_id} className="border-b border-[#1a1a2a] hover:bg-white/[0.02] transition-colors">
-                  <td className="px-5 py-3"><Link href={`/riders/${r.rider_id}`} className="font-mono text-xs text-[#6C5CE7] font-semibold hover:underline">{r.rider_code ?? "—"}</Link></td>
-                  <td className="px-5 py-3"><Link href={`/riders/${r.rider_id}`} className="text-white font-medium hover:text-[#6C5CE7] hover:underline transition-colors">{r.name}</Link></td>
-                  <td className="px-5 py-3 text-[#aaa]">{r.mobile}</td>
-                  <td className="px-5 py-3 text-[#aaa]">{r.weeks}</td>
-                  <td className="px-5 py-3 font-semibold text-[#ff6b6b]">{rupee(r.pending)}</td>
+                <tr key={r.rider_id} className="border-b border-subtle hover:bg-overlay-hover transition-colors">
+                  <td className="px-5 py-3"><Link href={`/riders/${r.rider_id}`} className="font-mono text-xs text-accent-purple font-semibold hover:underline">{r.rider_code ?? "—"}</Link></td>
+                  <td className="px-5 py-3"><Link href={`/riders/${r.rider_id}`} className="text-primary font-medium hover:text-accent-purple hover:underline transition-colors">{r.name}</Link></td>
+                  <td className="px-5 py-3 text-secondary">{r.mobile}</td>
+                  <td className="px-5 py-3 text-secondary">{r.weeks}</td>
+                  <td className="px-5 py-3 font-semibold text-accent-danger-alt">{rupee(r.pending)}</td>
                 </tr>
               ))}
             </tbody>

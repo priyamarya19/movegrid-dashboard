@@ -39,7 +39,7 @@ export default function RecordPayment({ riderId, dailyRent }: { riderId: string;
     return (
       <button
         onClick={() => { setOpen(true); setError(""); }}
-        className="inline-flex items-center gap-2 bg-[#6C5CE7] hover:bg-[#7c6cf7] text-white text-sm font-medium px-4 py-2 rounded-xl transition-colors"
+        className="inline-flex items-center gap-2 bg-accent-purple hover:bg-accent-purple text-primary text-sm font-medium px-4 py-2 rounded-xl transition-colors"
       >
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
         Record Payment
@@ -49,24 +49,24 @@ export default function RecordPayment({ riderId, dailyRent }: { riderId: string;
 
   return (
     <div className="relative inline-block">
-      <div className="absolute right-0 top-0 z-50 w-72 p-4 rounded-xl bg-[#12121A] border border-[#2a2a3a] shadow-xl space-y-3">
+      <div className="absolute right-0 top-0 z-50 w-72 p-4 rounded-xl bg-surface border border-strong shadow-xl space-y-3">
         <div className="flex items-center justify-between">
-          <span className="text-xs font-semibold text-white">Record rent payment</span>
-          <button onClick={() => setOpen(false)} className="text-[#555] hover:text-[#aaa] text-xs">✕</button>
+          <span className="text-xs font-semibold text-primary">Record rent payment</span>
+          <button onClick={() => setOpen(false)} className="text-muted hover:text-secondary text-xs">✕</button>
         </div>
         <div>
-          <label className="block text-[11px] text-[#555] uppercase tracking-wider mb-1">Amount ₹</label>
+          <label className="block text-[11px] text-muted uppercase tracking-wider mb-1">Amount ₹</label>
           <input type="number" value={amount} onChange={e => setAmount(e.target.value)}
             placeholder="e.g. 1680, or more for an advance"
-            className="w-full bg-[#0A0A0F] border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-[#6C5CE7]" autoFocus />
+            className="w-full bg-base border border-default rounded-lg px-3 py-2 text-primary text-sm focus:outline-none focus:border-accent-purple" autoFocus />
           {daysPreview > 0 && (
-            <p className="text-[11px] text-[#00D1B2] mt-1">≈ {daysPreview} day{daysPreview !== 1 ? "s" : ""} of rent</p>
+            <p className="text-[11px] text-accent-teal mt-1">≈ {daysPreview} day{daysPreview !== 1 ? "s" : ""} of rent</p>
           )}
         </div>
         <PaymentProof value={proof} onChange={setProof} folder="rent-payments" />
-        {error && <p className="text-red-400 text-[11px]">{error}</p>}
+        {error && <p className="text-accent-danger-alt-text text-[11px]">{error}</p>}
         <button onClick={submit} disabled={loading || !amount || !proofValid(proof)}
-          className="w-full px-3 py-2 rounded-lg text-xs font-semibold bg-[#6C5CE7] hover:bg-[#7c6cf7] text-white disabled:opacity-50 transition-colors">
+          className="w-full px-3 py-2 rounded-lg text-xs font-semibold bg-accent-purple hover:bg-accent-purple text-primary disabled:opacity-50 transition-colors">
           {loading ? "Saving…" : "Record Payment"}
         </button>
       </div>
