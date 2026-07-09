@@ -9,8 +9,8 @@ export const isOnline = (mode: string) => mode === "Online" || mode === "Cash + 
 export const proofValid = (v: PaymentProofValue) => !!v.mode && !!v.proof;
 
 const MODES = ["Cash", "Online", "Cash + Online"];
-const sel = "w-full bg-[#0A0A0F] border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-[#e17055]";
-const lbl = "block text-[11px] text-[#555] uppercase tracking-wider mb-1";
+const sel = "w-full bg-base border border-default rounded-lg px-3 py-2 text-primary text-sm focus:outline-none focus:border-accent-danger";
+const lbl = "block text-[11px] text-muted uppercase tracking-wider mb-1";
 
 export default function PaymentProof({ value, onChange, folder }: {
   value: PaymentProofValue; onChange: (v: PaymentProofValue) => void; folder: string;
@@ -20,7 +20,7 @@ export default function PaymentProof({ value, onChange, folder }: {
   return (
     <div className="space-y-3">
       <div>
-        <label className={lbl}>Payment mode <span className="text-red-400">*</span></label>
+        <label className={lbl}>Payment mode <span className="text-accent-danger-alt-text">*</span></label>
         <select className={sel} value={value.mode} onChange={e => set("mode", e.target.value)}>
           <option value="">Select mode</option>
           {MODES.map(m => <option key={m} value={m}>{m}</option>)}
@@ -29,7 +29,7 @@ export default function PaymentProof({ value, onChange, folder }: {
 
       {online && (
         <div>
-          <label className={lbl}>UTR / Ref no. <span className="text-[#444] normal-case">(optional)</span></label>
+          <label className={lbl}>UTR / Ref no. <span className="text-faint normal-case">(optional)</span></label>
           <input className={sel} value={value.utr} onChange={e => set("utr", e.target.value)} placeholder="Transaction reference" />
         </div>
       )}

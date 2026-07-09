@@ -63,10 +63,10 @@ async function getData(id: string) {
 }
 
 const statusColor: Record<string, string> = {
-  active: "bg-green-500/20 text-green-400",
-  inactive: "bg-gray-500/20 text-gray-400",
-  pending: "bg-yellow-500/20 text-yellow-400",
-  suspended: "bg-red-500/20 text-red-400",
+  active: "bg-accent-success/20 text-accent-success-text",
+  inactive: "bg-muted/20 text-muted",
+  pending: "bg-accent-warning/20 text-accent-warning-text",
+  suspended: "bg-accent-danger-alt/20 text-accent-danger-alt-text",
 };
 
 export default async function RiderDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -86,8 +86,8 @@ export default async function RiderDetailPage({ params }: { params: Promise<{ id
 
         <div className="flex items-center gap-3">
           <BackButton fallback="/riders" label="Riders" />
-          <span className="text-[#333]">/</span>
-          <span className="text-white text-sm">{rider.name}</span>
+          <span className="text-faint">/</span>
+          <span className="text-primary text-sm">{rider.name}</span>
         </div>
 
         <div className="flex items-start justify-between gap-4">
@@ -95,30 +95,30 @@ export default async function RiderDetailPage({ params }: { params: Promise<{ id
             {rider.profile_photo_url ? (
               <a href={`/api/file?key=${encodeURIComponent(rider.profile_photo_url)}`} target="_blank" rel="noopener noreferrer">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={`/api/file?key=${encodeURIComponent(rider.profile_photo_url)}`} alt={rider.name} className="w-16 h-16 rounded-xl object-cover border border-white/10" />
+                <img src={`/api/file?key=${encodeURIComponent(rider.profile_photo_url)}`} alt={rider.name} className="w-16 h-16 rounded-xl object-cover border border-default" />
               </a>
             ) : (
-              <div className="w-16 h-16 rounded-xl bg-[#1e1e2e] flex items-center justify-center text-2xl font-bold text-[#6C5CE7]">
+              <div className="w-16 h-16 rounded-xl bg-default flex items-center justify-center text-2xl font-bold text-accent-purple">
                 {rider.name.charAt(0).toUpperCase()}
               </div>
             )}
             <div>
               <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-white text-2xl font-bold">{rider.name}</h1>
+                <h1 className="text-primary text-2xl font-bold">{rider.name}</h1>
                 {rider.rider_code && (
-                  <span className="font-mono text-xs font-semibold px-2 py-0.5 rounded-full bg-[#6C5CE7]/15 text-[#6C5CE7]">{rider.rider_code}</span>
+                  <span className="font-mono text-xs font-semibold px-2 py-0.5 rounded-full bg-accent-purple/15 text-accent-purple">{rider.rider_code}</span>
                 )}
                 {rider.is_blacklisted && (
-                  <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-red-500/20 text-red-400">Blacklisted</span>
+                  <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-accent-danger-alt/20 text-accent-danger-alt-text">Blacklisted</span>
                 )}
               </div>
-              <p className="text-[#666] text-sm mt-1">
+              <p className="text-muted text-sm mt-1">
                 {rider.mobile} · {rider.rental_mode ?? "—"}
-                {rider.employer ? <span> · <span className="text-[#aaa]">{rider.employer}</span></span> : ""}
+                {rider.employer ? <span> · <span className="text-secondary">{rider.employer}</span></span> : ""}
               </p>
             </div>
           </div>
-          <span className={`px-3 py-1 rounded-full text-sm font-medium capitalize shrink-0 ${statusColor[rider.status] ?? "bg-gray-500/20 text-gray-400"}`}>{rider.status}</span>
+          <span className={`px-3 py-1 rounded-full text-sm font-medium capitalize shrink-0 ${statusColor[rider.status] ?? "bg-muted/20 text-muted"}`}>{rider.status}</span>
         </div>
 
         <BlacklistButton
@@ -132,21 +132,21 @@ export default async function RiderDetailPage({ params }: { params: Promise<{ id
 
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[
-            { label: "Total Collected", value: "₹" + Number(totalCollected).toLocaleString(), color: "#00D1B2" },
-            { label: "Onboarding Fee", value: "₹" + Number(rider.onboarding_fee || 0).toLocaleString(), color: "#6C5CE7" },
-            { label: "Security Deposit", value: "₹" + Number(rider.security_deposit || 0).toLocaleString(), color: "#fdcb6e" },
-            { label: "Payments Made", value: payments.length.toString(), color: "#a29bfe" },
+            { label: "Total Collected", value: "₹" + Number(totalCollected).toLocaleString(), color: "var(--accent-teal)" },
+            { label: "Onboarding Fee", value: "₹" + Number(rider.onboarding_fee || 0).toLocaleString(), color: "var(--accent-purple)" },
+            { label: "Security Deposit", value: "₹" + Number(rider.security_deposit || 0).toLocaleString(), color: "var(--accent-warning)" },
+            { label: "Payments Made", value: payments.length.toString(), color: "var(--accent-purple-2)" },
           ].map((c) => (
-            <div key={c.label} className="bg-[#12121A] border border-[#1e1e2e] rounded-xl p-5">
-              <p className="text-[11px] text-[#555] uppercase tracking-wider mb-2">{c.label}</p>
+            <div key={c.label} className="bg-surface border border-default rounded-xl p-5">
+              <p className="text-[11px] text-muted uppercase tracking-wider mb-2">{c.label}</p>
               <p className="text-2xl font-bold" style={{ color: c.color }}>{c.value}</p>
             </div>
           ))}
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <div className="bg-[#12121A] border border-[#1e1e2e] rounded-xl p-5 space-y-3">
-            <h2 className="text-white font-semibold mb-4">Rider Details</h2>
+          <div className="bg-surface border border-default rounded-xl p-5 space-y-3">
+            <h2 className="text-primary font-semibold mb-4">Rider Details</h2>
             {[
               { label: "Onboarded", value: rider.created_at ? new Date(rider.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "—" },
               { label: "Mobile", value: rider.mobile },
@@ -160,26 +160,26 @@ export default async function RiderDetailPage({ params }: { params: Promise<{ id
               { label: "Current Address", value: rider.current_address ?? "—" },
               { label: "Permanent Address", value: rider.permanent_address ?? "—" },
             ].map((row) => (
-              <div key={row.label} className="flex justify-between py-2 border-b border-[#1e1e2e] last:border-0">
-                <span className="text-[#555] text-sm">{row.label}</span>
-                <span className="text-[#ccc] text-sm text-right max-w-xs">{row.value}</span>
+              <div key={row.label} className="flex justify-between py-2 border-b border-default last:border-0">
+                <span className="text-muted text-sm">{row.label}</span>
+                <span className="text-secondary text-sm text-right max-w-xs">{row.value}</span>
               </div>
             ))}
 
             {/* Family & Local references */}
             {(rider.family_ref_name || rider.local_ref_name) && (
               <div className="pt-3">
-                <p className="text-[#555] text-xs uppercase tracking-wider mb-2">References</p>
+                <p className="text-muted text-xs uppercase tracking-wider mb-2">References</p>
                 {rider.family_ref_name && (
-                  <div className="flex justify-between py-2 border-b border-[#1e1e2e]">
-                    <span className="text-[#555] text-sm">Family Ref</span>
-                    <span className="text-[#ccc] text-sm text-right">{rider.family_ref_name} · {rider.family_ref_mobile ?? "—"}</span>
+                  <div className="flex justify-between py-2 border-b border-default">
+                    <span className="text-muted text-sm">Family Ref</span>
+                    <span className="text-secondary text-sm text-right">{rider.family_ref_name} · {rider.family_ref_mobile ?? "—"}</span>
                   </div>
                 )}
                 {rider.local_ref_name && (
-                  <div className="flex justify-between py-2 border-b border-[#1e1e2e] last:border-0">
-                    <span className="text-[#555] text-sm">Local Ref</span>
-                    <span className="text-[#ccc] text-sm text-right">{rider.local_ref_name} · {rider.local_ref_mobile ?? "—"}</span>
+                  <div className="flex justify-between py-2 border-b border-default last:border-0">
+                    <span className="text-muted text-sm">Local Ref</span>
+                    <span className="text-secondary text-sm text-right">{rider.local_ref_name} · {rider.local_ref_mobile ?? "—"}</span>
                   </div>
                 )}
               </div>
@@ -187,46 +187,46 @@ export default async function RiderDetailPage({ params }: { params: Promise<{ id
           </div>
 
           <div className="space-y-4">
-            <div className="bg-[#12121A] border border-[#1e1e2e] rounded-xl p-5">
-              <h2 className="text-white font-semibold mb-4">Hub</h2>
+            <div className="bg-surface border border-default rounded-xl p-5">
+              <h2 className="text-primary font-semibold mb-4">Hub</h2>
               {rider.hub_id ? (
                 <Link href={`/hubs/${rider.hub_id}`} className="flex items-center justify-between group">
                   <div>
-                    <p className="text-[#6C5CE7] font-medium group-hover:underline">{rider.hub_name}</p>
-                    <p className="text-[#555] text-xs mt-0.5">{rider.hub_city}</p>
+                    <p className="text-accent-purple font-medium group-hover:underline">{rider.hub_name}</p>
+                    <p className="text-muted text-xs mt-0.5">{rider.hub_city}</p>
                   </div>
-                  <span className="text-[#555] group-hover:text-white transition-colors">→</span>
+                  <span className="text-muted group-hover:text-primary transition-colors">→</span>
                 </Link>
-              ) : <p className="text-[#555]">No hub assigned</p>}
+              ) : <p className="text-muted">No hub assigned</p>}
             </div>
 
-            <div className="bg-[#12121A] border border-[#1e1e2e] rounded-xl p-5">
-              <h2 className="text-white font-semibold mb-4">Current Vehicle</h2>
+            <div className="bg-surface border border-default rounded-xl p-5">
+              <h2 className="text-primary font-semibold mb-4">Current Vehicle</h2>
               {activeAssignment ? (
                 <Link href={`/vehicles/${activeAssignment.vehicle_id}`} className="flex items-center justify-between group">
                   <div>
-                    <p className="text-[#00D1B2] font-medium group-hover:underline">{activeAssignment.ev_number}</p>
-                    <p className="text-[#555] text-xs mt-0.5">{activeAssignment.model_name} · {activeAssignment.oem}</p>
-                    <p className="text-[#555] text-xs">Assigned: {new Date(activeAssignment.assigned_date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</p>
+                    <p className="text-accent-teal font-medium group-hover:underline">{activeAssignment.ev_number}</p>
+                    <p className="text-muted text-xs mt-0.5">{activeAssignment.model_name} · {activeAssignment.oem}</p>
+                    <p className="text-muted text-xs">Assigned: {new Date(activeAssignment.assigned_date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</p>
                   </div>
-                  <span className="text-[#555] group-hover:text-white transition-colors">→</span>
+                  <span className="text-muted group-hover:text-primary transition-colors">→</span>
                 </Link>
-              ) : <p className="text-[#555]">No vehicle assigned</p>}
+              ) : <p className="text-muted">No vehicle assigned</p>}
             </div>
           </div>
         </div>
 
         {/* KYC Documents */}
-        <div className="bg-[#12121A] border border-[#1e1e2e] rounded-xl p-5">
+        <div className="bg-surface border border-default rounded-xl p-5">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-white font-semibold">KYC Documents</h2>
+            <h2 className="text-primary font-semibold">KYC Documents</h2>
             {[rider.aadhaar_verified, rider.pan_verified, rider.dl_verified].every(Boolean) ? (
-              <span className="flex items-center gap-1.5 text-xs font-semibold text-[#00D1B2] bg-[#00D1B220] px-2.5 py-1 rounded-full">
+              <span className="flex items-center gap-1.5 text-xs font-semibold text-accent-teal bg-accent-teal/13 px-2.5 py-1 rounded-full">
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
                 All Verified
               </span>
             ) : (
-              <span className="flex items-center gap-1.5 text-xs font-semibold text-[#fdcb6e] bg-[#fdcb6e20] px-2.5 py-1 rounded-full">
+              <span className="flex items-center gap-1.5 text-xs font-semibold text-accent-warning bg-accent-warning/13 px-2.5 py-1 rounded-full">
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
                 Pending Verification
               </span>
@@ -265,34 +265,34 @@ export default async function RiderDetailPage({ params }: { params: Promise<{ id
                 verifiedAt: rider.dl_verified_at ?? null,
               },
             ].map((d) => (
-              <div key={d.label} className={`border rounded-xl p-4 transition-colors ${d.verified ? "border-[#00D1B230]" : "border-[#fdcb6e30]"}`}>
-                <p className="text-[#555] text-xs uppercase tracking-wider mb-2">{d.label}</p>
+              <div key={d.label} className={`border rounded-xl p-4 transition-colors ${d.verified ? "border-accent-teal/19" : "border-accent-warning/19"}`}>
+                <p className="text-muted text-xs uppercase tracking-wider mb-2">{d.label}</p>
                 {d.masked ? (
-                  <p className="text-[#ccc] text-sm font-mono mb-2">{d.masked}</p>
+                  <p className="text-secondary text-sm font-mono mb-2">{d.masked}</p>
                 ) : (
-                  <p className="text-[#444] text-sm mb-2">Not provided</p>
+                  <p className="text-faint text-sm mb-2">Not provided</p>
                 )}
                 <div className="flex flex-col gap-1 mb-1">
                   {d.frontUrl ? (
                     <a href={d.frontUrl} target="_blank" rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 text-xs text-[#6C5CE7] hover:underline">
+                      className="inline-flex items-center gap-1.5 text-xs text-accent-purple hover:underline">
                       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                       View Front
                     </a>
                   ) : (
-                    <span className="inline-flex items-center gap-1.5 text-xs text-[#333]">
+                    <span className="inline-flex items-center gap-1.5 text-xs text-faint">
                       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
                       No front image
                     </span>
                   )}
                   {d.backUrl !== undefined && (d.backUrl ? (
                     <a href={d.backUrl} target="_blank" rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 text-xs text-[#6C5CE7] hover:underline">
+                      className="inline-flex items-center gap-1.5 text-xs text-accent-purple hover:underline">
                       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                       View Back
                     </a>
                   ) : (
-                    <span className="inline-flex items-center gap-1.5 text-xs text-[#333]">
+                    <span className="inline-flex items-center gap-1.5 text-xs text-faint">
                       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
                       No back image
                     </span>
@@ -311,18 +311,18 @@ export default async function RiderDetailPage({ params }: { params: Promise<{ id
         </div>
 
         {/* Rent cycle — full unbroken weekly ledger (no gaps; stops at return) */}
-        <div className="bg-[#12121A] border border-[#1e1e2e] rounded-xl overflow-hidden">
-          <div className="px-5 py-4 border-b border-[#1e1e2e] flex flex-wrap items-center justify-between gap-3">
+        <div className="bg-surface border border-default rounded-xl overflow-hidden">
+          <div className="px-5 py-4 border-b border-default flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h2 className="text-white font-semibold">Rent Cycle</h2>
+              <h2 className="text-primary font-semibold">Rent Cycle</h2>
               {activeAssignment?.paid_through_date && (
-                <p className="text-[11px] text-[#00D1B2] mt-0.5">
+                <p className="text-[11px] text-accent-teal mt-0.5">
                   Paid through {new Date(activeAssignment.paid_through_date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
                 </p>
               )}
             </div>
             <div className="flex items-center gap-3">
-              <span className="text-[11px] text-[#555]">{cycle.length} week{cycle.length !== 1 ? "s" : ""} · shown until the bike is returned</span>
+              <span className="text-[11px] text-muted">{cycle.length} week{cycle.length !== 1 ? "s" : ""} · shown until the bike is returned</span>
               <ExportButton filename={`rent-cycle-${rider.rider_code ?? rider.mobile}`} rows={cycle} columns={[
                 { label: "Week", key: "week_no" }, { label: "Period start", key: "period_start" }, { label: "Period end", key: "period_end" },
                 { label: "Due date", key: "due_date" }, { label: "Vehicle", key: "ev_number" }, { label: "Rent", key: "amount" },
@@ -336,38 +336,38 @@ export default async function RiderDetailPage({ params }: { params: Promise<{ id
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-[#1e1e2e]">
+                <tr className="border-b border-default">
                   {["Week", "Period", "Due date", "Vehicle", "Rent", "Status", "Payment"].map((h) => (
-                    <th key={h} className="text-left px-5 py-3 text-[11px] text-[#555] uppercase tracking-wider whitespace-nowrap">{h}</th>
+                    <th key={h} className="text-left px-5 py-3 text-[11px] text-muted uppercase tracking-wider whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {cycle.length === 0 ? (
-                  <tr><td colSpan={7} className="px-5 py-8 text-center text-[#555]">No rent cycle yet (no allotment)</td></tr>
+                  <tr><td colSpan={7} className="px-5 py-8 text-center text-muted">No rent cycle yet (no allotment)</td></tr>
                 ) : [...cycle].reverse().map((w, i) => {
-                  const color = w.status === "Collected" ? "bg-green-500/15 text-green-400"
-                    : w.status === "Partial" ? "bg-orange-500/15 text-orange-400"
-                    : w.status === "Overdue" ? "bg-red-500/15 text-red-400"
-                    : "bg-yellow-500/15 text-yellow-400";
+                  const color = w.status === "Collected" ? "bg-accent-success/15 text-accent-success-text"
+                    : w.status === "Partial" ? "bg-accent-danger/15 text-accent-danger-text"
+                    : w.status === "Overdue" ? "bg-accent-danger-alt/15 text-accent-danger-alt-text"
+                    : "bg-accent-warning/15 text-accent-warning-text";
                   const fmtD = (s: string) => new Date(s).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
                   const daysLeft = Math.round((new Date(w.due_date).getTime() - todayIST.getTime()) / 86400000);
                   const balance = Math.max(Math.round(w.amount - w.paid), 0);
                   return (
-                    <tr key={i} className="border-b border-[#1a1a2a]">
-                      <td className="px-5 py-3 text-[#aaa]">{w.week_no}</td>
-                      <td className="px-5 py-3 text-[#ccc] whitespace-nowrap">{fmtD(w.period_start)} – {fmtD(w.period_end)}</td>
-                      <td className="px-5 py-3 text-[#aaa] whitespace-nowrap">{fmtD(w.due_date)}</td>
-                      <td className="px-5 py-3">{w.vehicle_id ? <Link href={`/vehicles/${w.vehicle_id}`} className="text-[#6C5CE7] hover:underline">{w.ev_number ?? "—"}</Link> : <span className="text-[#555]">{w.ev_number ?? "—"}</span>}</td>
-                      <td className="px-5 py-3 text-white">₹{Math.round(w.amount).toLocaleString("en-IN")}</td>
+                    <tr key={i} className="border-b border-subtle">
+                      <td className="px-5 py-3 text-secondary">{w.week_no}</td>
+                      <td className="px-5 py-3 text-secondary whitespace-nowrap">{fmtD(w.period_start)} – {fmtD(w.period_end)}</td>
+                      <td className="px-5 py-3 text-secondary whitespace-nowrap">{fmtD(w.due_date)}</td>
+                      <td className="px-5 py-3">{w.vehicle_id ? <Link href={`/vehicles/${w.vehicle_id}`} className="text-accent-purple hover:underline">{w.ev_number ?? "—"}</Link> : <span className="text-muted">{w.ev_number ?? "—"}</span>}</td>
+                      <td className="px-5 py-3 text-primary">₹{Math.round(w.amount).toLocaleString("en-IN")}</td>
                       <td className="px-5 py-3"><span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${color}`}>{w.status}</span></td>
                       <td className="px-5 py-3">
                         {w.status === "Collected" ? (
-                          <span className="text-[#00D1B2] text-xs font-semibold">₹{Math.round(w.paid).toLocaleString("en-IN")} paid</span>
+                          <span className="text-accent-teal text-xs font-semibold">₹{Math.round(w.paid).toLocaleString("en-IN")} paid</span>
                         ) : w.status === "Partial" ? (
-                          <span className="text-orange-400 text-xs font-semibold">₹{Math.round(w.paid).toLocaleString("en-IN")} of ₹{Math.round(w.amount).toLocaleString("en-IN")}</span>
+                          <span className="text-accent-danger-text text-xs font-semibold">₹{Math.round(w.paid).toLocaleString("en-IN")} of ₹{Math.round(w.amount).toLocaleString("en-IN")}</span>
                         ) : (
-                          <span className="text-[11px]" style={{ color: daysLeft < 0 ? "#f87171" : daysLeft <= 2 ? "#fdcb6e" : "#666" }}>
+                          <span className="text-[11px]" style={{ color: daysLeft < 0 ? "var(--accent-danger-alt-text)" : daysLeft <= 2 ? "var(--accent-warning-text)" : "var(--text-muted)" }}>
                             {daysLeft < 0 ? `Overdue ${Math.abs(daysLeft)}d` : daysLeft === 0 ? "Due today" : `Due in ${daysLeft}d`} · ₹{balance.toLocaleString("en-IN")}
                           </span>
                         )}

@@ -40,21 +40,21 @@ export default function BlacklistButton({ riderId, isBlacklisted, blacklistReaso
 
   if (isBlacklisted) {
     return (
-      <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 space-y-2">
+      <div className="bg-accent-danger-alt/10 border border-accent-danger-alt/30 rounded-xl p-4 space-y-2">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-red-400 font-semibold text-sm">
+          <div className="flex items-center gap-2 text-accent-danger-alt-text font-semibold text-sm">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
             Blacklisted
           </div>
           {role === "admin" && (
             <button onClick={handleUnblacklist} disabled={loading}
-              className="text-xs text-[#555] hover:text-white transition-colors disabled:opacity-50">
+              className="text-xs text-muted hover:text-primary transition-colors disabled:opacity-50">
               Remove blacklist
             </button>
           )}
         </div>
-        {blacklistReason && <p className="text-red-300/80 text-xs">Reason: {blacklistReason}</p>}
-        {blacklistedBy && <p className="text-[#555] text-xs">By {blacklistedBy}{blacklistedAt ? ` · ${new Date(blacklistedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}` : ""}</p>}
+        {blacklistReason && <p className="text-accent-danger-alt-text/80 text-xs">Reason: {blacklistReason}</p>}
+        {blacklistedBy && <p className="text-muted text-xs">By {blacklistedBy}{blacklistedAt ? ` · ${new Date(blacklistedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}` : ""}</p>}
       </div>
     );
   }
@@ -62,10 +62,10 @@ export default function BlacklistButton({ riderId, isBlacklisted, blacklistReaso
   if (!["admin", "ops_manager"].includes(role)) return null;
 
   return showForm ? (
-    <div className="bg-[#1a1a2a] border border-red-500/20 rounded-xl p-4 space-y-3">
-      <p className="text-white text-sm font-medium">Blacklist this rider?</p>
+    <div className="bg-subtle border border-accent-danger-alt/20 rounded-xl p-4 space-y-3">
+      <p className="text-primary text-sm font-medium">Blacklist this rider?</p>
       <textarea
-        className="w-full bg-[#0A0A0F] border border-white/10 rounded-lg px-3 py-2 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-red-500/50 resize-none"
+        className="w-full bg-base border border-default rounded-lg px-3 py-2 text-primary text-sm placeholder-faint focus:outline-none focus:border-accent-danger-alt/50 resize-none"
         rows={2}
         placeholder="Reason for blacklisting..."
         value={reason}
@@ -73,17 +73,17 @@ export default function BlacklistButton({ riderId, isBlacklisted, blacklistReaso
       />
       <div className="flex gap-2">
         <button onClick={handleBlacklist} disabled={loading || !reason.trim()}
-          className="px-4 py-2 rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 text-sm font-medium disabled:opacity-50 transition-colors">
+          className="px-4 py-2 rounded-lg bg-accent-danger-alt/20 text-accent-danger-alt-text hover:bg-accent-danger-alt/30 text-sm font-medium disabled:opacity-50 transition-colors">
           {loading ? "..." : "Confirm Blacklist"}
         </button>
-        <button onClick={() => setShowForm(false)} className="px-4 py-2 rounded-lg border border-white/10 text-[#555] hover:text-white text-sm transition-colors">
+        <button onClick={() => setShowForm(false)} className="px-4 py-2 rounded-lg border border-default text-muted hover:text-primary text-sm transition-colors">
           Cancel
         </button>
       </div>
     </div>
   ) : (
     <button onClick={() => setShowForm(true)}
-      className="flex items-center gap-2 text-xs text-[#555] hover:text-red-400 transition-colors">
+      className="flex items-center gap-2 text-xs text-muted hover:text-accent-danger-alt-text transition-colors">
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
       Blacklist this rider
     </button>

@@ -41,26 +41,26 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0A0A0F] flex items-center justify-center px-4 relative">
+    <div className="min-h-screen bg-base flex items-center justify-center px-4 relative">
       <Footer className="absolute bottom-4 inset-x-0 px-4" />
       <div className="w-full max-w-sm">
 
         <div className="mb-8 text-center">
           <div className="inline-flex items-center gap-2 mb-6">
-            <div className="w-8 h-8 bg-[#00C48C] rounded-lg flex items-center justify-center">
+            <div className="w-8 h-8 bg-accent-success rounded-lg flex items-center justify-center">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="white">
                 <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
               </svg>
             </div>
-            <span className="text-white font-bold text-xl tracking-tight">MoveGrid</span>
+            <span className="text-primary font-bold text-xl tracking-tight">MoveGrid</span>
           </div>
-          <h1 className="text-white text-2xl font-bold">Dashboard</h1>
-          <p className="text-gray-400 text-sm mt-1">Sign in to your account</p>
+          <h1 className="text-primary text-2xl font-bold">Dashboard</h1>
+          <p className="text-muted text-sm mt-1">Sign in to your account</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="bg-[#111118] border border-white/10 rounded-2xl p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="bg-surface-alt border border-default rounded-2xl p-6 space-y-4">
           <div>
-            <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">
+            <label className="block text-xs font-semibold text-muted uppercase tracking-wider mb-1.5">
               Email
             </label>
             <input
@@ -69,16 +69,16 @@ export default function LoginPage() {
               onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))}
               placeholder="you@movegrid.in"
               required
-              className="w-full bg-[#0A0A0F] border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-600 text-sm focus:outline-none focus:border-[#00C48C] transition-colors"
+              className="w-full bg-base border border-default rounded-xl px-4 py-3 text-primary placeholder-faint text-sm focus:outline-none focus:border-accent-success transition-colors"
             />
           </div>
 
           <div>
             <div className="flex items-center justify-between mb-1.5">
-              <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider">
+              <label className="block text-xs font-semibold text-muted uppercase tracking-wider">
                 Password
               </label>
-              <Link href="/forgot-password" className="text-xs text-[#00C48C] hover:underline">
+              <Link href="/forgot-password" className="text-xs text-accent-success hover:underline">
                 Forgot password?
               </Link>
             </div>
@@ -89,12 +89,12 @@ export default function LoginPage() {
                 onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))}
                 placeholder="••••••••"
                 required
-                className="w-full bg-[#0A0A0F] border border-white/10 rounded-xl px-4 py-3 pr-11 text-white placeholder-gray-600 text-sm focus:outline-none focus:border-[#00C48C] transition-colors"
+                className="w-full bg-base border border-default rounded-xl px-4 py-3 pr-11 text-primary placeholder-faint text-sm focus:outline-none focus:border-accent-success transition-colors"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword((v) => !v)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 transition-colors"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted hover:text-secondary transition-colors"
                 tabIndex={-1}
                 aria-label={showPassword ? "Hide password" : "Show password"}
               >
@@ -108,19 +108,19 @@ export default function LoginPage() {
           </div>
 
           {error && (
-            <p className="text-red-400 text-sm text-center">{error}</p>
+            <p className="text-accent-danger-alt-text text-sm text-center">{error}</p>
           )}
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3 rounded-xl font-semibold text-sm bg-[#00C48C] text-white hover:bg-[#00E0A0] disabled:opacity-60 disabled:cursor-not-allowed transition-colors mt-2"
+            className="w-full py-3 rounded-xl font-semibold text-sm bg-accent-success text-primary hover:bg-accent-success disabled:opacity-60 disabled:cursor-not-allowed transition-colors mt-2"
           >
             {loading ? "Signing in..." : "Sign In"}
           </button>
         </form>
 
-        <p className="text-center text-xs text-gray-600 mt-6">
+        <p className="text-center text-xs text-faint mt-6">
           MoveGrid Technologies Pvt Ltd · Internal Use Only
         </p>
       </div>

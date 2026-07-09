@@ -22,20 +22,20 @@ export default async function ProfilePage() {
     <DashboardLayout allowedRoles={["investor"]}>
       <div className="space-y-6">
         <div>
-          <h1 className="text-white text-2xl font-bold">My Profile</h1>
-          <p className="text-[#666] text-sm mt-1">Your account and bank details</p>
+          <h1 className="text-primary text-2xl font-bold">My Profile</h1>
+          <p className="text-muted text-sm mt-1">Your account and bank details</p>
         </div>
 
         {!portfolio ? (
-          <div className="bg-[#12121A] border border-[#1e1e2e] rounded-2xl p-10 text-center">
-            <p className="text-[#aaa]">Your investor profile isn&apos;t set up yet.</p>
-            <p className="text-[#555] text-sm mt-1">Please contact the MoveGrid team to get started.</p>
+          <div className="bg-surface border border-default rounded-2xl p-10 text-center">
+            <p className="text-secondary">Your investor profile isn&apos;t set up yet.</p>
+            <p className="text-muted text-sm mt-1">Please contact the MoveGrid team to get started.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {/* Personal details */}
-            <div className="bg-[#12121A] border border-[#1e1e2e] rounded-xl p-5">
-              <h2 className="text-white font-semibold mb-4">Personal Details</h2>
+            <div className="bg-surface border border-default rounded-xl p-5">
+              <h2 className="text-primary font-semibold mb-4">Personal Details</h2>
               {([
                 { label: "Name", value: session.name },
                 { label: "Email", value: session.email },
@@ -45,9 +45,9 @@ export default async function ProfilePage() {
                 { label: "Investment Date", value: fmtDate(portfolio.profile.investment_date) },
                 { label: "Status", value: portfolio.profile.status },
               ] as { label: string; value: string; icon?: React.ReactNode }[]).map((row) => (
-                <div key={row.label} className="flex justify-between py-2 border-b border-[#1e1e2e] last:border-0">
-                  <span className="text-[#555] text-sm">{row.label}</span>
-                  <span className="text-[#ccc] text-sm capitalize flex items-center gap-2">{row.value}{row.icon}</span>
+                <div key={row.label} className="flex justify-between py-2 border-b border-default last:border-0">
+                  <span className="text-muted text-sm">{row.label}</span>
+                  <span className="text-secondary text-sm capitalize flex items-center gap-2">{row.value}{row.icon}</span>
                 </div>
               ))}
             </div>

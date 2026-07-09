@@ -71,8 +71,8 @@ export default function VehiclesTable({ statusFilter: initialStatus }: { statusF
     <div className="space-y-5">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="text-white text-2xl font-bold">Vehicles</h1>
-          <p className="text-[#666] text-sm mt-1">{vehicles.length} total • {counts[VSTATUS.assigned] || 0} assigned · {counts[VSTATUS.available] || 0} available · {counts[VSTATUS.maintenance] || 0} maintenance</p>
+          <h1 className="text-primary text-2xl font-bold">Vehicles</h1>
+          <p className="text-muted text-sm mt-1">{vehicles.length} total • {counts[VSTATUS.assigned] || 0} assigned · {counts[VSTATUS.available] || 0} available · {counts[VSTATUS.maintenance] || 0} maintenance</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <input
@@ -80,29 +80,29 @@ export default function VehiclesTable({ statusFilter: initialStatus }: { statusF
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by vehicle number"
-            className="bg-[#12121A] border border-[#1e1e2e] rounded-xl px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-[#6C5CE7] w-48"
+            className="bg-surface border border-default rounded-xl px-3 py-2 text-sm text-primary placeholder-faint focus:outline-none focus:border-accent-purple w-48"
           />
           <ExportButton filename="vehicles" columns={cols} rows={sorted} />
           <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
-            className="bg-[#12121A] border border-[#1e1e2e] rounded-xl px-3 py-2 text-sm text-gray-300 focus:outline-none focus:border-[#6C5CE7]">
+            className="bg-surface border border-default rounded-xl px-3 py-2 text-sm text-secondary focus:outline-none focus:border-accent-purple">
             {VEHICLE_FILTERS.map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}
           </select>
           <Link href="/vehicles/new"
-            className="inline-flex items-center gap-2 bg-[#6C5CE7] hover:bg-[#7c6cf7] text-white text-sm font-medium px-4 py-2 rounded-xl transition-colors">
+            className="inline-flex items-center gap-2 bg-accent-purple hover:bg-accent-purple text-primary text-sm font-medium px-4 py-2 rounded-xl transition-colors">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             Add Vehicle
           </Link>
         </div>
       </div>
 
-      <div className="bg-[#12121A] border border-[#1e1e2e] rounded-2xl overflow-hidden">
+      <div className="bg-surface border border-default rounded-2xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-[#1e1e2e]">
+              <tr className="border-b border-default">
                 {cols.map((c) => (
                   <th key={c.key} onClick={() => toggleSort(c.key)}
-                    className="text-left px-5 py-3 text-[11px] text-[#555] uppercase tracking-wider font-medium cursor-pointer select-none hover:text-[#aaa] transition-colors">
+                    className="text-left px-5 py-3 text-[11px] text-muted uppercase tracking-wider font-medium cursor-pointer select-none hover:text-secondary transition-colors">
                     {c.label}
                     <span className="ml-1 opacity-60">{sort.key === c.key ? (sort.dir === "asc" ? "↑" : "↓") : "↕"}</span>
                   </th>
@@ -111,28 +111,28 @@ export default function VehiclesTable({ statusFilter: initialStatus }: { statusF
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={8} className="px-5 py-10 text-center text-[#555]">Loading...</td></tr>
+                <tr><td colSpan={8} className="px-5 py-10 text-center text-muted">Loading...</td></tr>
               ) : sorted.length === 0 ? (
-                <tr><td colSpan={8} className="px-5 py-10 text-center text-[#555]">No vehicles found</td></tr>
+                <tr><td colSpan={8} className="px-5 py-10 text-center text-muted">No vehicles found</td></tr>
               ) : sorted.map((v) => (
-                <tr key={v.id} className="border-b border-[#1a1a2a] hover:bg-white/[0.02] transition-colors">
+                <tr key={v.id} className="border-b border-subtle hover:bg-overlay-hover transition-colors">
                   <td className="px-5 py-3">
-                    <Link href={`/vehicles/${v.id}`} className="text-[#6C5CE7] font-medium hover:underline">{v.ev_number}</Link>
+                    <Link href={`/vehicles/${v.id}`} className="text-accent-purple font-medium hover:underline">{v.ev_number}</Link>
                   </td>
-                  <td className="px-5 py-3 text-white">{v.model_name ?? "—"} <span className="text-[#555] text-xs">{v.oem}</span></td>
+                  <td className="px-5 py-3 text-primary">{v.model_name ?? "—"} <span className="text-muted text-xs">{v.oem}</span></td>
                   <td className="px-5 py-3">
-                    {v.hub_id ? <Link href={`/hubs/${v.hub_id}`} className="text-[#aaa] hover:text-[#6C5CE7] hover:underline transition-colors">{v.hub_name}</Link> : <span className="text-[#555]">—</span>}
-                  </td>
-                  <td className="px-5 py-3">
-                    {v.investor_id ? <Link href={`/investors/${v.investor_id}`} className="text-[#00D1B2] hover:underline">{v.investor_name}</Link> : <span className="text-[#555]">—</span>}
+                    {v.hub_id ? <Link href={`/hubs/${v.hub_id}`} className="text-secondary hover:text-accent-purple hover:underline transition-colors">{v.hub_name}</Link> : <span className="text-muted">—</span>}
                   </td>
                   <td className="px-5 py-3">
-                    {v.rider_id ? <Link href={`/riders/${v.rider_id}`} className="text-[#aaa] hover:text-[#fdcb6e] hover:underline transition-colors">{v.assigned_rider}</Link> : <span className="text-[#555]">—</span>}
+                    {v.investor_id ? <Link href={`/investors/${v.investor_id}`} className="text-accent-teal hover:underline">{v.investor_name}</Link> : <span className="text-muted">—</span>}
                   </td>
-                  <td className="px-5 py-3 text-[#555] text-xs">{v.purchase_date ? new Date(v.purchase_date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "—"}</td>
-                  <td className="px-5 py-3 text-[#fdcb6e]">{v.price ? "₹" + Number(v.price).toLocaleString() : "—"}</td>
                   <td className="px-5 py-3">
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${vehicleStatusColor[v.status] ?? "bg-gray-500/20 text-gray-400"}`}>{vehicleStatusLabel(v.status)}</span>
+                    {v.rider_id ? <Link href={`/riders/${v.rider_id}`} className="text-secondary hover:text-accent-warning hover:underline transition-colors">{v.assigned_rider}</Link> : <span className="text-muted">—</span>}
+                  </td>
+                  <td className="px-5 py-3 text-muted text-xs">{v.purchase_date ? new Date(v.purchase_date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "—"}</td>
+                  <td className="px-5 py-3 text-accent-warning">{v.price ? "₹" + Number(v.price).toLocaleString() : "—"}</td>
+                  <td className="px-5 py-3">
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${vehicleStatusColor[v.status] ?? "bg-muted/20 text-muted"}`}>{vehicleStatusLabel(v.status)}</span>
                   </td>
                 </tr>
               ))}

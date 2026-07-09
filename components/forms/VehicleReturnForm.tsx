@@ -10,16 +10,16 @@ const CONDITIONS = ["Same as allotted", "Motor damaged", "Controller issue", "Br
 function Field({ label, required, hint, children }: { label: string; required?: boolean; hint?: string; children: React.ReactNode }) {
   return (
     <div>
-      <label className="block text-xs text-[#555] uppercase tracking-wider mb-1.5">
-        {label}{required && <span className="text-red-400 ml-0.5">*</span>}
+      <label className="block text-xs text-muted uppercase tracking-wider mb-1.5">
+        {label}{required && <span className="text-accent-danger-alt-text ml-0.5">*</span>}
       </label>
       {children}
-      {hint && <p className="text-[#444] text-xs mt-1">{hint}</p>}
+      {hint && <p className="text-faint text-xs mt-1">{hint}</p>}
     </div>
   );
 }
 
-const inp = "w-full bg-[#0A0A0F] border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-[#e17055] transition-colors";
+const inp = "w-full bg-base border border-default rounded-xl px-4 py-2.5 text-primary text-sm placeholder-faint focus:outline-none focus:border-accent-danger transition-colors";
 
 type AssignmentInfo = { id: string; rider_name: string; ev_number: string; assigned_date: string; status: string };
 
@@ -112,9 +112,9 @@ export default function VehicleReturnForm() {
   const Section = ({ title }: { title: string }) => (
     <div className="col-span-full">
       <div className="flex items-center gap-3 mb-1">
-        <div className="h-px flex-1 bg-[#1e1e2e]" />
-        <span className="text-xs font-semibold uppercase tracking-widest text-[#e17055]">{title}</span>
-        <div className="h-px flex-1 bg-[#1e1e2e]" />
+        <div className="h-px flex-1 bg-default" />
+        <span className="text-xs font-semibold uppercase tracking-widest text-accent-danger">{title}</span>
+        <div className="h-px flex-1 bg-default" />
       </div>
     </div>
   );
@@ -125,7 +125,7 @@ export default function VehicleReturnForm() {
 
         <Section title="Identify Vehicle" />
         <Field label="EV / Scooter Number" required hint={evLookingUp ? "Looking up..." : assignment ? `Active allotment found — Rider: ${assignment.rider_name}` : evError}>
-          <input className={inp + (evError ? " border-red-500/50" : assignment ? " border-green-500/30" : "")}
+          <input className={inp + (evError ? " border-accent-danger-alt/50" : assignment ? " border-accent-success/30" : "")}
             value={evInput} onChange={e => setEvInput(e.target.value)} placeholder="MG-001" required />
         </Field>
         {assignment && (
@@ -139,7 +139,7 @@ export default function VehicleReturnForm() {
 
         <Section title="Return Details" />
         <Field label="All Rent Paid?" required>
-          <select className={"w-full bg-[#0A0A0F] border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-[#e17055] transition-colors"} value={form.rent_cleared} onChange={e => set("rent_cleared", e.target.value)} required>
+          <select className={"w-full bg-base border border-default rounded-xl px-4 py-2.5 text-primary text-sm focus:outline-none focus:border-accent-danger transition-colors"} value={form.rent_cleared} onChange={e => set("rent_cleared", e.target.value)} required>
             <option value="">Select</option>
             <option value="true">Yes — all rent paid</option>
             <option value="false">No — pending dues</option>
@@ -148,7 +148,7 @@ export default function VehicleReturnForm() {
         {form.rent_cleared === "true" && (
           <div className="col-span-full">
             <div className="max-w-xs">
-              <p className="text-xs text-[#e17055] font-semibold uppercase tracking-wider mb-2">Rent Settlement Proof</p>
+              <p className="text-xs text-accent-danger font-semibold uppercase tracking-wider mb-2">Rent Settlement Proof</p>
               <PaymentProof value={settle} onChange={setSettle} folder="rent-settlement" />
             </div>
           </div>
@@ -162,7 +162,7 @@ export default function VehicleReturnForm() {
           <div className="flex flex-wrap gap-2">
             {CONDITIONS.map(c => (
               <button key={c} type="button" onClick={() => toggleCondition(c)}
-                className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${form.condition_on_return.includes(c) ? "bg-[#e1705520] border-[#e17055] text-[#e17055]" : "bg-transparent border-[#333] text-[#555] hover:border-[#555] hover:text-[#aaa]"}`}>
+                className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${form.condition_on_return.includes(c) ? "bg-accent-danger/13 border-accent-danger text-accent-danger" : "bg-transparent border-strong text-muted hover:border-strong hover:text-secondary"}`}>
                 {c}
               </button>
             ))}
@@ -178,15 +178,15 @@ export default function VehicleReturnForm() {
 
       </div>
 
-      {error && <p className="text-red-400 text-sm">{error}</p>}
+      {error && <p className="text-accent-danger-alt-text text-sm">{error}</p>}
 
       <div className="flex items-center gap-3 pt-2">
         <button type="submit" disabled={submitting || !assignment}
-          className="px-6 py-2.5 rounded-xl bg-[#e17055] hover:bg-[#f08070] text-white text-sm font-semibold disabled:opacity-60 transition-colors">
+          className="px-6 py-2.5 rounded-xl bg-accent-danger hover:bg-accent-danger text-primary text-sm font-semibold disabled:opacity-60 transition-colors">
           {submitting ? "Saving..." : "Record Return"}
         </button>
         <button type="button" onClick={() => router.back()}
-          className="px-4 py-2.5 rounded-xl border border-white/10 text-gray-400 hover:text-white text-sm transition-colors">
+          className="px-4 py-2.5 rounded-xl border border-default text-muted hover:text-primary text-sm transition-colors">
           Cancel
         </button>
       </div>

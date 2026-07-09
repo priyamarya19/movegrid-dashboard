@@ -44,8 +44,8 @@ export default function FinanceSummary() {
     <div className="space-y-6">
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-white text-2xl font-bold">Finance</h1>
-          <p className="text-[#666] text-sm mt-1">All money collected — rent, penalties, onboarding fees & deposits</p>
+          <h1 className="text-primary text-2xl font-bold">Finance</h1>
+          <p className="text-muted text-sm mt-1">All money collected — rent, penalties, onboarding fees & deposits</p>
         </div>
         <ExportButton
           filename="finance-detail"
@@ -60,31 +60,31 @@ export default function FinanceSummary() {
         />
       </div>
 
-      <div className="bg-[#12121A] border border-[#1e1e2e] rounded-xl overflow-hidden">
+      <div className="bg-surface border border-default rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-[#1e1e2e]">
-                <th className="text-left px-5 py-3 text-[11px] text-[#555] uppercase tracking-wider whitespace-nowrap">Source</th>
+              <tr className="border-b border-default">
+                <th className="text-left px-5 py-3 text-[11px] text-muted uppercase tracking-wider whitespace-nowrap">Source</th>
                 {COLUMNS.map((c) => (
-                  <th key={c.key} className="text-right px-5 py-3 text-[11px] text-[#555] uppercase tracking-wider whitespace-nowrap">{c.label}</th>
+                  <th key={c.key} className="text-right px-5 py-3 text-[11px] text-muted uppercase tracking-wider whitespace-nowrap">{c.label}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={COLUMNS.length + 1} className="px-5 py-10 text-center text-[#555]">Loading...</td></tr>
+                <tr><td colSpan={COLUMNS.length + 1} className="px-5 py-10 text-center text-muted">Loading...</td></tr>
               ) : rows.map((row) => (
                 <tr
                   key={row.label}
-                  className={row.isTotal ? "bg-white/[0.03] border-t border-[#1e1e2e]" : "border-b border-[#1a1a2a] hover:bg-white/[0.02]"}
+                  className={row.isTotal ? "bg-overlay-hover border-t border-default" : "border-b border-subtle hover:bg-overlay-hover"}
                 >
-                  <td className={`px-5 py-3.5 whitespace-nowrap ${row.isTotal ? "text-white font-semibold" : "text-[#aaa]"}`}>{row.label}</td>
+                  <td className={`px-5 py-3.5 whitespace-nowrap ${row.isTotal ? "text-primary font-semibold" : "text-secondary"}`}>{row.label}</td>
                   {COLUMNS.map((c) => (
                     <td key={c.key} className="px-5 py-3.5 text-right whitespace-nowrap">
                       <Link
                         href={`/finance/detail?source=${row.sourceKey}&bucket=${c.key}`}
-                        className={`hover:underline ${row.isTotal ? "text-[#00C48C] font-semibold" : "text-white"}`}
+                        className={`hover:underline ${row.isTotal ? "text-accent-success font-semibold" : "text-primary"}`}
                       >
                         {inr(row.buckets[c.key])}
                       </Link>

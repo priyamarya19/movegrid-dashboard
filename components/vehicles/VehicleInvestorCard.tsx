@@ -52,11 +52,11 @@ export default function VehicleInvestorCard({ vehicleId, investorId, investorNam
   }
 
   return (
-    <div className="bg-[#12121A] border border-[#1e1e2e] rounded-xl p-5">
+    <div className="bg-surface border border-default rounded-xl p-5">
       <div className="flex items-center justify-between mb-3">
-        <h2 className="text-white font-semibold">Investor</h2>
+        <h2 className="text-primary font-semibold">Investor</h2>
         {canEdit && !editing && (
-          <button onClick={startEdit} className="text-xs text-[#00D1B2] hover:underline">
+          <button onClick={startEdit} className="text-xs text-accent-teal hover:underline">
             {investorId ? "Change" : "Map investor"}
           </button>
         )}
@@ -66,33 +66,33 @@ export default function VehicleInvestorCard({ vehicleId, investorId, investorNam
         investorId ? (
           <Link href={`/investors/${investorId}`} className="flex items-center justify-between group">
             <div>
-              <p className="text-[#00D1B2] font-medium group-hover:underline">{investorName}</p>
-              <p className="text-[#555] text-xs">₹{Number(totalInvested).toLocaleString()} invested</p>
+              <p className="text-accent-teal font-medium group-hover:underline">{investorName}</p>
+              <p className="text-muted text-xs">₹{Number(totalInvested).toLocaleString()} invested</p>
             </div>
-            <span className="text-[#555] group-hover:text-white">→</span>
+            <span className="text-muted group-hover:text-primary">→</span>
           </Link>
-        ) : <p className="text-[#555] text-sm">No investor linked</p>
+        ) : <p className="text-muted text-sm">No investor linked</p>
       ) : (
         <div className="space-y-3">
           <select
             value={selected}
             onChange={(e) => setSelected(e.target.value)}
             disabled={loading}
-            className="w-full bg-[#0A0A0F] border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-[#00D1B2]"
+            className="w-full bg-base border border-default rounded-xl px-3 py-2.5 text-primary text-sm focus:outline-none focus:border-accent-teal"
           >
             <option value="">— No investor —</option>
             {options.map((o) => (
               <option key={o.id} value={o.id}>{o.name}</option>
             ))}
           </select>
-          {error && <p className="text-red-400 text-xs">{error}</p>}
+          {error && <p className="text-accent-danger-alt-text text-xs">{error}</p>}
           <div className="flex items-center gap-2">
             <button onClick={save} disabled={saving || loading}
-              className="px-4 py-1.5 rounded-lg bg-[#00D1B2] hover:bg-[#13e0c2] text-[#06231f] text-xs font-semibold disabled:opacity-60 transition-colors">
+              className="px-4 py-1.5 rounded-lg bg-accent-teal hover:bg-accent-teal text-on-dark text-xs font-semibold disabled:opacity-60 transition-colors">
               {saving ? "Saving..." : "Save"}
             </button>
             <button onClick={() => { setEditing(false); setSelected(investorId ?? ""); setError(""); }}
-              className="px-3 py-1.5 rounded-lg border border-white/10 text-gray-400 hover:text-white text-xs transition-colors">
+              className="px-3 py-1.5 rounded-lg border border-default text-muted hover:text-primary text-xs transition-colors">
               Cancel
             </button>
           </div>

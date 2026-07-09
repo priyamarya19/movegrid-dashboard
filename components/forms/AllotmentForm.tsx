@@ -9,17 +9,17 @@ const RENTAL_MODES = ["B2B fleet rental", "Rider rental", "B2B rider"];
 function Field({ label, required, hint, children }: { label: string; required?: boolean; hint?: string; children: React.ReactNode }) {
   return (
     <div>
-      <label className="block text-xs text-[#555] uppercase tracking-wider mb-1.5">
-        {label}{required && <span className="text-red-400 ml-0.5">*</span>}
+      <label className="block text-xs text-muted uppercase tracking-wider mb-1.5">
+        {label}{required && <span className="text-accent-danger-alt-text ml-0.5">*</span>}
       </label>
       {children}
-      {hint && <p className="text-[#444] text-xs mt-1">{hint}</p>}
+      {hint && <p className="text-faint text-xs mt-1">{hint}</p>}
     </div>
   );
 }
 
-const inp = "w-full bg-[#0A0A0F] border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-[#fdcb6e] transition-colors";
-const sel = "w-full bg-[#0A0A0F] border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-[#fdcb6e] transition-colors";
+const inp = "w-full bg-base border border-default rounded-xl px-4 py-2.5 text-primary text-sm placeholder-faint focus:outline-none focus:border-accent-warning transition-colors";
+const sel = "w-full bg-base border border-default rounded-xl px-4 py-2.5 text-primary text-sm focus:outline-none focus:border-accent-warning transition-colors";
 
 type VehicleInfo = { id: string; ev_number: string; chassis_number?: string; motor_number?: string; controller_number?: string; battery_number?: string; oem?: string; model_name?: string; status?: string; hub_id?: string; hub_name?: string };
 type RiderInfo = { id: string; name: string; nickname?: string; mobile: string; rental_mode?: string; onboarding_fee?: number; security_deposit?: number };
@@ -125,9 +125,9 @@ export default function AllotmentForm() {
   const Section = ({ title }: { title: string }) => (
     <div className="col-span-full">
       <div className="flex items-center gap-3 mb-1">
-        <div className="h-px flex-1 bg-[#1e1e2e]" />
-        <span className="text-xs font-semibold uppercase tracking-widest text-[#fdcb6e]">{title}</span>
-        <div className="h-px flex-1 bg-[#1e1e2e]" />
+        <div className="h-px flex-1 bg-default" />
+        <span className="text-xs font-semibold uppercase tracking-widest text-accent-warning">{title}</span>
+        <div className="h-px flex-1 bg-default" />
       </div>
     </div>
   );
@@ -138,7 +138,7 @@ export default function AllotmentForm() {
 
         <Section title="Vehicle" />
         <Field label="EV / Scooter Number" required hint={evLookingUp ? "Looking up..." : vehicle ? `${vehicle.oem} ${vehicle.model_name} — ✅ ready to deploy` : readyList.length ? "Only ready-to-deploy vehicles are shown" : "No vehicles are ready to deploy yet — ops must clear one first"}>
-          <select className={sel + (vehicle ? " border-green-500/30" : "")}
+          <select className={sel + (vehicle ? " border-accent-success/30" : "")}
             value={evInput} onChange={e => setEvInput(e.target.value)} required>
             <option value="">{readyList.length ? "Select a vehicle…" : "None ready to deploy"}</option>
             {readyList.map(v => (
@@ -160,10 +160,10 @@ export default function AllotmentForm() {
         <Section title="Rider" />
         <Field label="Rider Mobile" required hint={riderLookingUp ? "Looking up..." : rider ? `Found: ${rider.name}${rider.nickname ? ` (${rider.nickname})` : ""}` : riderError}>
           <div className="flex gap-2">
-            <input className={inp + (riderError ? " border-red-500/50" : rider ? " border-green-500/30" : "")}
+            <input className={inp + (riderError ? " border-accent-danger-alt/50" : rider ? " border-accent-success/30" : "")}
               value={mobileInput} onChange={e => setMobileInput(e.target.value)} placeholder="+91 9876543210" required />
             <button type="button" onClick={lookupRider}
-              className="px-4 py-2.5 rounded-xl bg-[#fdcb6e20] text-[#fdcb6e] text-sm font-medium hover:bg-[#fdcb6e30] transition-colors whitespace-nowrap">
+              className="px-4 py-2.5 rounded-xl bg-accent-warning/13 text-accent-warning text-sm font-medium hover:bg-accent-warning/19 transition-colors whitespace-nowrap">
               Look up
             </button>
           </div>
@@ -194,15 +194,15 @@ export default function AllotmentForm() {
 
       </div>
 
-      {error && <p className="text-red-400 text-sm">{error}</p>}
+      {error && <p className="text-accent-danger-alt-text text-sm">{error}</p>}
 
       <div className="flex items-center gap-3 pt-2">
         <button type="submit" disabled={submitting || !vehicle || !rider}
-          className="px-6 py-2.5 rounded-xl bg-[#fdcb6e] hover:bg-[#ffd98a] text-black text-sm font-semibold disabled:opacity-60 transition-colors">
+          className="px-6 py-2.5 rounded-xl bg-accent-warning hover:bg-accent-warning text-on-dark text-sm font-semibold disabled:opacity-60 transition-colors">
           {submitting ? "Saving..." : "Confirm Allotment"}
         </button>
         <button type="button" onClick={() => router.back()}
-          className="px-4 py-2.5 rounded-xl border border-white/10 text-gray-400 hover:text-white text-sm transition-colors">
+          className="px-4 py-2.5 rounded-xl border border-default text-muted hover:text-primary text-sm transition-colors">
           Cancel
         </button>
       </div>

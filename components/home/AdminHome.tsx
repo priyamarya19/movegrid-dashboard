@@ -95,25 +95,25 @@ const fmt = (n: number) => {
 };
 
 const statusColor: Record<string, string> = {
-  new: "bg-[#6C5CE720] text-[#6C5CE7]",
-  contacted: "bg-[#00D1B220] text-[#00D1B2]",
-  converted: "bg-[#00b89420] text-[#00b894]",
-  rejected: "bg-red-500/20 text-red-400",
+  new: "bg-accent-purple/13 text-accent-purple",
+  contacted: "bg-accent-teal/13 text-accent-teal",
+  converted: "bg-accent-success/13 text-accent-success",
+  rejected: "bg-accent-danger-alt/20 text-accent-danger-alt-text",
 };
 
 const typeColor: Record<string, string> = {
-  investor: "text-[#00D1B2]",
-  rider: "text-[#6C5CE7]",
-  fleet: "text-[#fdcb6e]",
+  investor: "text-accent-teal",
+  rider: "text-accent-purple",
+  fleet: "text-accent-warning",
 };
 
 const dotColor: Record<string, string> = {
-  onboard_rider: "#00D1B2",
-  assign_vehicle: "#6C5CE7",
-  record_payment: "#fdcb6e",
-  update_lead: "#e17055",
-  payout_marked: "#a29bfe",
-  new_lead: "#00D1B2",
+  onboard_rider: "var(--accent-teal)",
+  assign_vehicle: "var(--accent-purple)",
+  record_payment: "var(--accent-warning)",
+  update_lead: "var(--accent-danger)",
+  payout_marked: "var(--accent-purple-2)",
+  new_lead: "var(--accent-teal)",
 };
 
 function timeAgo(date: string) {
@@ -164,37 +164,37 @@ export default async function AdminHome({ role, name }: Props) {
   const collection = { collected: ledger.collected, expected: ledger.expectedToDate, pending: ledger.overdue, pct: ledger.pct };
 
   const currentMonth = new Date().toLocaleDateString("en-IN", { month: "long", year: "numeric" });
-  const pctColor = collection.pct >= 80 ? "#00D1B2" : collection.pct >= 50 ? "#fdcb6e" : "#ff6b6b";
+  const pctColor = collection.pct >= 80 ? "var(--accent-teal)" : collection.pct >= 50 ? "var(--accent-warning)" : "var(--accent-danger-alt)";
   const roleLabel: Record<string, string> = { admin: "Admin", ops_manager: "Ops Manager", hub_incharge: "Hub Incharge" };
 
   return (
     <div>
       {/* Topbar */}
-      <div className="flex items-center justify-between px-4 py-4 lg:px-7 lg:py-5 border-b border-[#1e1e2e] bg-[#0A0A0F]">
+      <div className="flex items-center justify-between px-4 py-4 lg:px-7 lg:py-5 border-b border-default bg-base">
         <div>
-          <h2 className="text-lg font-semibold text-white">Good morning, {name} 👋</h2>
-          <p className="text-[#666] text-sm mt-0.5">Business overview — {currentMonth}</p>
+          <h2 className="text-lg font-semibold text-primary">Good morning, {name} 👋</h2>
+          <p className="text-muted text-sm mt-0.5">Business overview — {currentMonth}</p>
         </div>
-        <span className="text-xs text-gray-500 uppercase tracking-wider">{roleLabel[role] ?? role}</span>
+        <span className="text-xs text-muted uppercase tracking-wider">{roleLabel[role] ?? role}</span>
       </div>
 
       <div className="p-4 lg:p-7 space-y-6">
 
         {/* Row 1 — Fleet & Riders */}
         <div>
-          <p className="text-[11px] text-[#555] uppercase tracking-widest mb-3">Fleet & Riders</p>
+          <p className="text-[11px] text-muted uppercase tracking-widest mb-3">Fleet & Riders</p>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             {[
-              { label: "Deployed", value: stats.assignedVehicles, sub: `of ${stats.totalVehicles} total`, accent: "#00D1B2", href: "/vehicles?status=assigned" },
-              { label: "Available", value: stats.availableVehicles, sub: "ready to deploy", accent: "#a29bfe", href: `/vehicles?status=${VSTATUS.available}` },
-              { label: "Not Available", value: stats.notAvailableVehicles, sub: "maintenance, returned, etc.", accent: "#fdcb6e", href: `/vehicles?status=${NOT_AVAILABLE}` },
-              { label: "Available Riders", value: stats.pendingRiders, sub: "not yet allotted a vehicle", accent: "#6C5CE7", href: "/riders?status=pending" },
+              { label: "Deployed", value: stats.assignedVehicles, sub: `of ${stats.totalVehicles} total`, accent: "var(--accent-teal)", href: "/vehicles?status=assigned" },
+              { label: "Available", value: stats.availableVehicles, sub: "ready to deploy", accent: "var(--accent-purple-2)", href: `/vehicles?status=${VSTATUS.available}` },
+              { label: "Not Available", value: stats.notAvailableVehicles, sub: "maintenance, returned, etc.", accent: "var(--accent-warning)", href: `/vehicles?status=${NOT_AVAILABLE}` },
+              { label: "Available Riders", value: stats.pendingRiders, sub: "not yet allotted a vehicle", accent: "var(--accent-purple)", href: "/riders?status=pending" },
             ].map((c) => (
-              <Link key={c.label} href={c.href} className="bg-[#12121A] border border-[#1e1e2e] rounded-xl p-5 relative overflow-hidden hover:border-[#333] hover:bg-[#16161f] transition-colors block">
+              <Link key={c.label} href={c.href} className="bg-surface border border-default rounded-xl p-5 relative overflow-hidden hover:border-strong hover:bg-surface-hover transition-colors block">
                 <div className="absolute top-0 left-0 right-0 h-[3px]" style={{ background: c.accent }} />
-                <p className="text-[11px] text-[#666] uppercase tracking-wider mb-2">{c.label}</p>
-                <p className="text-[28px] font-bold text-white mb-1" style={{ color: c.accent }}>{c.value}</p>
-                <p className="text-[11px] text-[#555]">{c.sub}</p>
+                <p className="text-[11px] text-muted uppercase tracking-wider mb-2">{c.label}</p>
+                <p className="text-[28px] font-bold text-primary mb-1" style={{ color: c.accent }}>{c.value}</p>
+                <p className="text-[11px] text-muted">{c.sub}</p>
               </Link>
             ))}
           </div>
@@ -202,19 +202,19 @@ export default async function AdminHome({ role, name }: Props) {
 
         {/* Row 2 — Money */}
         <div>
-          <p className="text-[11px] text-[#555] uppercase tracking-widest mb-3">Financials</p>
+          <p className="text-[11px] text-muted uppercase tracking-widest mb-3">Financials</p>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             {[
-              { label: "Rent This Month", value: fmt(stats.rentMTD), sub: `+${fmt(stats.onboardMTD)} onboarding`, accent: "#00D1B2", href: "/riders" },
-              { label: "Total Collected", value: fmt(stats.totalCollected), sub: "all time rent", accent: "#6C5CE7", href: "/riders" },
-              { label: "Total Investment", value: fmt(stats.totalInvestments), sub: `${fmt(stats.payoutsDone)} paid out`, accent: "#fdcb6e", href: "/investors" },
-              { label: "Payouts Pending", value: fmt(stats.payoutsPending), sub: "to investors", accent: stats.payoutsPending > 0 ? "#ff6b6b" : "#555", href: "/investors" },
+              { label: "Rent This Month", value: fmt(stats.rentMTD), sub: `+${fmt(stats.onboardMTD)} onboarding`, accent: "var(--accent-teal)", href: "/riders" },
+              { label: "Total Collected", value: fmt(stats.totalCollected), sub: "all time rent", accent: "var(--accent-purple)", href: "/riders" },
+              { label: "Total Investment", value: fmt(stats.totalInvestments), sub: `${fmt(stats.payoutsDone)} paid out`, accent: "var(--accent-warning)", href: "/investors" },
+              { label: "Payouts Pending", value: fmt(stats.payoutsPending), sub: "to investors", accent: stats.payoutsPending > 0 ? "var(--accent-danger-alt)" : "var(--text-muted)", href: "/investors" },
             ].map((c) => (
-              <Link key={c.label} href={c.href} className="bg-[#12121A] border border-[#1e1e2e] rounded-xl p-5 relative overflow-hidden hover:border-[#333] hover:bg-[#16161f] transition-colors block">
+              <Link key={c.label} href={c.href} className="bg-surface border border-default rounded-xl p-5 relative overflow-hidden hover:border-strong hover:bg-surface-hover transition-colors block">
                 <div className="absolute top-0 left-0 right-0 h-[3px]" style={{ background: c.accent }} />
-                <p className="text-[11px] text-[#666] uppercase tracking-wider mb-2">{c.label}</p>
+                <p className="text-[11px] text-muted uppercase tracking-wider mb-2">{c.label}</p>
                 <p className="text-[24px] font-bold mb-1" style={{ color: c.accent }}>{c.value}</p>
-                <p className="text-[11px] text-[#555]">{c.sub}</p>
+                <p className="text-[11px] text-muted">{c.sub}</p>
               </Link>
             ))}
           </div>
@@ -222,57 +222,57 @@ export default async function AdminHome({ role, name }: Props) {
 
         {/* Rent Collection — collected vs expected (MTD) */}
         <div>
-          <p className="text-[11px] text-[#555] uppercase tracking-widest mb-3">Rent Collection — to date</p>
-          <div className="bg-[#12121A] border border-[#1e1e2e] rounded-xl p-5">
+          <p className="text-[11px] text-muted uppercase tracking-widest mb-3">Rent Collection — to date</p>
+          <div className="bg-surface border border-default rounded-xl p-5">
             <div className="flex flex-wrap items-end gap-x-10 gap-y-4">
               <div>
-                <p className="text-[11px] text-[#666] uppercase tracking-wider mb-1">Collected</p>
-                <p className="text-[28px] font-bold text-[#00D1B2]">{fmt(collection.collected)}</p>
+                <p className="text-[11px] text-muted uppercase tracking-wider mb-1">Collected</p>
+                <p className="text-[28px] font-bold text-accent-teal">{fmt(collection.collected)}</p>
               </div>
               <Link href="/collections" className="group" title="See which riders' rent is pending">
-                <p className="text-[11px] text-[#666] group-hover:text-[#a29bfe] uppercase tracking-wider mb-1">Expected ↗</p>
-                <p className="text-[28px] font-bold text-[#a29bfe] group-hover:underline">{fmt(collection.expected)}</p>
+                <p className="text-[11px] text-muted group-hover:text-accent-purple-2 uppercase tracking-wider mb-1">Expected ↗</p>
+                <p className="text-[28px] font-bold text-accent-purple-2 group-hover:underline">{fmt(collection.expected)}</p>
               </Link>
               <Link href="/collections" className="group" title="See which riders' rent is pending">
-                <p className="text-[11px] text-[#666] uppercase tracking-wider mb-1">Pending ↗</p>
-                <p className="text-[28px] font-bold text-[#ff6b6b] group-hover:underline">{fmt(collection.pending)}</p>
+                <p className="text-[11px] text-muted uppercase tracking-wider mb-1">Pending ↗</p>
+                <p className="text-[28px] font-bold text-accent-danger-alt group-hover:underline">{fmt(collection.pending)}</p>
               </Link>
               <div className="ml-auto text-right">
-                <p className="text-[11px] text-[#666] uppercase tracking-wider mb-1">Collection</p>
+                <p className="text-[11px] text-muted uppercase tracking-wider mb-1">Collection</p>
                 <p className="text-[28px] font-bold" style={{ color: pctColor }}>{collection.pct}%</p>
               </div>
             </div>
-            <div className="mt-4 h-2 bg-[#1e1e2e] rounded-full overflow-hidden">
+            <div className="mt-4 h-2 bg-default rounded-full overflow-hidden">
               <div className="h-full rounded-full" style={{ width: `${Math.min(collection.pct, 100)}%`, background: pctColor }} />
             </div>
-            <p className="text-[11px] text-[#555] mt-2">From the rent ledger (all roles see this same figure) · click <span className="text-[#a29bfe]">Expected</span> or <span className="text-[#ff6b6b]">Pending</span> to see who owes rent</p>
+            <p className="text-[11px] text-muted mt-2">From the rent ledger (all roles see this same figure) · click <span className="text-accent-purple-2">Expected</span> or <span className="text-accent-danger-alt">Pending</span> to see who owes rent</p>
           </div>
         </div>
 
         {/* Charts: Onboarding trend + Vehicle donut */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <div className="lg:col-span-2 bg-[#12121A] border border-[#1e1e2e] rounded-xl p-5">
-            <p className="text-sm font-semibold text-white mb-1">Riders Onboarded</p>
-            <p className="text-xs text-[#555] mb-4">Monthly trend</p>
+          <div className="lg:col-span-2 bg-surface border border-default rounded-xl p-5">
+            <p className="text-sm font-semibold text-primary mb-1">Riders Onboarded</p>
+            <p className="text-xs text-muted mb-4">Monthly trend</p>
             <RidersChart data={onboardingData} />
           </div>
 
-          <div className="bg-[#12121A] border border-[#1e1e2e] rounded-xl p-5">
-            <p className="text-sm font-semibold text-white mb-1">Fleet Allocation</p>
-            <p className="text-xs text-[#555] mb-4">{stats.totalVehicles} total vehicles</p>
+          <div className="bg-surface border border-default rounded-xl p-5">
+            <p className="text-sm font-semibold text-primary mb-1">Fleet Allocation</p>
+            <p className="text-xs text-muted mb-4">{stats.totalVehicles} total vehicles</p>
             <VehicleDonut assigned={stats.assignedVehicles} available={stats.availableVehicles} notAvailable={stats.notAvailableVehicles} />
             <div className="mt-4 space-y-2">
               {[
-                { label: "Deployed", color: "#00D1B2", val: stats.assignedVehicles, pct: stats.totalVehicles ? Math.round(stats.assignedVehicles / stats.totalVehicles * 100) : 0 },
-                { label: "Available", color: "#a29bfe", val: stats.availableVehicles, pct: stats.totalVehicles ? Math.round(stats.availableVehicles / stats.totalVehicles * 100) : 0 },
-                { label: "Not Available", color: "#fdcb6e", val: stats.notAvailableVehicles, pct: stats.totalVehicles ? Math.round(stats.notAvailableVehicles / stats.totalVehicles * 100) : 0 },
+                { label: "Deployed", color: "var(--accent-teal)", val: stats.assignedVehicles, pct: stats.totalVehicles ? Math.round(stats.assignedVehicles / stats.totalVehicles * 100) : 0 },
+                { label: "Available", color: "var(--accent-purple-2)", val: stats.availableVehicles, pct: stats.totalVehicles ? Math.round(stats.availableVehicles / stats.totalVehicles * 100) : 0 },
+                { label: "Not Available", color: "var(--accent-warning)", val: stats.notAvailableVehicles, pct: stats.totalVehicles ? Math.round(stats.notAvailableVehicles / stats.totalVehicles * 100) : 0 },
               ].map((row) => (
                 <div key={row.label} className="flex items-center gap-3 text-sm">
                   <span className="w-20 text-xs shrink-0" style={{ color: row.color }}>{row.label}</span>
-                  <div className="flex-1 h-1.5 bg-[#1e1e2e] rounded-full overflow-hidden">
+                  <div className="flex-1 h-1.5 bg-default rounded-full overflow-hidden">
                     <div className="h-full rounded-full" style={{ width: `${row.pct}%`, background: row.color }} />
                   </div>
-                  <span className="w-6 text-right text-white font-semibold text-xs shrink-0">{row.val}</span>
+                  <span className="w-6 text-right text-primary font-semibold text-xs shrink-0">{row.val}</span>
                 </div>
               ))}
             </div>
@@ -280,20 +280,20 @@ export default async function AdminHome({ role, name }: Props) {
         </div>
 
         {/* Revenue Summary */}
-        <div className="bg-[#12121A] border border-[#1e1e2e] rounded-xl p-5">
-          <p className="text-sm font-semibold text-white mb-1">Revenue Summary</p>
-          <p className="text-xs text-[#555] mb-4">Monthly breakdown — collected vs paid out vs net</p>
+        <div className="bg-surface border border-default rounded-xl p-5">
+          <p className="text-sm font-semibold text-primary mb-1">Revenue Summary</p>
+          <p className="text-xs text-muted mb-4">Monthly breakdown — collected vs paid out vs net</p>
           <div className="overflow-x-auto">
             <table className="w-full text-sm border-collapse">
               <thead>
-                <tr className="border-b border-[#1e1e2e]">
+                <tr className="border-b border-default">
                   {[
-                    { label: "Month", color: "#555" },
-                    { label: "Rent", color: "#00D1B2" },
-                    { label: "Onboarding", color: "#6C5CE7" },
-                    { label: "Security", color: "#a29bfe" },
-                    { label: "Investor Payouts", color: "#e17055" },
-                    { label: "Net", color: "#fff" },
+                    { label: "Month", color: "var(--text-muted)" },
+                    { label: "Rent", color: "var(--accent-teal)" },
+                    { label: "Onboarding", color: "var(--accent-purple)" },
+                    { label: "Security", color: "var(--accent-purple-2)" },
+                    { label: "Investor Payouts", color: "var(--accent-danger)" },
+                    { label: "Net", color: "var(--text-primary)" },
                   ].map(h => (
                     <th key={h.label} className="text-left pb-3 text-[11px] uppercase tracking-wider whitespace-nowrap" style={{ color: h.color }}>{h.label}</th>
                   ))}
@@ -301,17 +301,17 @@ export default async function AdminHome({ role, name }: Props) {
               </thead>
               <tbody>
                 {revenueSummary.length === 0 ? (
-                  <tr><td colSpan={6} className="py-8 text-center text-[#555]">No revenue data yet</td></tr>
+                  <tr><td colSpan={6} className="py-8 text-center text-muted">No revenue data yet</td></tr>
                 ) : revenueSummary.map((row: { month: string; rent: number; onboard: number; security: number; payouts: number }, i: number) => {
                   const net = Number(row.rent) + Number(row.onboard) + Number(row.security) - Number(row.payouts);
                   return (
-                    <tr key={row.month} className="border-b border-[#1a1a2a]">
-                      <td className={`py-2.5 ${i === 0 ? "font-bold text-white" : "text-[#ccc]"}`}>{row.month}</td>
-                      <td className="py-2.5 text-[#00D1B2]">{fmt(Number(row.rent))}</td>
-                      <td className="py-2.5 text-[#6C5CE7]">{fmt(Number(row.onboard))}</td>
-                      <td className="py-2.5 text-[#a29bfe]">{fmt(Number(row.security))}</td>
-                      <td className="py-2.5 text-[#e17055]">{Number(row.payouts) > 0 ? `−${fmt(Number(row.payouts))}` : "—"}</td>
-                      <td className={`py-2.5 font-bold ${i === 0 ? "text-[#00D1B2]" : "text-white"}`}>{fmt(net)}</td>
+                    <tr key={row.month} className="border-b border-subtle">
+                      <td className={`py-2.5 ${i === 0 ? "font-bold text-primary" : "text-secondary"}`}>{row.month}</td>
+                      <td className="py-2.5 text-accent-teal">{fmt(Number(row.rent))}</td>
+                      <td className="py-2.5 text-accent-purple">{fmt(Number(row.onboard))}</td>
+                      <td className="py-2.5 text-accent-purple-2">{fmt(Number(row.security))}</td>
+                      <td className="py-2.5 text-accent-danger">{Number(row.payouts) > 0 ? `−${fmt(Number(row.payouts))}` : "—"}</td>
+                      <td className={`py-2.5 font-bold ${i === 0 ? "text-accent-teal" : "text-primary"}`}>{fmt(net)}</td>
                     </tr>
                   );
                 })}
@@ -321,13 +321,13 @@ export default async function AdminHome({ role, name }: Props) {
                   const ytdSecurity = revenueSummary.reduce((s: number, r: { security: number }) => s + Number(r.security), 0);
                   const ytdPayouts = revenueSummary.reduce((s: number, r: { payouts: number }) => s + Number(r.payouts), 0);
                   return (
-                    <tr className="border-t-2 border-[#6C5CE740]">
-                      <td className="py-2.5 font-bold text-[#6C5CE7]">YTD</td>
-                      <td className="py-2.5 font-bold text-[#00D1B2]">{fmt(ytdRent)}</td>
-                      <td className="py-2.5 font-bold text-[#6C5CE7]">{fmt(ytdOnboard)}</td>
-                      <td className="py-2.5 font-bold text-[#a29bfe]">{fmt(ytdSecurity)}</td>
-                      <td className="py-2.5 font-bold text-[#e17055]">{ytdPayouts > 0 ? `−${fmt(ytdPayouts)}` : "—"}</td>
-                      <td className="py-2.5 font-bold text-[#00D1B2] text-[15px]">{fmt(ytdRent + ytdOnboard + ytdSecurity - ytdPayouts)}</td>
+                    <tr className="border-t-2 border-accent-purple/25">
+                      <td className="py-2.5 font-bold text-accent-purple">YTD</td>
+                      <td className="py-2.5 font-bold text-accent-teal">{fmt(ytdRent)}</td>
+                      <td className="py-2.5 font-bold text-accent-purple">{fmt(ytdOnboard)}</td>
+                      <td className="py-2.5 font-bold text-accent-purple-2">{fmt(ytdSecurity)}</td>
+                      <td className="py-2.5 font-bold text-accent-danger">{ytdPayouts > 0 ? `−${fmt(ytdPayouts)}` : "—"}</td>
+                      <td className="py-2.5 font-bold text-accent-teal text-[15px]">{fmt(ytdRent + ytdOnboard + ytdSecurity - ytdPayouts)}</td>
                     </tr>
                   );
                 })()}
@@ -341,31 +341,31 @@ export default async function AdminHome({ role, name }: Props) {
 
         {/* Recent Leads + Activity */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <div className="bg-[#12121A] border border-[#1e1e2e] rounded-xl p-5">
+          <div className="bg-surface border border-default rounded-xl p-5">
             <div className="flex items-center justify-between mb-4">
-              <p className="text-sm font-semibold text-white">Recent Leads</p>
-              <Link href="/leads" className="text-xs text-[#6C5CE7] hover:underline">View all →</Link>
+              <p className="text-sm font-semibold text-primary">Recent Leads</p>
+              <Link href="/leads" className="text-xs text-accent-purple hover:underline">View all →</Link>
             </div>
             <div className="overflow-x-auto"><table className="w-full text-sm border-collapse">
               <thead>
-                <tr className="border-b border-[#1e1e2e]">
+                <tr className="border-b border-default">
                   {["Name", "Type", "Phone", "Status"].map(h => (
-                    <th key={h} className="text-left pb-3 text-[11px] text-[#555] uppercase tracking-wider">{h}</th>
+                    <th key={h} className="text-left pb-3 text-[11px] text-muted uppercase tracking-wider">{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {leads.length === 0 ? (
-                  <tr><td colSpan={4} className="py-6 text-center text-[#555]">No leads yet</td></tr>
+                  <tr><td colSpan={4} className="py-6 text-center text-muted">No leads yet</td></tr>
                 ) : leads.map((lead) => (
-                  <tr key={lead.id} className="border-b border-[#1a1a2a] hover:bg-white/[0.02]">
+                  <tr key={lead.id} className="border-b border-subtle hover:bg-overlay-hover">
                     <td className="py-2.5">
-                      <Link href={`/leads/${lead.id}`} className="text-[#ccc] hover:text-white hover:underline">{lead.name}</Link>
+                      <Link href={`/leads/${lead.id}`} className="text-secondary hover:text-primary hover:underline">{lead.name}</Link>
                     </td>
-                    <td className={`py-2.5 font-medium capitalize ${typeColor[lead.type] ?? "text-gray-400"}`}>{lead.type}</td>
-                    <td className="py-2.5 text-[#ccc]">{lead.phone ?? "—"}</td>
+                    <td className={`py-2.5 font-medium capitalize ${typeColor[lead.type] ?? "text-muted"}`}>{lead.type}</td>
+                    <td className="py-2.5 text-secondary">{lead.phone ?? "—"}</td>
                     <td className="py-2.5">
-                      <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold capitalize ${statusColor[lead.status] ?? "bg-gray-500/20 text-gray-400"}`}>{lead.status}</span>
+                      <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold capitalize ${statusColor[lead.status] ?? "bg-muted/20 text-muted"}`}>{lead.status}</span>
                     </td>
                   </tr>
                 ))}
@@ -373,20 +373,20 @@ export default async function AdminHome({ role, name }: Props) {
             </table></div>
           </div>
 
-          <div className="bg-[#12121A] border border-[#1e1e2e] rounded-xl p-5">
+          <div className="bg-surface border border-default rounded-xl p-5">
             <div className="flex items-center justify-between mb-4">
-              <p className="text-sm font-semibold text-white">Recent Activity</p>
-              <Link href="/logs" className="text-xs text-[#6C5CE7] hover:underline">View logs →</Link>
+              <p className="text-sm font-semibold text-primary">Recent Activity</p>
+              <Link href="/logs" className="text-xs text-accent-purple hover:underline">View logs →</Link>
             </div>
             <div className="space-y-0">
               {logs.length === 0 ? (
-                <p className="text-[#555] text-sm py-4 text-center">No activity yet</p>
+                <p className="text-muted text-sm py-4 text-center">No activity yet</p>
               ) : logs.map((log, i) => (
-                <div key={i} className="flex gap-3 items-start py-2.5 border-b border-[#1a1a2a] last:border-0">
-                  <div className="w-2 h-2 rounded-full mt-1.5 shrink-0" style={{ background: dotColor[log.action] ?? "#666" }} />
+                <div key={i} className="flex gap-3 items-start py-2.5 border-b border-subtle last:border-0">
+                  <div className="w-2 h-2 rounded-full mt-1.5 shrink-0" style={{ background: dotColor[log.action] ?? "var(--text-muted)" }} />
                   <div className="min-w-0">
-                    <p className="text-sm text-[#ccc] leading-snug">{activityText(log)}</p>
-                    <p className="text-[11px] text-[#555] mt-0.5">{timeAgo(log.created_at)}</p>
+                    <p className="text-sm text-secondary leading-snug">{activityText(log)}</p>
+                    <p className="text-[11px] text-muted mt-0.5">{timeAgo(log.created_at)}</p>
                   </div>
                 </div>
               ))}

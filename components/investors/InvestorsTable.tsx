@@ -68,12 +68,12 @@ export default function InvestorsTable() {
     <div className="space-y-5">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="text-white text-2xl font-bold">Investors</h1>
-          <p className="text-[#666] text-sm mt-1">{investors.length} investors · ₹{(totalInvested / 100000).toFixed(1)}L total invested · ₹{(totalPending / 100000).toFixed(1)}L pending payouts</p>
+          <h1 className="text-primary text-2xl font-bold">Investors</h1>
+          <p className="text-muted text-sm mt-1">{investors.length} investors · ₹{(totalInvested / 100000).toFixed(1)}L total invested · ₹{(totalPending / 100000).toFixed(1)}L pending payouts</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <ExportButton filename="investors" columns={cols} rows={sorted} />
-          <Link href="/investors/new" className="px-4 py-2.5 rounded-xl bg-[#6C5CE7] hover:bg-[#7d6df0] text-white text-sm font-semibold transition-colors shrink-0">
+          <Link href="/investors/new" className="px-4 py-2.5 rounded-xl bg-accent-purple hover:bg-accent-purple text-primary text-sm font-semibold transition-colors shrink-0">
             + Add Investor
           </Link>
         </div>
@@ -81,25 +81,25 @@ export default function InvestorsTable() {
 
       {/* Bank verification notifications */}
       {pendingBank.length > 0 && (
-        <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4 space-y-3">
+        <div className="bg-accent-warning/10 border border-accent-warning/30 rounded-xl p-4 space-y-3">
           <div className="flex items-center gap-2">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-            <p className="text-yellow-400 text-sm font-semibold">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent-warning)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            <p className="text-accent-warning-text text-sm font-semibold">
               {pendingBank.length} bank {pendingBank.length === 1 ? "change" : "changes"} awaiting verification
             </p>
           </div>
           {pendingBank.map((inv) => (
-            <div key={inv.id} className="flex items-center justify-between gap-3 bg-[#12121A] border border-[#1e1e2e] rounded-lg px-4 py-3">
+            <div key={inv.id} className="flex items-center justify-between gap-3 bg-surface border border-default rounded-lg px-4 py-3">
               <div className="min-w-0">
-                <Link href={`/investors/${inv.id}`} className="text-white text-sm font-medium hover:text-[#00D1B2]">{inv.name}</Link>
-                <p className="text-[#777] text-xs mt-0.5 truncate">
+                <Link href={`/investors/${inv.id}`} className="text-primary text-sm font-medium hover:text-accent-teal">{inv.name}</Link>
+                <p className="text-muted text-xs mt-0.5 truncate">
                   {inv.bank ?? "—"} · A/C {inv.account_number ?? "—"} · {inv.ifsc ?? "—"}
                 </p>
               </div>
               <button
                 onClick={() => verifyBank(inv.id)}
                 disabled={verifying === inv.id}
-                className="shrink-0 px-4 py-1.5 rounded-lg bg-green-500/20 text-green-400 hover:bg-green-500/30 text-xs font-semibold disabled:opacity-60 transition-colors"
+                className="shrink-0 px-4 py-1.5 rounded-lg bg-accent-success/20 text-accent-success-text hover:bg-accent-success/30 text-xs font-semibold disabled:opacity-60 transition-colors"
               >
                 {verifying === inv.id ? "Verifying..." : "Mark verified"}
               </button>
@@ -110,25 +110,25 @@ export default function InvestorsTable() {
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {[
-          { label: "Total Investors", value: investors.length.toString(), color: "#6C5CE7" },
-          { label: "Total Invested", value: "₹" + (totalInvested / 100000).toFixed(1) + "L", color: "#00D1B2" },
-          { label: "Pending Payouts", value: "₹" + (totalPending / 100000).toFixed(1) + "L", color: "#e17055" },
+          { label: "Total Investors", value: investors.length.toString(), color: "var(--accent-purple)" },
+          { label: "Total Invested", value: "₹" + (totalInvested / 100000).toFixed(1) + "L", color: "var(--accent-teal)" },
+          { label: "Pending Payouts", value: "₹" + (totalPending / 100000).toFixed(1) + "L", color: "var(--accent-danger)" },
         ].map((c) => (
-          <div key={c.label} className="bg-[#12121A] border border-[#1e1e2e] rounded-xl p-5">
-            <p className="text-[11px] text-[#555] uppercase tracking-wider mb-2">{c.label}</p>
+          <div key={c.label} className="bg-surface border border-default rounded-xl p-5">
+            <p className="text-[11px] text-muted uppercase tracking-wider mb-2">{c.label}</p>
             <p className="text-2xl font-bold" style={{ color: c.color }}>{c.value}</p>
           </div>
         ))}
       </div>
 
-      <div className="bg-[#12121A] border border-[#1e1e2e] rounded-2xl overflow-hidden">
+      <div className="bg-surface border border-default rounded-2xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-[#1e1e2e]">
+              <tr className="border-b border-default">
                 {cols.map((c) => (
                   <th key={c.key} onClick={() => toggleSort(c.key)}
-                    className="text-left px-5 py-3 text-[11px] text-[#555] uppercase tracking-wider font-medium cursor-pointer select-none hover:text-[#aaa] transition-colors">
+                    className="text-left px-5 py-3 text-[11px] text-muted uppercase tracking-wider font-medium cursor-pointer select-none hover:text-secondary transition-colors">
                     {c.label}
                     <span className="ml-1 opacity-60">{sort.key === c.key ? (sort.dir === "asc" ? "↑" : "↓") : "↕"}</span>
                   </th>
@@ -137,23 +137,23 @@ export default function InvestorsTable() {
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={8} className="px-5 py-10 text-center text-[#555]">Loading...</td></tr>
+                <tr><td colSpan={8} className="px-5 py-10 text-center text-muted">Loading...</td></tr>
               ) : sorted.map((inv) => (
-                <tr key={inv.id} className="border-b border-[#1a1a2a] hover:bg-white/[0.02] transition-colors">
+                <tr key={inv.id} className="border-b border-subtle hover:bg-overlay-hover transition-colors">
                   <td className="px-5 py-3">
-                    <Link href={`/investors/${inv.id}`} className="text-white font-medium hover:text-[#00D1B2] hover:underline transition-colors">{inv.name}</Link>
+                    <Link href={`/investors/${inv.id}`} className="text-primary font-medium hover:text-accent-teal hover:underline transition-colors">{inv.name}</Link>
                   </td>
                   <td className="px-5 py-3">
-                    <p className="text-[#aaa]">{inv.mobile}</p>
-                    <p className="text-[#555] text-xs">{inv.email}</p>
+                    <p className="text-secondary">{inv.mobile}</p>
+                    <p className="text-muted text-xs">{inv.email}</p>
                   </td>
-                  <td className="px-5 py-3 text-[#00D1B2] font-semibold">₹{Number(inv.total_invested).toLocaleString()}</td>
-                  <td className="px-5 py-3 text-[#6C5CE7] font-semibold">{inv.vehicle_count}</td>
-                  <td className="px-5 py-3 text-green-400">₹{Number(inv.total_paid).toLocaleString()}</td>
-                  <td className="px-5 py-3 text-[#e17055]">₹{Number(inv.pending_amount).toLocaleString()}</td>
-                  <td className="px-5 py-3 text-[#555] text-xs">{inv.investment_date ? new Date(inv.investment_date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "—"}</td>
+                  <td className="px-5 py-3 text-accent-teal font-semibold">₹{Number(inv.total_invested).toLocaleString()}</td>
+                  <td className="px-5 py-3 text-accent-purple font-semibold">{inv.vehicle_count}</td>
+                  <td className="px-5 py-3 text-accent-success-text">₹{Number(inv.total_paid).toLocaleString()}</td>
+                  <td className="px-5 py-3 text-accent-danger">₹{Number(inv.pending_amount).toLocaleString()}</td>
+                  <td className="px-5 py-3 text-muted text-xs">{inv.investment_date ? new Date(inv.investment_date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "—"}</td>
                   <td className="px-5 py-3">
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize ${inv.status === "active" ? "bg-green-500/20 text-green-400" : "bg-gray-500/20 text-gray-400"}`}>{inv.status}</span>
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize ${inv.status === "active" ? "bg-accent-success/20 text-accent-success-text" : "bg-muted/20 text-muted"}`}>{inv.status}</span>
                   </td>
                 </tr>
               ))}

@@ -12,16 +12,16 @@ const B2B_COMPANIES = ["Swiggy", "Zomato", "Blinkit", "Dunzo", "Zepto", "Porter"
 function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
   return (
     <div>
-      <label className="block text-xs text-[#555] uppercase tracking-wider mb-1.5">
-        {label}{required && <span className="text-red-400 ml-0.5">*</span>}
+      <label className="block text-xs text-muted uppercase tracking-wider mb-1.5">
+        {label}{required && <span className="text-accent-danger-alt-text ml-0.5">*</span>}
       </label>
       {children}
     </div>
   );
 }
 
-const inp = "w-full bg-[#0A0A0F] border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-[#6C5CE7] transition-colors";
-const sel = "w-full bg-[#0A0A0F] border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-[#6C5CE7] transition-colors";
+const inp = "w-full bg-base border border-default rounded-xl px-4 py-2.5 text-primary text-sm placeholder-faint focus:outline-none focus:border-accent-purple transition-colors";
+const sel = "w-full bg-base border border-default rounded-xl px-4 py-2.5 text-primary text-sm focus:outline-none focus:border-accent-purple transition-colors";
 
 export default function RiderForm() {
   const router = useRouter();
@@ -89,12 +89,12 @@ export default function RiderForm() {
     } finally { setSubmitting(false); }
   }
 
-  const Section = ({ title, color = "#6C5CE7" }: { title: string; color?: string }) => (
+  const Section = ({ title, color = "var(--accent-purple)" }: { title: string; color?: string }) => (
     <div className="col-span-full">
       <div className="flex items-center gap-3 mb-1">
-        <div className="h-px flex-1 bg-[#1e1e2e]" />
+        <div className="h-px flex-1 bg-default" />
         <span className="text-xs font-semibold uppercase tracking-widest" style={{ color }}>{title}</span>
-        <div className="h-px flex-1 bg-[#1e1e2e]" />
+        <div className="h-px flex-1 bg-default" />
       </div>
     </div>
   );
@@ -121,7 +121,7 @@ export default function RiderForm() {
         <Section title="Identity Documents" />
         <Field label="Aadhaar Number">
           <input
-            className={inp + (blacklistWarning ? " border-red-500" : "")}
+            className={inp + (blacklistWarning ? " border-accent-danger-alt" : "")}
             value={form.aadhaar}
             onChange={e => set("aadhaar", e.target.value)}
             onBlur={e => checkBlacklist(e.target.value)}
@@ -129,9 +129,9 @@ export default function RiderForm() {
             maxLength={14}
           />
           {blacklistWarning && (
-            <div className="mt-1.5 flex items-start gap-2 bg-red-500/10 border border-red-500/30 rounded-lg px-3 py-2">
-              <span className="text-red-400 text-lg leading-none">⚠</span>
-              <p className="text-red-400 text-xs font-medium">{blacklistWarning}</p>
+            <div className="mt-1.5 flex items-start gap-2 bg-accent-danger-alt/10 border border-accent-danger-alt/30 rounded-lg px-3 py-2">
+              <span className="text-accent-danger-alt-text text-lg leading-none">⚠</span>
+              <p className="text-accent-danger-alt-text text-xs font-medium">{blacklistWarning}</p>
             </div>
           )}
         </Field>
@@ -179,15 +179,15 @@ export default function RiderForm() {
 
       </div>
 
-      {error && <p className="text-red-400 text-sm">{error}</p>}
+      {error && <p className="text-accent-danger-alt-text text-sm">{error}</p>}
 
       <div className="flex items-center gap-3 pt-2">
         <button type="submit" disabled={submitting}
-          className="px-6 py-2.5 rounded-xl bg-[#6C5CE7] hover:bg-[#7d6ff0] text-white text-sm font-semibold disabled:opacity-60 transition-colors">
+          className="px-6 py-2.5 rounded-xl bg-accent-purple hover:bg-accent-purple text-primary text-sm font-semibold disabled:opacity-60 transition-colors">
           {submitting ? "Saving..." : "Create Rider"}
         </button>
         <button type="button" onClick={() => router.back()}
-          className="px-4 py-2.5 rounded-xl border border-white/10 text-gray-400 hover:text-white text-sm transition-colors">
+          className="px-4 py-2.5 rounded-xl border border-default text-muted hover:text-primary text-sm transition-colors">
           Cancel
         </button>
       </div>

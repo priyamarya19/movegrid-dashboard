@@ -12,7 +12,7 @@ export default function BackButton({ fallback, label }: Props) {
         if (window.history.length > 1) router.back();
         else router.push(fallback);
       }}
-      className="text-[#555] hover:text-white text-sm transition-colors"
+      className="text-muted hover:text-primary text-sm transition-colors"
     >
       ← {label}
     </button>
