@@ -40,10 +40,11 @@ function sortData(data: Vehicle[], sort: Sort): Vehicle[] {
   });
 }
 
-export default function VehiclesTable() {
+export default function VehiclesTable({ statusFilter: initialStatus }: { statusFilter?: string | null } = {}) {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState(initialStatus ?? "");
+  const [search, setSearch] = useState("");
   const [sort, setSort] = useState<Sort>({ key: "ev_number", dir: "asc" });
 
   const fetch_ = async () => {
@@ -60,7 +61,10 @@ export default function VehiclesTable() {
   const toggleSort = (key: string) =>
     setSort(s => s.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: "asc" });
 
-  const sorted = sortData(vehicles, sort);
+  // Search by vehicle number only.
+  const q = search.trim().toLowerCase();
+  const filtered = q ? vehicles.filter((v) => v.ev_number?.toLowerCase().includes(q)) : vehicles;
+  const sorted = sortData(filtered, sort);
   const counts = vehicles.reduce((acc, v) => { acc[v.status] = (acc[v.status] || 0) + 1; return acc; }, {} as Record<string, number>);
 
   return (
@@ -71,6 +75,13 @@ export default function VehiclesTable() {
           <p className="text-[#666] text-sm mt-1">{vehicles.length} total • {counts[VSTATUS.assigned] || 0} assigned · {counts[VSTATUS.available] || 0} available · {counts[VSTATUS.maintenance] || 0} maintenance</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by vehicle number"
+            className="bg-[#12121A] border border-[#1e1e2e] rounded-xl px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-[#6C5CE7] w-48"
+          />
           <ExportButton filename="vehicles" columns={cols} rows={sorted} />
           <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
             className="bg-[#12121A] border border-[#1e1e2e] rounded-xl px-3 py-2 text-sm text-gray-300 focus:outline-none focus:border-[#6C5CE7]">
