@@ -164,10 +164,10 @@ export async function GET(req: NextRequest) {
 
   if (rent === "overdue" || rent === "due_soon") {
     // 2-day grace: not chased as Overdue until paid_through_date is > 2 days stale.
-    // Due-soon: lapsing within the next 2 days but not yet past grace (matches
+    // Due-soon: next week starts within 2 days but not yet past grace (matches
     // getOverdueRiders/getDueSoonRiders in lib/rent.ts exactly).
     const overdueWhere = `rd.days_behind > 2`;
-    const dueSoonWhere = `rd.days_behind BETWEEN -2 AND 2`;
+    const dueSoonWhere = `rd.days_behind BETWEEN -1 AND 2`;
 
     const rentSelect = baseSelect.replace(
       `FROM ${schemas.ops}.riders r`,
