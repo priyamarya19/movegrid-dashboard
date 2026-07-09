@@ -42,3 +42,18 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# dev server log
+.dev.log
+
+# raw rider PII from ops sheets / generated reports — lives in the database,
+# not in git. Real names, mobiles, Aadhaar/PAN/bank doc links, addresses.
+/data update/
+/rider-rent-report.csv
+/sheet-rent-report.csv
+/scripts/rent-jul.csv
+/scripts/allotments.csv
+/scripts/fleet-data.json
+
+# vendor API collection with an embedded real credential
+/postman/\[PROD\]*.postman_collection.json
