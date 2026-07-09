@@ -1,15 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { schemas } from "@/lib/schemas";
-import { getSession } from "@/lib/auth";
+import { requireRole } from "@/lib/auth";
 
 // Bulk-map vehicles to this investor. Only vehicles not already linked to any
 // investor are mapped (already-linked vehicles are silently skipped).
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const session = await getSession(req);
-  if (!session || session.role !== "admin") {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
-  }
+  const guard = await requireRole(req, ["admin"]);
+  if ("response" in guard) return guard.response;
 
   const { id } = await params;
   const body = await req.json();

@@ -24,12 +24,12 @@ export async function POST(req: Request) {
     const user = result.rows[0];
 
     if (!user || user.status !== "active") {
-      return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
+      return NextResponse.json({ error: "Invalid credentials", code: "invalid_credentials" }, { status: 400 });
     }
 
     const valid = await bcrypt.compare(password, user.password_hash);
     if (!valid) {
-      return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
+      return NextResponse.json({ error: "Invalid credentials", code: "invalid_credentials" }, { status: 400 });
     }
 
     const token = await signToken({

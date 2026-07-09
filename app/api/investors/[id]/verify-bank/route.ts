@@ -1,14 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { schemas } from "@/lib/schemas";
-import { getSession } from "@/lib/auth";
+import { requireRole } from "@/lib/auth";
 
 // Admin verifies an investor's pending bank change. Flips bank_status back to 'verified'.
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const session = await getSession(req);
-  if (!session || session.role !== "admin") {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
-  }
+  const guard = await requireRole(req, ["admin"]);
+  if ("response" in guard) return guard.response;
 
   const { id } = await params;
   const result = await pool.query(

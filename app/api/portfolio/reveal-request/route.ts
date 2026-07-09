@@ -1,17 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { schemas } from "@/lib/schemas";
-import { getSession } from "@/lib/auth";
+import { requireRole } from "@/lib/auth";
 import { sendEmail } from "@/lib/email";
 
 // An investor requests to know a rider's full contact number. We do NOT reveal the
 // number to the investor here — both the admin and the investor get an email recording
 // the request (with reason); the admin shares the number manually.
 export async function POST(req: NextRequest) {
-  const session = await getSession(req);
-  if (!session || session.role !== "investor") {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
-  }
+  const guard = await requireRole(req, ["investor"]);
+  if ("response" in guard) return guard.response;
+  const { session } = guard;
 
   const { vehicle_id, reason } = await req.json();
   if (!vehicle_id || !reason?.trim()) {

@@ -1,16 +1,35 @@
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { schemas } from "@/lib/schemas";
-import { getSession } from "@/lib/auth";
+import { requireRole } from "@/lib/auth";
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const session = await getSession(req);
-  if (!session || session.role !== "admin") {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
-  }
+  const guard = await requireRole(req, ["admin"]);
+  if ("response" in guard) return guard.response;
+  const { session } = guard;
 
   const { id } = await params;
   const body = await req.json();
+
+  // Last-admin lockout guard: an admin must not be able to strip their own admin
+  // role, or deactivate themselves, if they are the last remaining active admin.
+  const isSelf = id === session.userId;
+  const demotingSelf = isSelf && body.role !== undefined && body.role !== "admin";
+  const deactivatingSelf = isSelf && body.status !== undefined && body.status !== "active";
+  if (demotingSelf || deactivatingSelf) {
+    const adminCount = await pool.query(
+      `SELECT COUNT(*)::int AS n
+       FROM ${schemas.auth}.users u
+       JOIN ${schemas.auth}.roles r ON r.id = u.role_id
+       WHERE r.name = 'admin' AND u.status = 'active'`
+    );
+    if ((adminCount.rows[0]?.n ?? 0) <= 1) {
+      return NextResponse.json(
+        { error: "You are the last active admin; you cannot remove your own admin access." },
+        { status: 400 }
+      );
+    }
+  }
 
   if (body.role !== undefined) {
     const roleResult = await pool.query(
