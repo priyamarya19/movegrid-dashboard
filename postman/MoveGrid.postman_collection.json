@@ -1,0 +1,1547 @@
+{
+  "info": {
+    "_postman_id": "mg-dashboard-0000-0000-0000-000000000001",
+    "name": "MoveGrid Dashboard API",
+    "description": "All HTTP APIs used by the MoveGrid ops dashboard, grouped by task.\n\n## Setup\n1. Set the `baseUrl` variable (default `http://localhost:3000`; UAT app runs on port 3002).\n2. Run **Auth → Login** with a valid email/password. It sends `X-Client-Type: mobile` so the response includes a `token`, which a test script saves to the `token` variable.\n3. Every other request inherits `Authorization: Bearer {{token}}` automatically.\n\n## Roles\nEach request notes the role(s) allowed: **admin**, **ops_manager**, **hub_incharge**, **investor**. A 403 means your logged-in user's role isn't permitted.\n\n## Path/ID variables\nSet `riderId`, `vehicleId`, `investorId`, `hubId`, `leadId`, `userId`, `payoutId`, `allotmentId` as needed.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "riderId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "vehicleId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "investorId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "hubId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "leadId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "userId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "payoutId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "allotmentId",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "description": "Login / session / password management.",
+      "item": [
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Client-Type",
+                "value": "mobile"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Authenticate. Sends `X-Client-Type: mobile` so the JSON response includes `token` (also sets the `mg_token` cookie). A test script stores the token in the `token` collection variable. **Public.**",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"priyam@movegrid.in\",\n  \"password\": \"your-password\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j && j.token) { pm.collectionVariables.set('token', j.token); console.log('token saved'); }",
+                  "else { console.log('No token in body — send header X-Client-Type: mobile'); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Current session",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/session",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "session"
+              ]
+            },
+            "description": "Returns the logged-in user (id, name, email, role) from the cookie/Bearer token. **Any logged-in user.**"
+          },
+          "response": []
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/logout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "logout"
+              ]
+            },
+            "description": "Clears the `mg_token` cookie. **Any logged-in user.**"
+          },
+          "response": []
+        },
+        {
+          "name": "Change password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/change-password",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "change-password"
+              ]
+            },
+            "description": "Change your own password (min 8 chars). **Any logged-in user.**",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currentPassword\": \"old-password\",\n  \"newPassword\": \"new-password-8+\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Forgot password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/forgot-password",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "forgot-password"
+              ]
+            },
+            "description": "Emails a password-reset link to the address (if it exists). **Public.**",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"priyam@movegrid.in\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Reset password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/reset-password",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "reset-password"
+              ]
+            },
+            "description": "Set a new password using the token from the reset email. **Public.**",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"reset-token-from-email\",\n  \"password\": \"new-password-8+\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Riders",
+      "description": "Onboard, view, KYC, payments, blacklist.",
+      "item": [
+        {
+          "name": "List riders",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/riders?status=active&hub=&rent=overdue",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "riders"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "active",
+                  "description": "active | inactive | pending",
+                  "disabled": true
+                },
+                {
+                  "key": "hub",
+                  "value": "",
+                  "description": "hub id",
+                  "disabled": true
+                },
+                {
+                  "key": "rent",
+                  "value": "overdue",
+                  "description": "overdue | due_soon",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "List riders with optional filters. **admin / ops_manager / hub_incharge.**"
+          },
+          "response": []
+        },
+        {
+          "name": "Create rider",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/riders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "riders"
+              ]
+            },
+            "description": "Onboard a rider (name + mobile required; rest optional). **admin / ops_manager / hub_incharge.**",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Test Rider\",\n  \"mobile\": \"9876543210\",\n  \"nickname\": \"Test\",\n  \"rental_mode\": \"weekly\",\n  \"business_type\": \"rental\",\n  \"employer\": \"Blinkit\",\n  \"onboarding_fee\": 1250,\n  \"security_deposit\": 0,\n  \"assigned_hub_id\": \"{{hubId}}\",\n  \"current_address\": \"Sector 122 Noida\",\n  \"permanent_address\": \"\",\n  \"address_map_link\": \"\",\n  \"aadhaar\": \"\",\n  \"pan\": \"\",\n  \"dl_number\": \"\",\n  \"bank\": \"\",\n  \"account_number\": \"\",\n  \"ifsc\": \"\",\n  \"family_ref_name\": \"\",\n  \"family_ref_mobile\": \"\",\n  \"family_ref_aadhaar\": \"\",\n  \"local_ref_name\": \"\",\n  \"local_ref_mobile\": \"\",\n  \"aadhaar_front_url\": \"\",\n  \"aadhaar_back_url\": \"\",\n  \"pan_image_url\": \"\",\n  \"dl_front_url\": \"\",\n  \"dl_back_url\": \"\",\n  \"bank_doc_url\": \"\",\n  \"family_ref_aadhaar_url\": \"\",\n  \"profile_photo_url\": \"\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get rider",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/riders/{{riderId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "riders",
+                "{{riderId}}"
+              ]
+            },
+            "description": "Full rider detail (KYC, assignment, payments). **admin / ops_manager / hub_incharge.**"
+          },
+          "response": []
+        },
+        {
+          "name": "Verify KYC document",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/riders/{{riderId}}/kyc",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "riders",
+                "{{riderId}}",
+                "kyc"
+              ]
+            },
+            "description": "Mark a rider document verified/unverified. `document` ∈ aadhaar|pan|dl. **admin / ops_manager / hub_incharge.**",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"document\": \"aadhaar\",\n  \"verified\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Record rent received",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/riders/{{riderId}}/rent-received",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "riders",
+                "{{riderId}}",
+                "rent-received"
+              ]
+            },
+            "description": "Record a rent payment for the rider's active vehicle. **admin / ops_manager / hub_incharge.**",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 1610,\n  \"period_start\": \"2026-06-15\",\n  \"period_end\": \"2026-06-21\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Rent history",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/riders/{{riderId}}/rent-received",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "riders",
+                "{{riderId}}",
+                "rent-received"
+              ]
+            },
+            "description": "Payment history for the rider. **Any logged-in user.**"
+          },
+          "response": []
+        },
+        {
+          "name": "Blacklist rider",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/riders/{{riderId}}/blacklist",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "riders",
+                "{{riderId}}",
+                "blacklist"
+              ]
+            },
+            "description": "Blacklist a rider with a reason. **admin / ops_manager.**",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Repeated non-payment\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Un-blacklist rider",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/riders/{{riderId}}/blacklist",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "riders",
+                "{{riderId}}",
+                "blacklist"
+              ]
+            },
+            "description": "Remove a rider from the blacklist. **admin only.**"
+          },
+          "response": []
+        },
+        {
+          "name": "Blacklist check by Aadhaar",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/riders/blacklist-check?aadhaar=123412341234",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "riders",
+                "blacklist-check"
+              ],
+              "query": [
+                {
+                  "key": "aadhaar",
+                  "value": "123412341234",
+                  "description": "Aadhaar number",
+                  "disabled": false
+                }
+              ]
+            },
+            "description": "Check if an Aadhaar belongs to a blacklisted rider (pre-onboarding). **Any logged-in user.**"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Allotments",
+      "description": "Assign a vehicle to a rider and process returns.",
+      "item": [
+        {
+          "name": "Assign vehicle (allot)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/allotments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "allotments"
+              ]
+            },
+            "description": "Allot a vehicle to a rider; sets rider active + vehicle assigned, optionally records first payment. **admin / ops_manager / hub_incharge.**",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rider_id\": \"{{riderId}}\",\n  \"vehicle_id\": \"{{vehicleId}}\",\n  \"hub_id\": \"{{hubId}}\",\n  \"assigned_date\": \"2026-06-22\",\n  \"rental_mode\": \"weekly\",\n  \"onboarding_fee\": 1250,\n  \"security_deposit\": 0,\n  \"amount_collected\": 1610,\n  \"payment_screenshot_url\": \"\",\n  \"undertaking_url\": \"\",\n  \"allotment_pics\": [\n    \"\",\n    \"\",\n    \"\",\n    \"\",\n    \"\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Return vehicle",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/allotments/{{allotmentId}}/return",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "allotments",
+                "{{allotmentId}}",
+                "return"
+              ]
+            },
+            "description": "Process a vehicle return for an assignment; frees the vehicle and deactivates the rider. **admin / ops_manager / hub_incharge.**",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"returned_date\": \"2026-06-22\",\n  \"rent_cleared\": true,\n  \"penalty_amount\": 0,\n  \"condition_on_return\": [\n    \"scratches\"\n  ],\n  \"return_photos\": [\n    \"\"\n  ],\n  \"return_remarks\": \"\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Vehicles",
+      "description": "Fleet inventory, lookups, investor mapping.",
+      "item": [
+        {
+          "name": "List vehicles",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/vehicles?status=available&unassigned=1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "vehicles"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "available",
+                  "description": "available | assigned | maintenance",
+                  "disabled": true
+                },
+                {
+                  "key": "unassigned",
+                  "value": "1",
+                  "description": "1 = only vehicles with no investor",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "List vehicles, optional filters. **admin / ops_manager / hub_incharge.**"
+          },
+          "response": []
+        },
+        {
+          "name": "Create vehicle",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/vehicles",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "vehicles"
+              ]
+            },
+            "description": "Add a vehicle (ev_number + oem required). **admin / ops_manager.**",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ev_number\": \"MG0426N0051\",\n  \"oem\": \"Shelby\",\n  \"chassis_number\": \"\",\n  \"motor_number\": \"\",\n  \"controller_number\": \"\",\n  \"iot_imei\": \"\",\n  \"iot_partner\": \"Fixx ev/Loconav\",\n  \"battery_number\": \"\",\n  \"battery_partner\": \"Battery Smart\",\n  \"hub_id\": \"{{hubId}}\",\n  \"purchase_date\": \"2026-06-01\",\n  \"price\": 0,\n  \"vehicle_photo_url\": \"\",\n  \"rc_book_url\": \"\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get vehicle",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/vehicles/{{vehicleId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "vehicles",
+                "{{vehicleId}}"
+              ]
+            },
+            "description": "Vehicle detail incl. model, hub, investor, current rider. **admin / ops_manager / hub_incharge.**"
+          },
+          "response": []
+        },
+        {
+          "name": "Assign vehicle to investor",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/vehicles/{{vehicleId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "vehicles",
+                "{{vehicleId}}"
+              ]
+            },
+            "description": "Set/clear the investor that owns this vehicle. **admin only.**",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"investor_id\": \"{{investorId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Lookup by EV number or mobile",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/vehicles/lookup?ev_number=MG0426N0010&mobile=",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "vehicles",
+                "lookup"
+              ],
+              "query": [
+                {
+                  "key": "ev_number",
+                  "value": "MG0426N0010",
+                  "description": "find a vehicle",
+                  "disabled": false
+                },
+                {
+                  "key": "mobile",
+                  "value": "",
+                  "description": "find a rider",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Resolve a vehicle by `ev_number`, OR a rider by `mobile` (used by scan/quick-find). **Any logged-in user.**"
+          },
+          "response": []
+        },
+        {
+          "name": "Current assignment",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/vehicles/{{vehicleId}}/assignment",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "vehicles",
+                "{{vehicleId}}",
+                "assignment"
+              ]
+            },
+            "description": "Active rider assignment for a vehicle. **Any logged-in user.**"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Investors",
+      "description": "Investor accounts, vehicle mapping, bank, payouts.",
+      "item": [
+        {
+          "name": "List investors",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/investors",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "investors"
+              ]
+            },
+            "description": "All investors with totals. **admin only.**"
+          },
+          "response": []
+        },
+        {
+          "name": "Create investor",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/investors",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "investors"
+              ]
+            },
+            "description": "Create an investor account (also creates a login). **admin only.**",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Test Investor\",\n  \"email\": \"investor2@movegrid.in\",\n  \"mobile\": \"9000000010\",\n  \"password\": \"investor123\",\n  \"total_invested\": 100000,\n  \"investment_date\": \"2026-06-01\",\n  \"bank\": \"HDFC\",\n  \"account_number\": \"1234567890\",\n  \"confirm_account_number\": \"1234567890\",\n  \"ifsc\": \"HDFC0001203\",\n  \"pan\": \"\",\n  \"aadhaar\": \"\",\n  \"aadhaar_url\": \"\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get investor",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/investors/{{investorId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "investors",
+                "{{investorId}}"
+              ]
+            },
+            "description": "Investor detail, vehicles, payouts. **admin / ops_manager / hub_incharge.**"
+          },
+          "response": []
+        },
+        {
+          "name": "Map vehicles to investor",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/investors/{{investorId}}/vehicles",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "investors",
+                "{{investorId}}",
+                "vehicles"
+              ]
+            },
+            "description": "Attach a set of vehicles to an investor. **admin only.**",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"vehicle_ids\": [\n    \"{{vehicleId}}\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Verify investor bank",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/investors/{{investorId}}/verify-bank",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "investors",
+                "{{investorId}}",
+                "verify-bank"
+              ]
+            },
+            "description": "Mark the investor's bank details as verified. **admin only.**"
+          },
+          "response": []
+        },
+        {
+          "name": "Update own bank (investor)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/investors/bank",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "investors",
+                "bank"
+              ]
+            },
+            "description": "Investor updates their own bank account. **investor only.**",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"bank\": \"HDFC\",\n  \"account_number\": \"1234567890\",\n  \"confirm_account_number\": \"1234567890\",\n  \"ifsc\": \"HDFC0001203\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create payout",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/investors/payouts",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "investors",
+                "payouts"
+              ]
+            },
+            "description": "Record an investor payout for a month (proof required). **admin only.**",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"investor_id\": \"{{investorId}}\",\n  \"period_month\": \"2026-06\",\n  \"amount\": 5000,\n  \"proof_url\": \"https://...\",\n  \"vehicle_id\": \"{{vehicleId}}\",\n  \"paid_date\": \"2026-06-22\",\n  \"note\": \"\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Mark payout paid",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/investors/payouts",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "investors",
+                "payouts"
+              ]
+            },
+            "description": "Mark a pending payout as paid. **admin only.**",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"payout_id\": \"{{payoutId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Hubs",
+      "description": "Hub master data.",
+      "item": [
+        {
+          "name": "List hubs",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/hubs",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "hubs"
+              ]
+            },
+            "description": "All hubs. **admin / ops_manager / hub_incharge.**"
+          },
+          "response": []
+        },
+        {
+          "name": "Create hub",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/hubs",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "hubs"
+              ]
+            },
+            "description": "Create a hub (hub_name + city required). **admin only.**",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"hub_name\": \"Noida-123\",\n  \"city\": \"Noida\",\n  \"area\": \"Sector 123\",\n  \"owner_name\": \"\",\n  \"owner_mobile\": \"\",\n  \"monthly_rent\": 0,\n  \"security_deposit\": 0,\n  \"vehicle_capacity\": 50,\n  \"agreement_pdf_url\": \"\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get hub",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/hubs/{{hubId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "hubs",
+                "{{hubId}}"
+              ]
+            },
+            "description": "Hub detail with vehicles/riders. **admin / ops_manager / hub_incharge.**"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Leads",
+      "description": "Inbound leads (rider/investor/fleet) + comments.",
+      "item": [
+        {
+          "name": "List leads",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/leads?type=rider&status=new",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "leads"
+              ],
+              "query": [
+                {
+                  "key": "type",
+                  "value": "rider",
+                  "description": "rider | investor | fleet",
+                  "disabled": true
+                },
+                {
+                  "key": "status",
+                  "value": "new",
+                  "description": "new | contacted | converted | rejected",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "List leads, optional filters. **admin / ops_manager.**"
+          },
+          "response": []
+        },
+        {
+          "name": "Update lead status (list)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/leads",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "leads"
+              ]
+            },
+            "description": "Update a lead's status by id. **admin / ops_manager.**",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{leadId}}\",\n  \"status\": \"contacted\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get lead",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/leads/{{leadId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "leads",
+                "{{leadId}}"
+              ]
+            },
+            "description": "Lead detail + comment history. **admin / ops_manager / hub_incharge.**"
+          },
+          "response": []
+        },
+        {
+          "name": "Add lead comment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/leads/{{leadId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "leads",
+                "{{leadId}}"
+              ]
+            },
+            "description": "Add a comment to a lead. **admin / ops_manager / hub_incharge.**",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"comment\": \"Called, will visit hub tomorrow.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update lead status (by id)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/leads/{{leadId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "leads",
+                "{{leadId}}"
+              ]
+            },
+            "description": "Update this lead's status. **admin / ops_manager / hub_incharge.**",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"converted\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Users (Staff)",
+      "description": "Internal staff accounts. Admin only.",
+      "item": [
+        {
+          "name": "List staff",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users"
+              ]
+            },
+            "description": "All staff users + roles. **admin only.**"
+          },
+          "response": []
+        },
+        {
+          "name": "Create staff user",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/users",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users"
+              ]
+            },
+            "description": "Create a staff login. role ∈ admin|ops_manager|hub_incharge|investor. **admin only.**",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"New Ops\",\n  \"email\": \"ops2@movegrid.in\",\n  \"mobile\": \"9000000020\",\n  \"password\": \"password123\",\n  \"role\": \"ops_manager\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update staff user",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/{{userId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "{{userId}}"
+              ]
+            },
+            "description": "Change a user's role and/or status. **admin only.**",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"role\": \"ops_manager\",\n  \"status\": \"active\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Files",
+      "description": "S3 upload + signed download.",
+      "item": [
+        {
+          "name": "Upload file",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/upload",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "upload"
+              ]
+            },
+            "description": "Multipart upload to S3; returns the stored key/URL. Use form-data: `file` (file) + `folder` (text). **Any logged-in user.**",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": []
+                },
+                {
+                  "key": "folder",
+                  "value": "kyc",
+                  "type": "text"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get signed file URL",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/file?key=kyc/example.jpg",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "file"
+              ],
+              "query": [
+                {
+                  "key": "key",
+                  "value": "kyc/example.jpg",
+                  "description": "S3 object key",
+                  "disabled": false
+                }
+              ]
+            },
+            "description": "Get a presigned download URL for an S3 key. **Any logged-in user.**"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Investor self-service",
+      "description": "Endpoints used by the investor portal.",
+      "item": [
+        {
+          "name": "Raise support ticket",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/support",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "support"
+              ]
+            },
+            "description": "Investor submits a support request. **investor only.**",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"subject\": \"Payout query\",\n  \"message\": \"When is June payout?\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Request rider reveal",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/portfolio/reveal-request",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "portfolio",
+                "reveal-request"
+              ]
+            },
+            "description": "Investor requests to reveal the rider assigned to one of their vehicles. **investor only.**",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"vehicle_id\": \"{{vehicleId}}\",\n  \"reason\": \"Verifying utilisation\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Logs",
+      "description": "Audit trail. Admin only.",
+      "item": [
+        {
+          "name": "Audit logs",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/logs?action=record_payment",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "logs"
+              ],
+              "query": [
+                {
+                  "key": "action",
+                  "value": "record_payment",
+                  "description": "filter by action",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Recent audit log entries, optional `action` filter. **admin only.**"
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,2 @@
+rider_mobile,rider_name,due_date,period_start,period_end,amount,status,payment_date,mode,payment_proof_url,collected_by,remarks
+9999900000,Example Rider,08/05/2026,02/05/2026,08/05/2026,1610,Collected,08/05/2026,Cash,https://drive.google.com/open?id=PROOF,Amit,
