@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { schemas } from "@/lib/schemas";
 import { requireRole } from "@/lib/auth";
+import { IST } from "@/lib/rent";
 
 // rental_mode is constrained by riders_rental_mode_check to ('weekly','monthly').
 // Normalize known display labels; reject anything else with a 400 rather than
@@ -143,12 +144,8 @@ export async function GET(req: NextRequest) {
            r.aadhaar_verified, r.pan_verified, r.dl_verified,
            h.id AS hub_id, h.hub_name,
            v.id AS vehicle_id, v.ev_number AS vehicle_number,
-           EXISTS (
-             SELECT 1 FROM ${schemas.ops}.rider_payments p
-             WHERE p.rider_id = r.id
-               AND p.rental_period_start >= date_trunc('month', CURRENT_DATE)
-               AND p.rental_period_end <= (date_trunc('month', CURRENT_DATE) + INTERVAL '1 month - 1 day')::date
-           ) AS rent_received_this_month,
+           rva.daily_rent,
+           COALESCE(rva.paid_through_date, rva.assigned_date - 1) >= ${IST} AS rent_paid_this_week,
            EXISTS (
              SELECT 1 FROM ${schemas.ops}.rider_vehicle_assignments rva_a
              WHERE rva_a.rider_id = r.id AND rva_a.status = 'active'

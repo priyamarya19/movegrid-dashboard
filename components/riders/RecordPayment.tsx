@@ -7,7 +7,7 @@ import PaymentProof, { PaymentProofValue, emptyProof, proofValid } from "@/compo
 // Rider-level payment recording. Rolling-balance model: any amount just extends the
 // rider's paid_through_date (amount ÷ daily_rate = days added) — a normal week's rent,
 // a partial catch-up, and a multi-week advance top-up are all the same action.
-export default function RecordPayment({ riderId, dailyRent }: { riderId: string; dailyRent: number | null }) {
+export default function RecordPayment({ riderId, dailyRent, onRecorded, compact }: { riderId: string; dailyRent: number | null; onRecorded?: () => void; compact?: boolean }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [amount, setAmount] = useState("");
@@ -32,11 +32,19 @@ export default function RecordPayment({ riderId, dailyRent }: { riderId: string;
     setLoading(false);
     if (!res.ok) { setError((await res.json()).error || "Failed"); return; }
     setOpen(false); setAmount(""); setProof(emptyProof);
-    router.refresh();
+    if (onRecorded) onRecorded(); else router.refresh();
   }
 
   if (!open) {
-    return (
+    return compact ? (
+      <button
+        onClick={() => { setOpen(true); setError(""); }}
+        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-default text-muted hover:bg-accent-warning/13 hover:text-accent-warning transition-colors whitespace-nowrap"
+      >
+        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        Due
+      </button>
+    ) : (
       <button
         onClick={() => { setOpen(true); setError(""); }}
         className="inline-flex items-center gap-2 bg-accent-purple hover:bg-accent-purple text-primary text-sm font-medium px-4 py-2 rounded-xl transition-colors"
