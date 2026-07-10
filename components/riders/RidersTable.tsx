@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import ExportButton from "@/components/ExportButton";
+import RecordPayment from "@/components/riders/RecordPayment";
 
 type Rider = {
   id: string; rider_code: string; name: string; mobile: string; status: string;
@@ -13,7 +14,8 @@ type Rider = {
   employer: string;
   created_at: string;
   aadhaar_verified: boolean; pan_verified: boolean; dl_verified: boolean;
-  rent_received_this_month: boolean;
+  daily_rent: string | number | null;
+  rent_paid_this_week: boolean;
 };
 
 type Sort = { key: string; dir: "asc" | "desc" };
@@ -35,7 +37,7 @@ const cols: { label: string; key: string }[] = [
   { label: "Rent Cycle", key: "rental_mode" },
   { label: "KYC", key: "aadhaar_verified" },
   { label: "Status", key: "status" },
-  { label: "Rent", key: "rent_received_this_month" },
+  { label: "Rent", key: "rent_paid_this_week" },
   { label: "Joined", key: "created_at" },
 ];
 
@@ -53,40 +55,21 @@ function sortData(data: Rider[], sort: Sort): Rider[] {
 }
 
 function RentToggle({ rider, onToggled }: { rider: Rider; onToggled: () => void }) {
-  const [loading, setLoading] = useState(false);
-
   // No rent status for riders with no active vehicle (new/unallotted riders owe nothing).
   if (rider.status !== "active" || !rider.vehicle_id) return <span className="text-faint">—</span>;
 
-  async function markReceived() {
-    if (rider.rent_received_this_month) return;
-    setLoading(true);
-    const today = new Date();
-    const period_start = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split("T")[0];
-    const period_end = new Date(today.getFullYear(), today.getMonth() + 1, 0).toISOString().split("T")[0];
-    await fetch(`/api/riders/${rider.id}/rent-received`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ period_start, period_end }),
-    });
-    setLoading(false);
-    onToggled();
-  }
-
-  return rider.rent_received_this_month ? (
+  return rider.rent_paid_this_week ? (
     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-accent-success/15 text-accent-success-text whitespace-nowrap">
       <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>
-      Received
+      Paid
     </span>
   ) : (
-    <button
-      onClick={markReceived}
-      disabled={loading}
-      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-default text-muted hover:bg-accent-warning/13 hover:text-accent-warning transition-colors whitespace-nowrap disabled:opacity-50"
-    >
-      <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-      {loading ? "..." : "Due"}
-    </button>
+    <RecordPayment
+      riderId={rider.id}
+      dailyRent={rider.daily_rent != null ? Number(rider.daily_rent) : null}
+      onRecorded={onToggled}
+      compact
+    />
   );
 }
 
