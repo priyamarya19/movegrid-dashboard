@@ -115,19 +115,22 @@ export async function POST(req: NextRequest) {
     const obApplies = gapDays === null || gapDays > 15;
     const onboardingFeeValue = obApplies ? (b.onboarding_fee ?? null) : null;
 
-    // Create new assignment
+    // Create new assignment. continues_from_assignment_id is a permanent link (unlike
+    // is_issue_swap, which gets reset once consumed above) — the rent ledger regenerator
+    // uses it to keep week numbers continuous across the vehicle change (Week 4, 5... not
+    // a fresh Week 1) even though the physical vehicle and its own assigned_date changed.
     const result = await client.query(`
       INSERT INTO ${schemas.ops}.rider_vehicle_assignments (
         rider_id, vehicle_id, hub_id, assigned_date, status,
         amount_collected, payment_screenshot_url, undertaking_url, allotment_pics, allotted_by,
-        daily_rent, paid_through_date
-      ) VALUES ($1,$2,$3,$4,'active',$5,$6,$7,$8,$9,$10,$11)
+        daily_rent, paid_through_date, continues_from_assignment_id
+      ) VALUES ($1,$2,$3,$4,'active',$5,$6,$7,$8,$9,$10,$11,$12)
       RETURNING id`,
       [
         b.rider_id, b.vehicle_id, b.hub_id ?? null, assignedDate,
         b.amount_collected ?? null, b.payment_screenshot_url ?? null,
         b.undertaking_url ?? null, b.allotment_pics ?? null, session.name,
-        dailyRent, paidThroughDateValue,
+        dailyRent, paidThroughDateValue, carryOver ? carryOver.id : null,
       ]
     );
 
