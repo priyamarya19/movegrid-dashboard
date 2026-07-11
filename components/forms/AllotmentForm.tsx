@@ -58,17 +58,6 @@ export default function AllotmentForm() {
     allotment_pics: ["", "", "", "", ""],
     assigned_date: new Date().toISOString().split("T")[0],
   });
-  // Explicit yes/no on whether each fee was actually collected — the free-text amount
-  // fields alone were easy to skip while still filling the required "Amount Collected"
-  // total, which is exactly why onboarding_fee ended up silently null for real riders.
-  // Forcing a choice here means every new allotment records a real 0 for "not collected"
-  // instead of an ambiguous null.
-  const [obCollected, setObCollected] = useState(false);
-  const [sdCollected, setSdCollected] = useState(false);
-  // A rider who already has an onboarding_fee on file was charged it on a previous
-  // allotment — onboarding is one-time per rider, not per vehicle, so a reallocation
-  // shows that as already settled instead of asking again.
-  const alreadyOnboarded = rider?.onboarding_fee != null;
 
   function set(k: string, v: string) { setForm(p => ({ ...p, [k]: v })); }
 
@@ -97,8 +86,6 @@ export default function AllotmentForm() {
         const data = await res.json();
         setRider(data);
         setForm(p => ({ ...p, rental_mode: data.rental_mode ?? "", onboarding_fee: data.onboarding_fee ?? "", security_deposit: data.security_deposit ?? "" }));
-        setObCollected(data.onboarding_fee != null);
-        setSdCollected(data.security_deposit != null);
       } else { setRider(null); setRiderError("Rider not found with this mobile"); }
     } finally { setRiderLookingUp(false); }
   }
@@ -109,8 +96,6 @@ export default function AllotmentForm() {
     if (!rider) { setError("Please look up and confirm the rider"); return; }
     if (vehicle.status === "assigned") { setError("This vehicle is already assigned to another rider"); return; }
     if (vehicle.status !== "ready_to_deploy") { setError("This vehicle is not 'Ready to Deploy'. Ops must clear it first."); return; }
-    if (!alreadyOnboarded && obCollected && !form.onboarding_fee) { setError("Enter the onboarding fee amount collected, or uncheck the box"); return; }
-    if (sdCollected && !form.security_deposit) { setError("Enter the security deposit amount collected, or uncheck the box"); return; }
 
     setSubmitting(true); setError("");
     try {
@@ -122,8 +107,8 @@ export default function AllotmentForm() {
           rider_id: rider.id, vehicle_id: vehicle.id,
           hub_id: vehicle.hub_id ?? null,
           rental_mode: form.rental_mode || null,
-          onboarding_fee: alreadyOnboarded ? undefined : (obCollected ? Number(form.onboarding_fee) : 0),
-          security_deposit: sdCollected ? Number(form.security_deposit) : 0,
+          onboarding_fee: form.onboarding_fee ? Number(form.onboarding_fee) : null,
+          security_deposit: form.security_deposit ? Number(form.security_deposit) : null,
           amount_collected: form.amount_collected ? Number(form.amount_collected) : null,
           payment_screenshot_url: form.payment_screenshot_url || null,
           undertaking_url: form.undertaking_url || null,
@@ -191,32 +176,8 @@ export default function AllotmentForm() {
             {RENTAL_MODES.map(m => <option key={m} value={m}>{m}</option>)}
           </select>
         </Field>
-        <Field label="Onboarding Fee">
-          {alreadyOnboarded ? (
-            <input className={inp + " opacity-60"} value={`Already collected — ₹${rider!.onboarding_fee} (one-time, on a previous allotment)`} readOnly />
-          ) : (
-            <div className="space-y-2">
-              <label className="flex items-center gap-2 text-sm text-secondary">
-                <input type="checkbox" checked={obCollected} onChange={e => setObCollected(e.target.checked)} className="accent-accent-warning" />
-                Onboarding fee collected
-              </label>
-              {obCollected && (
-                <input type="number" className={inp} value={form.onboarding_fee} onChange={e => set("onboarding_fee", e.target.value)} placeholder="e.g. 1500" required />
-              )}
-            </div>
-          )}
-        </Field>
-        <Field label="Security Deposit">
-          <div className="space-y-2">
-            <label className="flex items-center gap-2 text-sm text-secondary">
-              <input type="checkbox" checked={sdCollected} onChange={e => setSdCollected(e.target.checked)} className="accent-accent-warning" />
-              Security deposit collected
-            </label>
-            {sdCollected && (
-              <input type="number" className={inp} value={form.security_deposit} onChange={e => set("security_deposit", e.target.value)} placeholder="0" required />
-            )}
-          </div>
-        </Field>
+        <Field label="Onboarding Fee (₹)"><input type="number" className={inp} value={form.onboarding_fee} onChange={e => set("onboarding_fee", e.target.value)} placeholder="0" /></Field>
+        <Field label="Security Deposit (₹)"><input type="number" className={inp} value={form.security_deposit} onChange={e => set("security_deposit", e.target.value)} placeholder="0" /></Field>
         <Field label="Amount Collected (₹)" required hint="Total of onboarding fee + security deposit">
           <input type="number" className={inp} value={form.amount_collected} onChange={e => set("amount_collected", e.target.value)} placeholder="0" required />
         </Field>
