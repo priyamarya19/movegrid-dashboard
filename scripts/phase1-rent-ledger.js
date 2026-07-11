@@ -42,7 +42,7 @@ async function run() {
 
     // 2. backfill daily_rent by model, override MB-Unlimited
     const asg = await client.query(`
-      SELECT a.id, a.daily_rent,
+      SELECT a.id, a.daily_rent, a.continues_from_assignment_id,
              to_char(a.assigned_date,'YYYY-MM-DD') AS assigned_date,
              to_char(a.returned_date,'YYYY-MM-DD') AS returned_date,
              a.rider_id, a.vehicle_id, r.mobile, m.oem
@@ -84,13 +84,19 @@ async function run() {
     //   active   -> cutoff = tomorrow (so the current week is included)
     const today = istToday();
     let duesUpserted = 0;
+    // Tracks the last week_no generated per assignment, in assigned_date order, so a
+    // continuation (continues_from_assignment_id) can pick its own numbering up from
+    // where the linked (always-earlier) assignment left off instead of restarting at 1 —
+    // the vehicle changed, but it's the same rent cycle from the rider's perspective.
+    const lastWeekByAssignment = {};
     for (const a of asg.rows) {
       const start = new Date(a.assigned_date + "T00:00:00Z");
       const cutoff = a.returned_date ? new Date(a.returned_date + "T00:00:00Z") : addDays(today, 1);
       const amount = Number(a.daily_rent) * 7;
       // wipe + regenerate this assignment's dues so stale/over-generated weeks are removed
       await client.query(`DELETE FROM ${S}.rent_dues WHERE assignment_id = $1`, [a.id]);
-      let week = 1;
+      const startWeek = a.continues_from_assignment_id ? (lastWeekByAssignment[a.continues_from_assignment_id] || 0) + 1 : 1;
+      let week = startWeek;
       for (let ps = new Date(start); ps < cutoff; ps = addDays(ps, 7), week++) {
         const pe = addDays(ps, 6);
         await client.query(`
@@ -99,6 +105,7 @@ async function run() {
           [a.id, a.rider_id, a.vehicle_id, week, iso(ps), iso(pe), iso(addDays(ps, -1)), amount]); // rent in advance: due = day before cycle start
         duesUpserted++;
       }
+      lastWeekByAssignment[a.id] = week - 1;
     }
     console.log(`✓ rent_dues regenerated: ${duesUpserted} weekly dues across ${asg.rows.length} assignments`);
 
