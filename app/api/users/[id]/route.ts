@@ -56,5 +56,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     );
   }
 
+  // A configurable per-user permission, independent of role — who can approve a
+  // pending rent waiver request (see app/api/rent-waivers).
+  if (body.can_approve_rent_waivers !== undefined) {
+    await pool.query(
+      `UPDATE ${schemas.auth}.users SET can_approve_rent_waivers = $1 WHERE id = $2`,
+      [body.can_approve_rent_waivers === true, id]
+    );
+  }
+
   return NextResponse.json({ ok: true });
 }

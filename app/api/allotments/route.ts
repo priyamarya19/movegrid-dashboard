@@ -72,7 +72,9 @@ export async function POST(req: NextRequest) {
     // If the rider's vehicle was just swapped out due to a hardware fault (marked at
     // return time — see app/api/allotments/[id]/return), continue their existing rent
     // cycle from where it left off instead of starting a fresh week: they already paid
-    // for days beyond the swap date, and non_functional_days credits the downtime on top.
+    // for days beyond the swap date. non_functional_days is NOT applied here — it sits
+    // as a pending waiver request until someone with can_approve_rent_waivers approves
+    // it (see the INSERT below), so the rider is shown owing full rent until then.
     // Marks the old row consumed immediately so this can never be matched again by a
     // later, unrelated allotment for the same rider.
     const priorSwap = await client.query(
@@ -87,7 +89,7 @@ export async function POST(req: NextRequest) {
     let paidThroughDateValue;
     if (carryOver) {
       const base = new Date(carryOver.paid_through_date + "T00:00:00Z");
-      base.setUTCDate(base.getUTCDate() + Number(carryOver.non_functional_days || 0) + (week1Paid ? 6 : 0));
+      base.setUTCDate(base.getUTCDate() + (week1Paid ? 6 : 0));
       paidThroughDateValue = base.toISOString().slice(0, 10);
       await client.query(
         `UPDATE ${schemas.ops}.rider_vehicle_assignments SET is_issue_swap = false WHERE id = $1`,
@@ -98,6 +100,20 @@ export async function POST(req: NextRequest) {
       base.setUTCDate(base.getUTCDate() + (week1Paid ? 6 : -1));
       paidThroughDateValue = base.toISOString().slice(0, 10);
     }
+
+    // Onboarding fee is charged once per continuous rental relationship, not on every
+    // reallocation — but a gap of more than 15 days since the rider's last return resets
+    // that: treated as a fresh onboarding, so OB applies again. A same-day issue-swap
+    // (gap = 0) always falls well inside the window, so no special-casing needed here.
+    const lastReturn = await client.query(
+      `SELECT to_char(MAX(returned_date),'YYYY-MM-DD') AS last_returned
+       FROM ${schemas.ops}.rider_vehicle_assignments WHERE rider_id = $1 AND status = 'returned'`,
+      [b.rider_id]
+    );
+    const lastReturned = lastReturn.rows[0]?.last_returned;
+    const gapDays = lastReturned ? Math.round((new Date(assignedDate + "T00:00:00Z").getTime() - new Date(lastReturned + "T00:00:00Z").getTime()) / 86400000) : null;
+    const obApplies = gapDays === null || gapDays > 15;
+    const onboardingFeeValue = obApplies ? (b.onboarding_fee ?? null) : null;
 
     // Create new assignment
     const result = await client.query(`
@@ -125,12 +141,22 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Pending rent waiver: the non_functional_days credit from an issue-swap doesn't
+    // apply immediately (see paidThroughDateValue above) — it waits here for approval.
+    if (carryOver && Number(carryOver.non_functional_days) > 0) {
+      await client.query(
+        `INSERT INTO ${schemas.ops}.rent_waiver_requests (rider_id, assignment_id, non_functional_days, requested_by)
+         VALUES ($1, $2, $3, $4)`,
+        [b.rider_id, result.rows[0].id, Number(carryOver.non_functional_days), session.name]
+      );
+    }
+
     // Update rider: status → active, rental_mode, onboarding_fee, security_deposit
     await client.query(
       `UPDATE ${schemas.ops}.riders SET status = 'active', rental_mode = COALESCE($1, rental_mode),
        onboarding_fee = COALESCE($2, onboarding_fee), security_deposit = COALESCE($3, security_deposit)
        WHERE id = $4`,
-      [b.rental_mode ?? null, b.onboarding_fee ?? null, b.security_deposit ?? null, b.rider_id]
+      [b.rental_mode ?? null, onboardingFeeValue, b.security_deposit ?? null, b.rider_id]
     );
 
     // Update vehicle status → assigned
