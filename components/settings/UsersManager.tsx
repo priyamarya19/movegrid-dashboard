@@ -10,6 +10,7 @@ type User = {
   role: string;
   status: string;
   created_at: string;
+  can_approve_rent_waivers: boolean;
 };
 
 const ROLES = ["admin", "ops_manager", "hub_incharge", "investor"];
@@ -97,6 +98,17 @@ export default function UsersManager() {
     });
     if (res.ok) {
       setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, status: next } : u)));
+    }
+  }
+
+  async function handleWaiverToggle(userId: string, current: boolean) {
+    const res = await fetch(`/api/users/${userId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ can_approve_rent_waivers: !current }),
+    });
+    if (res.ok) {
+      setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, can_approve_rent_waivers: !current } : u)));
     }
   }
 
@@ -224,16 +236,16 @@ export default function UsersManager() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-default">
-                {["Member", "Email", "Mobile", "Role", "Status", "Created", "Actions"].map((h) => (
+                {["Member", "Email", "Mobile", "Role", "Status", "Approve Waivers", "Created", "Actions"].map((h) => (
                   <th key={h} className="text-left px-5 py-3 text-[11px] text-muted uppercase tracking-wider whitespace-nowrap">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={7} className="px-5 py-10 text-center text-muted">Loading...</td></tr>
+                <tr><td colSpan={8} className="px-5 py-10 text-center text-muted">Loading...</td></tr>
               ) : users.length === 0 ? (
-                <tr><td colSpan={7} className="px-5 py-10 text-center text-muted">No users found</td></tr>
+                <tr><td colSpan={8} className="px-5 py-10 text-center text-muted">No users found</td></tr>
               ) : users.map((user) => (
                 <tr key={user.id} className="border-b border-subtle hover:bg-overlay-hover">
                   <td className="px-5 py-3.5">
@@ -273,6 +285,17 @@ export default function UsersManager() {
                     <span className={`px-2.5 py-1 rounded-full text-xs font-semibold capitalize whitespace-nowrap ${statusColor[user.status] ?? "bg-muted/20 text-muted"}`}>
                       {user.status}
                     </span>
+                  </td>
+                  <td className="px-5 py-3.5">
+                    <label className="inline-flex items-center gap-1.5 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={user.can_approve_rent_waivers}
+                        onChange={() => handleWaiverToggle(user.id, user.can_approve_rent_waivers)}
+                        className="w-3.5 h-3.5 accent-accent-success"
+                      />
+                      <span className="text-muted text-xs">{user.can_approve_rent_waivers ? "Yes" : "No"}</span>
+                    </label>
                   </td>
                   <td className="px-5 py-3.5 text-muted text-xs whitespace-nowrap">
                     {new Date(user.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}

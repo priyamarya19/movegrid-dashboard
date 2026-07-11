@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Sidebar from "@/components/Sidebar";
 import Footer from "@/components/Footer";
+import RentWaiverBanner from "@/components/RentWaiverBanner";
 
 type Props = {
   role: string;
@@ -53,6 +54,8 @@ export default function DashboardShell({ role, name, children }: Props) {
 
       {/* Main area */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+
+        <RentWaiverBanner />
 
         {/* Mobile top bar */}
         <header className="lg:hidden flex items-center gap-3 px-4 py-3 bg-surface-alt border-b border-default shrink-0">

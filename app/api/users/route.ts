@@ -10,6 +10,7 @@ export async function GET(req: NextRequest) {
 
   const result = await pool.query(`
     SELECT u.id, u.name, u.email, u.mobile, u.status, u.created_at,
+           u.can_approve_rent_waivers,
            r.name AS role
     FROM ${schemas.auth}.users u
     LEFT JOIN ${schemas.auth}.roles r ON r.id = u.role_id
