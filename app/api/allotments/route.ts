@@ -68,7 +68,36 @@ export async function POST(req: NextRequest) {
     // together) always covers at least week 1, so week 1 counts as paid — unless nothing was
     // collected at all, in which case don't fabricate a payment that didn't happen.
     const week1Paid = b.amount_collected != null && Number(b.amount_collected) > 0;
-    const paidThroughDate = week1Paid ? `$4::date + 6` : `$4::date - 1`;
+
+    // If the rider's vehicle was just swapped out due to a hardware fault (marked at
+    // return time — see app/api/allotments/[id]/return), continue their existing rent
+    // cycle from where it left off instead of starting a fresh week: they already paid
+    // for days beyond the swap date, and non_functional_days credits the downtime on top.
+    // Marks the old row consumed immediately so this can never be matched again by a
+    // later, unrelated allotment for the same rider.
+    const priorSwap = await client.query(
+      `SELECT id, to_char(paid_through_date,'YYYY-MM-DD') AS paid_through_date, non_functional_days
+       FROM ${schemas.ops}.rider_vehicle_assignments
+       WHERE rider_id = $1 AND status = 'returned' AND is_issue_swap = true
+       ORDER BY returned_date DESC, created_at DESC LIMIT 1`,
+      [b.rider_id]
+    );
+    const carryOver = priorSwap.rows[0];
+
+    let paidThroughDateValue;
+    if (carryOver) {
+      const base = new Date(carryOver.paid_through_date + "T00:00:00Z");
+      base.setUTCDate(base.getUTCDate() + Number(carryOver.non_functional_days || 0) + (week1Paid ? 6 : 0));
+      paidThroughDateValue = base.toISOString().slice(0, 10);
+      await client.query(
+        `UPDATE ${schemas.ops}.rider_vehicle_assignments SET is_issue_swap = false WHERE id = $1`,
+        [carryOver.id]
+      );
+    } else {
+      const base = new Date(assignedDate + "T00:00:00Z");
+      base.setUTCDate(base.getUTCDate() + (week1Paid ? 6 : -1));
+      paidThroughDateValue = base.toISOString().slice(0, 10);
+    }
 
     // Create new assignment
     const result = await client.query(`
@@ -76,13 +105,13 @@ export async function POST(req: NextRequest) {
         rider_id, vehicle_id, hub_id, assigned_date, status,
         amount_collected, payment_screenshot_url, undertaking_url, allotment_pics, allotted_by,
         daily_rent, paid_through_date
-      ) VALUES ($1,$2,$3,$4,'active',$5,$6,$7,$8,$9,$10,${paidThroughDate})
+      ) VALUES ($1,$2,$3,$4,'active',$5,$6,$7,$8,$9,$10,$11)
       RETURNING id`,
       [
         b.rider_id, b.vehicle_id, b.hub_id ?? null, assignedDate,
         b.amount_collected ?? null, b.payment_screenshot_url ?? null,
         b.undertaking_url ?? null, b.allotment_pics ?? null, session.name,
-        dailyRent,
+        dailyRent, paidThroughDateValue,
       ]
     );
 

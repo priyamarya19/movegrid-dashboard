@@ -43,6 +43,8 @@ export default function VehicleReturnForm() {
     return_remarks: "",
     return_photos: ["", "", ""],
     returned_date: new Date().toISOString().split("T")[0],
+    is_issue_swap: false,
+    non_functional_days: "",
   });
 
   const [settle, setSettle] = useState<PaymentProofValue>(emptyProof);
@@ -101,6 +103,8 @@ export default function VehicleReturnForm() {
           rent_settlement_mode: form.rent_cleared === "true" ? settle.mode : null,
           rent_settlement_utr: form.rent_cleared === "true" ? (settle.utr || null) : null,
           rent_settlement_proof_url: form.rent_cleared === "true" ? settle.proof : null,
+          is_issue_swap: form.is_issue_swap,
+          non_functional_days: form.is_issue_swap && form.non_functional_days ? Number(form.non_functional_days) : 0,
         }),
       });
       const data = await res.json();
@@ -156,6 +160,29 @@ export default function VehicleReturnForm() {
         <Field label="Penalty Amount (₹)"><input type="number" className={inp} value={form.penalty_amount} onChange={e => set("penalty_amount", e.target.value)} placeholder="0" /></Field>
         <Field label="Penalty Details" hint="Damaged parts / reason — saved to the rider's penalties"><input className={inp} value={form.penalty_detail} onChange={e => set("penalty_detail", e.target.value)} placeholder="e.g. Front fender, handle T band" /></Field>
         <Field label="Any Remarks"><input className={inp} value={form.return_remarks} onChange={e => set("return_remarks", e.target.value)} placeholder="Notes on return..." /></Field>
+
+        <div className="col-span-full">
+          <label className="flex items-center gap-2.5 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={form.is_issue_swap}
+              onChange={e => setForm(p => ({ ...p, is_issue_swap: e.target.checked }))}
+              className="w-4 h-4 accent-accent-danger"
+            />
+            <span className="text-sm text-primary">
+              Vehicle non-functional — rider is being immediately reallotted a replacement
+            </span>
+          </label>
+          <p className="text-faint text-xs mt-1 ml-6">
+            Keeps the rider's rent cycle continuing on the new vehicle instead of restarting — they won't lose rent they've already paid for, or be charged for the days it was down.
+          </p>
+        </div>
+        {form.is_issue_swap && (
+          <Field label="Non-Functional Days" required hint="Credited to the rider — subtracted from what they owe on the new vehicle">
+            <input type="number" min="0" className={inp} value={form.non_functional_days}
+              onChange={e => set("non_functional_days", e.target.value)} placeholder="0" required />
+          </Field>
+        )}
 
         <Section title="Scooter Condition" />
         <div className="col-span-full">
