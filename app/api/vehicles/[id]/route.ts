@@ -23,8 +23,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     `, [id]),
 
     pool.query(`
-      SELECT rva.assigned_date, rva.returned_date, rva.status,
-             r.name AS rider_name, r.id AS rider_id, r.mobile AS rider_mobile
+      SELECT rva.assigned_date, rva.returned_date, rva.status, rva.allotment_code,
+             r.name AS rider_name, r.id AS rider_id, r.mobile AS rider_mobile, r.rider_code
       FROM ${schemas.ops}.rider_vehicle_assignments rva
       JOIN ${schemas.ops}.riders r ON r.id = rva.rider_id
       WHERE rva.vehicle_id = $1

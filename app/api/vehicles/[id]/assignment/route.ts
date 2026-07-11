@@ -11,7 +11,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const { id } = await params;
 
   const result = await pool.query(`
-    SELECT rva.id, rva.assigned_date, rva.status,
+    SELECT rva.id, rva.assigned_date, rva.status, rva.allotment_code,
            r.name AS rider_name, r.id AS rider_id,
            v.ev_number
     FROM ${schemas.ops}.rider_vehicle_assignments rva

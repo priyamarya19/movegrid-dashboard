@@ -33,6 +33,7 @@ export const PAID_FROM_BALANCE = `
 export type CycleWeek = {
   week_no: number; period_start: string; period_end: string; due_date: string;
   amount: number; paid: number; status: string; ev_number: string | null; vehicle_id: string | null;
+  sheet_note: string | null; // free-text payment note from the ops rent sheet (e.g. "1300 rs Recieved | 730 pending")
 };
 
 // Full unbroken weekly cycle for one rider (across all their assignments) — per-week
@@ -71,7 +72,7 @@ export async function getRiderCycle(riderId: string): Promise<CycleWeek[]> {
       UNION ALL
       SELECT * FROM synthesized
     )
-    SELECT week_no, period_start, period_end, due_date, amount, paid, ev_number, vehicle_id,
+    SELECT week_no, period_start, period_end, due_date, amount, paid, ev_number, vehicle_id, sheet_note,
       CASE WHEN paid >= amount THEN 'Collected'
            WHEN paid > 0 THEN 'Partial'
            WHEN asgn_status = 'active' AND ps_dt < ${OVERDUE_CUTOFF} THEN 'Overdue'
@@ -82,7 +83,7 @@ export async function getRiderCycle(riderId: string): Promise<CycleWeek[]> {
         to_char(w.period_end,'YYYY-MM-DD') AS period_end,
         to_char(w.due_date,'YYYY-MM-DD') AS due_date,
         w.period_start AS ps_dt, a.vehicle_id, a.status AS asgn_status,
-        w.amount,
+        w.amount, a.sheet_note,
         GREATEST(0, LEAST(COALESCE(a.paid_through_date, a.assigned_date - 1), w.period_end) - w.period_start + 1) * a.daily_rent AS paid,
         v.ev_number, a.assigned_date
       FROM weeks w
@@ -93,6 +94,7 @@ export async function getRiderCycle(riderId: string): Promise<CycleWeek[]> {
   return res.rows.map((r) => ({
     week_no: r.week_no, period_start: r.period_start, period_end: r.period_end, due_date: r.due_date,
     amount: Number(r.amount), paid: Number(r.paid), status: r.status, ev_number: r.ev_number, vehicle_id: r.vehicle_id,
+    sheet_note: r.sheet_note ?? null,
   }));
 }
 

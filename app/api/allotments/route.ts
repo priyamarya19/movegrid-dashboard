@@ -78,7 +78,7 @@ export async function POST(req: NextRequest) {
     // Marks the old row consumed immediately so this can never be matched again by a
     // later, unrelated allotment for the same rider.
     const priorSwap = await client.query(
-      `SELECT id, to_char(paid_through_date,'YYYY-MM-DD') AS paid_through_date, non_functional_days
+      `SELECT id, to_char(paid_through_date,'YYYY-MM-DD') AS paid_through_date, non_functional_days, allotment_code
        FROM ${schemas.ops}.rider_vehicle_assignments
        WHERE rider_id = $1 AND status = 'returned' AND is_issue_swap = true
        ORDER BY returned_date DESC, created_at DESC LIMIT 1`,
@@ -115,6 +115,14 @@ export async function POST(req: NextRequest) {
     const obApplies = gapDays === null || gapDays > 15;
     const onboardingFeeValue = obApplies ? (b.onboarding_fee ?? null) : null;
 
+    // Allotment ID: an issue-swap continuation stays inside the same tenancy, so it
+    // inherits the swapped-out assignment's allotment_code (one sheet row = one code,
+    // even across a vehicle change). A genuine new allotment takes the next code in
+    // the sequence — same numbering the ops rent sheet uses.
+    const allotmentCode = carryOver?.allotment_code
+      ? carryOver.allotment_code
+      : (await client.query(`SELECT 'MG' || LPAD(NEXTVAL('${schemas.ops}.allotment_code_seq')::TEXT, 6, '0') AS code`)).rows[0].code;
+
     // Create new assignment. continues_from_assignment_id is a permanent link (unlike
     // is_issue_swap, which gets reset once consumed above) — the rent ledger regenerator
     // uses it to keep week numbers continuous across the vehicle change (Week 4, 5... not
@@ -123,14 +131,14 @@ export async function POST(req: NextRequest) {
       INSERT INTO ${schemas.ops}.rider_vehicle_assignments (
         rider_id, vehicle_id, hub_id, assigned_date, status,
         amount_collected, payment_screenshot_url, undertaking_url, allotment_pics, allotted_by,
-        daily_rent, paid_through_date, continues_from_assignment_id
-      ) VALUES ($1,$2,$3,$4,'active',$5,$6,$7,$8,$9,$10,$11,$12)
-      RETURNING id`,
+        daily_rent, paid_through_date, continues_from_assignment_id, allotment_code
+      ) VALUES ($1,$2,$3,$4,'active',$5,$6,$7,$8,$9,$10,$11,$12,$13)
+      RETURNING id, allotment_code`,
       [
         b.rider_id, b.vehicle_id, b.hub_id ?? null, assignedDate,
         b.amount_collected ?? null, b.payment_screenshot_url ?? null,
         b.undertaking_url ?? null, b.allotment_pics ?? null, session.name,
-        dailyRent, paidThroughDateValue, carryOver ? carryOver.id : null,
+        dailyRent, paidThroughDateValue, carryOver ? carryOver.id : null, allotmentCode,
       ]
     );
 
@@ -169,7 +177,7 @@ export async function POST(req: NextRequest) {
     );
 
     await client.query("COMMIT");
-    return NextResponse.json({ id: result.rows[0].id }, { status: 201 });
+    return NextResponse.json({ id: result.rows[0].id, allotment_code: result.rows[0].allotment_code }, { status: 201 });
   } catch (e) {
     await client.query("ROLLBACK");
     throw e;

@@ -49,6 +49,8 @@ next-env.d.ts
 # raw rider PII from ops sheets / generated reports — lives in the database,
 # not in git. Real names, mobiles, Aadhaar/PAN/bank doc links, addresses.
 /data update/
+# full DB dumps taken before destructive rebuilds — PII + auth password hashes
+/backups/
 /rider-rent-report.csv
 /sheet-rent-report.csv
 /scripts/rent-jul.csv
