@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
       onboarding_fee, security_deposit,
       profile_photo_url, assigned_hub_id, status, created_by
     ) VALUES (
-      'MG' || LPAD(NEXTVAL('${schemas.ops}.rider_code_seq')::TEXT, 6, '0'),
+      'MGR' || LPAD(NEXTVAL('${schemas.ops}.rider_code_seq')::TEXT, 6, '0'),
       $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35
     ) RETURNING id, rider_code, name, mobile, status`,
     [
@@ -144,12 +144,17 @@ export async function GET(req: NextRequest) {
            r.aadhaar_verified, r.pan_verified, r.dl_verified,
            h.id AS hub_id, h.hub_name,
            v.id AS vehicle_id, v.ev_number AS vehicle_number,
-           rva.daily_rent,
+           rva.daily_rent, rva.allotment_code,
            COALESCE(rva.paid_through_date, rva.assigned_date - 1) >= ${IST} AS rent_paid_this_week,
            EXISTS (
              SELECT 1 FROM ${schemas.ops}.rider_vehicle_assignments rva_a
              WHERE rva_a.rider_id = r.id AND rva_a.status = 'active'
-           ) AS has_active_assignment
+           ) AS has_active_assignment,
+           -- every allotment ID this rider has ever held, so search can match
+           -- historical tenancies too (space-joined, matched with includes())
+           (SELECT string_agg(rva_all.allotment_code, ' ')
+            FROM ${schemas.ops}.rider_vehicle_assignments rva_all
+            WHERE rva_all.rider_id = r.id AND rva_all.allotment_code IS NOT NULL) AS allotment_codes
     FROM ${schemas.ops}.riders r
     LEFT JOIN ${schemas.ops}.hubs h ON h.id = r.assigned_hub_id
     LEFT JOIN ${schemas.ops}.rider_vehicle_assignments rva ON rva.rider_id = r.id AND rva.status = 'active'

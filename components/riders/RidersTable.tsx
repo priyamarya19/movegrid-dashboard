@@ -16,6 +16,8 @@ type Rider = {
   aadhaar_verified: boolean; pan_verified: boolean; dl_verified: boolean;
   daily_rent: string | number | null;
   rent_paid_this_week: boolean;
+  allotment_code: string | null;   // active tenancy's allotment ID
+  allotment_codes: string | null;  // all allotment IDs ever held, space-joined (for search)
 };
 
 type Sort = { key: string; dir: "asc" | "desc" };
@@ -28,7 +30,7 @@ const statusColor: Record<string, string> = {
 };
 
 const cols: { label: string; key: string }[] = [
-  { label: "User ID", key: "rider_code" },
+  { label: "Rider ID", key: "rider_code" },
   { label: "Name", key: "name" },
   { label: "Mobile", key: "mobile" },
   { label: "Hub", key: "hub_name" },
@@ -96,12 +98,13 @@ export default function RidersTable({ rentFilter, statusFilter: initialStatus }:
   const toggleSort = (key: string) =>
     setSort(s => s.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: "asc" });
 
-  // Search by user ID or name only.
+  // Search by name, rider ID (MGR...) or any allotment ID (MG...) the rider has held.
   const q = search.trim().toLowerCase();
   const filtered = q
     ? riders.filter((r) =>
         r.name?.toLowerCase().includes(q) ||
-        r.rider_code?.toLowerCase().includes(q))
+        r.rider_code?.toLowerCase().includes(q) ||
+        r.allotment_codes?.toLowerCase().includes(q))
     : riders;
   const sorted = sortData(filtered, sort);
   const counts = riders.reduce((acc, r) => { acc[r.status] = (acc[r.status] || 0) + 1; return acc; }, {} as Record<string, number>);
@@ -120,7 +123,7 @@ export default function RidersTable({ rentFilter, statusFilter: initialStatus }:
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by name or user ID"
+            placeholder="Search by name, rider ID or allotment ID"
             className="bg-surface border border-default rounded-xl px-3 py-2 text-sm text-primary placeholder-faint focus:outline-none focus:border-accent-purple w-48"
           />
           <ExportButton filename="riders" columns={cols} rows={sorted} />

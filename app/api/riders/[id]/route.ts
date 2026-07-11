@@ -26,7 +26,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     `, [id]),
 
     pool.query(`
-      SELECT rva.assigned_date, rva.status AS assignment_status,
+      SELECT rva.assigned_date, rva.status AS assignment_status, rva.allotment_code,
              v.ev_number, v.id AS vehicle_id, v.status AS vehicle_status,
              m.model_name, m.oem
       FROM ${schemas.ops}.rider_vehicle_assignments rva

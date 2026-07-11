@@ -43,6 +43,7 @@ async function getData(id: string) {
     pool.query(`
       SELECT rva.assigned_date, rva.status AS assignment_status,
              rva.daily_rent, to_char(rva.paid_through_date, 'YYYY-MM-DD') AS paid_through_date,
+             rva.allotment_code,
              v.ev_number, v.id AS vehicle_id,
              m.model_name, m.oem
       FROM ${schemas.ops}.rider_vehicle_assignments rva
@@ -207,6 +208,7 @@ export default async function RiderDetailPage({ params }: { params: Promise<{ id
                   <div>
                     <p className="text-accent-teal font-medium group-hover:underline">{activeAssignment.ev_number}</p>
                     <p className="text-muted text-xs mt-0.5">{activeAssignment.model_name} · {activeAssignment.oem}</p>
+                    {activeAssignment.allotment_code && <p className="text-muted text-xs">Allotment ID: {activeAssignment.allotment_code}</p>}
                     <p className="text-muted text-xs">Assigned: {new Date(activeAssignment.assigned_date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</p>
                   </div>
                   <span className="text-muted group-hover:text-primary transition-colors">→</span>
@@ -360,7 +362,28 @@ export default async function RiderDetailPage({ params }: { params: Promise<{ id
                       <td className="px-5 py-3 text-secondary whitespace-nowrap">{fmtD(w.due_date)}</td>
                       <td className="px-5 py-3">{w.vehicle_id ? <Link href={`/vehicles/${w.vehicle_id}`} className="text-accent-purple hover:underline">{w.ev_number ?? "—"}</Link> : <span className="text-muted">{w.ev_number ?? "—"}</span>}</td>
                       <td className="px-5 py-3 text-primary">₹{Math.round(w.amount).toLocaleString("en-IN")}</td>
-                      <td className="px-5 py-3"><span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${color}`}>{w.status}</span></td>
+                      <td className="px-5 py-3 whitespace-nowrap">
+                        {w.status === "Partial" ? (
+                          <span className={`relative group cursor-default px-2 py-0.5 rounded-full text-[11px] font-semibold ${color}`}>
+                            {w.status}
+                            <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 hidden group-hover:block whitespace-nowrap bg-surface border border-default rounded-lg px-3 py-1.5 text-[11px] font-normal shadow-lg z-10">
+                              <span className="text-accent-teal font-semibold">₹{Math.round(w.paid).toLocaleString("en-IN")} paid</span>
+                              <span className="text-muted"> · </span>
+                              <span className="text-accent-danger-text font-semibold">₹{balance.toLocaleString("en-IN")} pending</span>
+                            </span>
+                          </span>
+                        ) : (
+                          <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${color}`}>{w.status}</span>
+                        )}
+                        {w.sheet_note && (
+                          <span className="relative group cursor-default ml-1.5 align-middle text-muted hover:text-primary text-[12px]">
+                            📝
+                            <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 hidden group-hover:block whitespace-nowrap bg-surface border border-default rounded-lg px-3 py-1.5 text-[11px] font-normal text-secondary shadow-lg z-10">
+                              {w.sheet_note}
+                            </span>
+                          </span>
+                        )}
+                      </td>
                       <td className="px-5 py-3">
                         {w.status === "Collected" ? (
                           <span className="text-accent-teal text-xs font-semibold">₹{Math.round(w.paid).toLocaleString("en-IN")} paid</span>

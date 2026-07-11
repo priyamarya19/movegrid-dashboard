@@ -84,19 +84,26 @@ async function run() {
     //   active   -> cutoff = tomorrow (so the current week is included)
     const today = istToday();
     let duesUpserted = 0;
-    // Tracks the last week_no generated per assignment, in assigned_date order, so a
-    // continuation (continues_from_assignment_id) can pick its own numbering up from
-    // where the linked (always-earlier) assignment left off instead of restarting at 1 —
-    // the vehicle changed, but it's the same rent cycle from the rider's perspective.
+    // Tracks the last week_no AND last period_end generated per assignment, in
+    // assigned_date order, so a continuation (continues_from_assignment_id) picks up
+    // both its numbering AND its period cadence from exactly where the linked (always-
+    // earlier) assignment left off — Week 3 ending 1 Jul means Week 4 starts 2 Jul,
+    // regardless of the new vehicle's own assigned_date. The vehicle changed; the
+    // rider's unbroken weekly billing rhythm didn't.
     const lastWeekByAssignment = {};
+    const lastPeriodEndByAssignment = {};
     for (const a of asg.rows) {
-      const start = new Date(a.assigned_date + "T00:00:00Z");
       const cutoff = a.returned_date ? new Date(a.returned_date + "T00:00:00Z") : addDays(today, 1);
       const amount = Number(a.daily_rent) * 7;
       // wipe + regenerate this assignment's dues so stale/over-generated weeks are removed
       await client.query(`DELETE FROM ${S}.rent_dues WHERE assignment_id = $1`, [a.id]);
-      const startWeek = a.continues_from_assignment_id ? (lastWeekByAssignment[a.continues_from_assignment_id] || 0) + 1 : 1;
+
+      const linkedEnd = a.continues_from_assignment_id && lastPeriodEndByAssignment[a.continues_from_assignment_id];
+      const startWeek = linkedEnd ? (lastWeekByAssignment[a.continues_from_assignment_id] || 0) + 1 : 1;
+      const start = linkedEnd ? addDays(linkedEnd, 1) : new Date(a.assigned_date + "T00:00:00Z");
+
       let week = startWeek;
+      let lastPe = addDays(start, -1);
       for (let ps = new Date(start); ps < cutoff; ps = addDays(ps, 7), week++) {
         const pe = addDays(ps, 6);
         await client.query(`
@@ -104,8 +111,10 @@ async function run() {
           VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
           [a.id, a.rider_id, a.vehicle_id, week, iso(ps), iso(pe), iso(addDays(ps, -1)), amount]); // rent in advance: due = day before cycle start
         duesUpserted++;
+        lastPe = pe;
       }
       lastWeekByAssignment[a.id] = week - 1;
+      lastPeriodEndByAssignment[a.id] = lastPe;
     }
     console.log(`✓ rent_dues regenerated: ${duesUpserted} weekly dues across ${asg.rows.length} assignments`);
 
