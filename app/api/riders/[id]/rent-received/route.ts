@@ -3,6 +3,7 @@ import pool from "@/lib/db";
 import { schemas } from "@/lib/schemas";
 import { requireRole, requireSession } from "@/lib/auth";
 import { PAYMENT_MODES } from "@/lib/rent";
+import { beginIdempotency, finishIdempotency, abortIdempotency } from "@/lib/idempotency";
 
 // Record a rent payment of any amount. Rolling-balance model: the amount converts to
 // (amount / daily_rate) days and extends the rider's paid_through_date on their active
@@ -32,6 +33,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: "A valid payment amount is required" }, { status: 400 });
   }
 
+  // Dedupe a timed-out-then-retried submission from the app (same Idempotency-Key)
+  // so it can't record the same payment twice. No header → behaves as before.
+  const idem = await beginIdempotency(req, "rent-received", guard.session.userId);
+  if (idem.mode === "replay") return idem.response;
+
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
@@ -44,6 +50,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const assignment = asgn.rows[0];
     if (!assignment || !assignment.daily_rent) {
       await client.query("ROLLBACK");
+      if (idem.mode === "claimed") await abortIdempotency(idem);
       return NextResponse.json({ error: "Rider has no active assignment with a daily rate set" }, { status: 409 });
     }
 
@@ -70,9 +77,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     );
 
     await client.query("COMMIT");
-    return NextResponse.json({ ok: true, paid_through_date: newPaidThrough, days_added: daysToAdd });
+    const respBody = { ok: true, paid_through_date: newPaidThrough, days_added: daysToAdd };
+    if (idem.mode === "claimed") await finishIdempotency(idem, 200, respBody);
+    return NextResponse.json(respBody);
   } catch (e) {
     await client.query("ROLLBACK");
+    if (idem.mode === "claimed") await abortIdempotency(idem);
     throw e;
   } finally {
     client.release();
