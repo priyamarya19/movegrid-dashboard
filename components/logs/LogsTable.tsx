@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import ExportButton from "@/components/ExportButton";
 import Pagination from "@/components/Pagination";
+import { fetchList } from "@/lib/listFetch";
 
 const PAGE_SIZE = 25;
 
@@ -53,6 +54,7 @@ function sortData(data: Log[], sort: Sort): Log[] {
 export default function LogsTable() {
   const [logs, setLogs] = useState<Log[]>([]);
   const [total, setTotal] = useState<number | null>(null);
+  const [loadError, setLoadError] = useState(false);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("");
   const [page, setPage] = useState(1);
@@ -64,9 +66,10 @@ export default function LogsTable() {
     if (filter) params.set("action", filter);
     params.set("page", String(page));
     params.set("pageSize", String(PAGE_SIZE));
-    const res = await fetch(`/api/logs?${params}`);
-    setTotal(Number(res.headers.get("X-Total-Count")) || null);
-    setLogs(await res.json());
+    const r = await fetchList<Log>(`/api/logs?${params}`);
+    setLoadError(!r.ok);
+    setTotal(r.total);
+    setLogs(r.rows);
     setLoading(false);
   }, [filter, page]);
 
@@ -112,6 +115,11 @@ export default function LogsTable() {
             <tbody>
               {loading ? (
                 <tr><td colSpan={5} className="px-5 py-10 text-center text-muted">Loading...</td></tr>
+              ) : loadError ? (
+                <tr><td colSpan={5} className="px-5 py-10 text-center">
+                  <p className="text-accent-danger-alt-text text-sm">Couldn&apos;t load logs.</p>
+                  <button onClick={() => fetch_()} className="mt-2 text-xs text-accent-purple hover:underline">Try again</button>
+                </td></tr>
               ) : sorted.length === 0 ? (
                 <tr><td colSpan={5} className="px-5 py-10 text-center text-muted">No logs found</td></tr>
               ) : sorted.map((log) => (

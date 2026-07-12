@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import ExportButton from "@/components/ExportButton";
 import Pagination from "@/components/Pagination";
+import { fetchList } from "@/lib/listFetch";
 import RecordPayment from "@/components/riders/RecordPayment";
 
 type Rider = {
@@ -88,6 +89,7 @@ export default function RidersTable({ rentFilter, statusFilter: initialStatus }:
   const [total, setTotal] = useState<number | null>(null);
   const [serverCounts, setServerCounts] = useState<Record<string, number> | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [page, setPage] = useState(1);
   // Seed the status filter from the URL (e.g. /riders?status=pending from the KYC badge).
   const [statusFilter, setStatusFilter] = useState(initialStatus ?? "");
@@ -113,12 +115,11 @@ export default function RidersTable({ rentFilter, statusFilter: initialStatus }:
       params.set("dir", sort.dir);
       if (debouncedQ) params.set("q", debouncedQ);
     }
-    const res = await fetch(`/api/riders?${params}`);
-    const totalHeader = res.headers.get("X-Total-Count");
-    setTotal(totalHeader ? Number(totalHeader) : null);
-    const scHeader = res.headers.get("X-Status-Counts");
-    setServerCounts(scHeader ? JSON.parse(scHeader) : null);
-    setRiders(await res.json());
+    const r = await fetchList<Rider>(`/api/riders?${params}`);
+    setLoadError(!r.ok);
+    setTotal(r.total);
+    setServerCounts(r.counts);
+    setRiders(r.rows);
     setLoading(false);
   }, [statusFilter, rentFilter, serverPaginate, page, sort, debouncedQ]);
 
@@ -217,6 +218,11 @@ export default function RidersTable({ rentFilter, statusFilter: initialStatus }:
             <tbody>
               {loading ? (
                 <tr><td colSpan={11} className="px-5 py-10 text-center text-muted">Loading...</td></tr>
+              ) : loadError ? (
+                <tr><td colSpan={11} className="px-5 py-10 text-center">
+                  <p className="text-accent-danger-alt-text text-sm">Couldn&apos;t load riders.</p>
+                  <button onClick={() => fetchRiders()} className="mt-2 text-xs text-accent-purple hover:underline">Try again</button>
+                </td></tr>
               ) : sorted.length === 0 ? (
                 <tr><td colSpan={11} className="px-5 py-10 text-center text-muted">No riders found</td></tr>
               ) : sorted.map((r) => (
