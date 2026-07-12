@@ -65,7 +65,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     await client.query(
       `INSERT INTO ${schemas.ops}.rider_payments
         (rider_id, vehicle_id, amount_collected, payment_date, rental_period_start, rental_period_end, payment_screenshot_url, payment_mode, payment_utr)
-       VALUES ($1, $2, $3, CURRENT_DATE, $4, $5, $6, $7, $8)`,
+       VALUES ($1, $2, $3, (now() AT TIME ZONE 'Asia/Kolkata')::date, $4, $5, $6, $7, $8)`,
       [id, assignment.vehicle_id, amountNum, oldPaidThrough, newPaidThrough, payment_screenshot_url, payment_mode, payment_utr ?? null]
     );
 

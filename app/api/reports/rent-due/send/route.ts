@@ -3,6 +3,7 @@ import pool from "@/lib/db";
 import { schemas } from "@/lib/schemas";
 import { sendEmail } from "@/lib/email";
 import { getRentDueAlert } from "@/lib/reports";
+import { escapeHtml } from "@/lib/html";
 
 const inr = (n: number) => `₹${n.toLocaleString("en-IN")}`;
 
@@ -26,10 +27,10 @@ export async function POST(req: NextRequest) {
   const labelColor: Record<string, string> = { Overdue: "#e17055", Today: "#fdcb6e", Tomorrow: "#00C48C" };
   const tableRows = rows.map((r) => `
     <tr>
-      <td style="padding:6px 10px;border-bottom:1px solid #eee;">${r.rider_name}</td>
-      <td style="padding:6px 10px;border-bottom:1px solid #eee;">${r.mobile}</td>
-      <td style="padding:6px 10px;border-bottom:1px solid #eee;">${r.ev_number ?? "-"}</td>
-      <td style="padding:6px 10px;border-bottom:1px solid #eee;">${r.hub_name ?? "-"}</td>
+      <td style="padding:6px 10px;border-bottom:1px solid #eee;">${escapeHtml(r.rider_name)}</td>
+      <td style="padding:6px 10px;border-bottom:1px solid #eee;">${escapeHtml(r.mobile)}</td>
+      <td style="padding:6px 10px;border-bottom:1px solid #eee;">${escapeHtml(r.ev_number ?? "-")}</td>
+      <td style="padding:6px 10px;border-bottom:1px solid #eee;">${escapeHtml(r.hub_name ?? "-")}</td>
       <td style="padding:6px 10px;border-bottom:1px solid #eee;">${inr(r.amount_due)}</td>
       <td style="padding:6px 10px;border-bottom:1px solid #eee;color:${labelColor[r.due_label]};font-weight:600;">${r.due_label}</td>
     </tr>`).join("");

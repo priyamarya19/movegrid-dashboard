@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { schemas } from "@/lib/schemas";
-import { requireSession } from "@/lib/auth";
+import { requireRole } from "@/lib/auth";
 
 // GET /api/vehicles/[id]/assignment — returns active assignment for return form
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const guard = await requireSession(req);
+  const guard = await requireRole(req);
   if ("response" in guard) return guard.response;
 
   const { id } = await params;

@@ -3,8 +3,7 @@ import { jwtVerify } from "jose";
 import bcrypt from "bcryptjs";
 import pool from "@/lib/db";
 import { schemas } from "@/lib/schemas";
-
-const secret = new TextEncoder().encode(process.env.JWT_SECRET || "fallback_secret");
+import { JWT_SECRET as secret } from "@/lib/jwt";
 
 export async function POST(req: Request) {
   const { token, password } = await req.json();

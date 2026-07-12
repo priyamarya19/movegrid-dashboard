@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { schemas } from "@/lib/schemas";
-import { requireSession } from "@/lib/auth";
+import { requireRole } from "@/lib/auth";
 
 export async function GET(req: NextRequest) {
-  const guard = await requireSession(req);
+  const guard = await requireRole(req);
   if ("response" in guard) return guard.response;
 
   const aadhaar = new URL(req.url).searchParams.get("aadhaar");

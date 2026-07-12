@@ -31,6 +31,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     }
   }
 
+  // A role or status change must revoke the user's existing tokens immediately
+  // (bump token_version — see isSessionCurrent in lib/auth): otherwise a demoted
+  // or suspended user keeps their old access until the 8h token expiry.
+  let revoke = false;
+
   if (body.role !== undefined) {
     const roleResult = await pool.query(
       `SELECT id FROM ${schemas.auth}.roles WHERE name = $1`,
@@ -43,6 +48,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       `UPDATE ${schemas.auth}.users SET role_id = $1 WHERE id = $2`,
       [roleResult.rows[0].id, id]
     );
+    revoke = true;
   }
 
   if (body.status !== undefined) {
@@ -53,6 +59,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     await pool.query(
       `UPDATE ${schemas.auth}.users SET status = $1 WHERE id = $2`,
       [body.status, id]
+    );
+    revoke = true;
+  }
+
+  if (revoke) {
+    await pool.query(
+      `UPDATE ${schemas.auth}.users SET token_version = token_version + 1 WHERE id = $1`,
+      [id]
     );
   }
 
