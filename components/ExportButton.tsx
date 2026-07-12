@@ -12,16 +12,20 @@ export type ExportColumn<T = Record<string, unknown>> = {
 };
 
 export default function ExportButton<T>({
-  filename, columns, rows, label = "Export",
+  filename, columns, rows, label = "Export", fetchAllRows,
 }: {
   filename: string;
   columns: ExportColumn<T>[];
   rows: T[];
   label?: string;
+  // When the visible `rows` are only one page (server pagination), supply this to
+  // export the full matching set — it's awaited on click instead of using `rows`.
+  fetchAllRows?: () => Promise<T[]>;
 }) {
   const toast = useToast();
   async function download() {
-    const flatRows = rows.map((r) =>
+    const source = fetchAllRows ? await fetchAllRows() : rows;
+    const flatRows = source.map((r) =>
       Object.fromEntries(
         columns.map((c) => [c.key, c.value ? c.value(r) : (r as Record<string, unknown>)[c.key]])
       )

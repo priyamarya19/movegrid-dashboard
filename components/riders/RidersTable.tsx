@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import ExportButton from "@/components/ExportButton";
 import RecordPayment from "@/components/riders/RecordPayment";
@@ -75,42 +75,96 @@ function RentToggle({ rider, onToggled }: { rider: Rider; onToggled: () => void 
   );
 }
 
+const PAGE_SIZE = 25;
+
 export default function RidersTable({ rentFilter, statusFilter: initialStatus }: { rentFilter?: string | null; statusFilter?: string | null }) {
+  // The overdue/due-soon alert views are bounded lists — keep them client-filtered.
+  // The main riders list is server-paginated (search + sort + page all server-side)
+  // so it stays correct and fast however large the fleet grows.
+  const serverPaginate = !rentFilter;
+
   const [riders, setRiders] = useState<Rider[]>([]);
   const [total, setTotal] = useState<number | null>(null);
+  const [serverCounts, setServerCounts] = useState<Record<string, number> | null>(null);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
   // Seed the status filter from the URL (e.g. /riders?status=pending from the KYC badge).
   const [statusFilter, setStatusFilter] = useState(initialStatus ?? "");
   const [search, setSearch] = useState("");
+  const [debouncedQ, setDebouncedQ] = useState("");
   const [sort, setSort] = useState<Sort>({ key: "created_at", dir: "desc" });
 
-  const fetchRiders = async () => {
+  // Debounce the search box so we don't fire a query on every keystroke.
+  useEffect(() => {
+    const t = setTimeout(() => { setDebouncedQ(search.trim()); setPage(1); }, 350);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  const fetchRiders = useCallback(async () => {
     setLoading(true);
     const params = new URLSearchParams();
     if (statusFilter) params.set("status", statusFilter);
     if (rentFilter && !statusFilter) params.set("rent", rentFilter);
+    if (serverPaginate) {
+      params.set("page", String(page));
+      params.set("pageSize", String(PAGE_SIZE));
+      params.set("sort", sort.key);
+      params.set("dir", sort.dir);
+      if (debouncedQ) params.set("q", debouncedQ);
+    }
     const res = await fetch(`/api/riders?${params}`);
     const totalHeader = res.headers.get("X-Total-Count");
     setTotal(totalHeader ? Number(totalHeader) : null);
+    const scHeader = res.headers.get("X-Status-Counts");
+    setServerCounts(scHeader ? JSON.parse(scHeader) : null);
     setRiders(await res.json());
     setLoading(false);
+  }, [statusFilter, rentFilter, serverPaginate, page, sort, debouncedQ]);
+
+  useEffect(() => { fetchRiders(); }, [fetchRiders]);
+
+  const toggleSort = (key: string) => {
+    setSort(s => s.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: "asc" });
+    if (serverPaginate) setPage(1);
   };
 
-  useEffect(() => { fetchRiders(); }, [statusFilter, rentFilter]);
+  // Export the FULL matching set (all pages), not just the visible page — loops
+  // 100 at a time until it has everything the current filters/search return.
+  const fetchAllForExport = useCallback(async (): Promise<Rider[]> => {
+    if (!serverPaginate) return riders;
+    const base = new URLSearchParams();
+    if (statusFilter) base.set("status", statusFilter);
+    base.set("sort", sort.key); base.set("dir", sort.dir); base.set("pageSize", "100");
+    if (debouncedQ) base.set("q", debouncedQ);
+    const all: Rider[] = [];
+    for (let p = 1; ; p++) {
+      base.set("page", String(p));
+      const res = await fetch(`/api/riders?${base}`);
+      const batch: Rider[] = await res.json();
+      all.push(...batch);
+      const t = Number(res.headers.get("X-Total-Count") || all.length);
+      if (all.length >= t || batch.length === 0) break;
+    }
+    return all;
+  }, [serverPaginate, riders, statusFilter, sort, debouncedQ]);
 
-  const toggleSort = (key: string) =>
-    setSort(s => s.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: "asc" });
-
-  // Search by name, rider ID (MGR...) or any allotment ID (MG...) the rider has held.
+  // Client-side filter/sort only in the bounded rent-alert mode; the paginated
+  // list is already filtered and sorted by the server.
   const q = search.trim().toLowerCase();
-  const filtered = q
-    ? riders.filter((r) =>
+  const filtered = serverPaginate
+    ? riders
+    : (q ? riders.filter((r) =>
         r.name?.toLowerCase().includes(q) ||
         r.rider_code?.toLowerCase().includes(q) ||
-        r.allotment_codes?.toLowerCase().includes(q))
-    : riders;
-  const sorted = sortData(filtered, sort);
-  const counts = riders.reduce((acc, r) => { acc[r.status] = (acc[r.status] || 0) + 1; return acc; }, {} as Record<string, number>);
+        r.allotment_codes?.toLowerCase().includes(q)) : riders);
+  const sorted = serverPaginate ? riders : sortData(filtered, sort);
+  const counts = serverPaginate && serverCounts
+    ? serverCounts
+    : riders.reduce((acc, r) => { acc[r.status] = (acc[r.status] || 0) + 1; return acc; }, {} as Record<string, number>);
+
+  const totalPages = total != null ? Math.max(1, Math.ceil(total / PAGE_SIZE)) : 1;
+  const rangeStart = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
+  const rangeEnd = (page - 1) * PAGE_SIZE + riders.length;
 
   return (
     <div className="space-y-5">
@@ -120,7 +174,7 @@ export default function RidersTable({ rentFilter, statusFilter: initialStatus }:
             Riders{rentFilter === "overdue" ? " — Overdue Rent" : rentFilter === "due_soon" ? " — Due in 2 Days" : ""}
           </h1>
           <p className="text-muted text-sm mt-1">
-            {total != null && total > riders.length ? `${riders.length} of ${total} riders` : `${riders.length} riders`} • {counts["active"] || 0} active · {counts["inactive"] || 0} inactive
+            {total ?? riders.length} riders • {counts["active"] || 0} active · {counts["inactive"] || 0} inactive
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
@@ -131,8 +185,8 @@ export default function RidersTable({ rentFilter, statusFilter: initialStatus }:
             placeholder="Search by name, rider ID or allotment ID"
             className="bg-surface border border-default rounded-xl px-3 py-2 text-sm text-primary placeholder-faint focus:outline-none focus:border-accent-purple w-48"
           />
-          <ExportButton filename="riders" columns={cols} rows={sorted} />
-          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
+          <ExportButton filename="riders" columns={cols} rows={sorted} fetchAllRows={serverPaginate ? fetchAllForExport : undefined} />
+          <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
             className="bg-surface border border-default rounded-xl px-3 py-2 text-sm text-secondary focus:outline-none focus:border-accent-purple">
             <option value="">All Status</option>
             <option value="active">Active</option>
@@ -147,12 +201,6 @@ export default function RidersTable({ rentFilter, statusFilter: initialStatus }:
           </Link>
         </div>
       </div>
-
-      {total != null && total > riders.length && (
-        <div className="bg-accent-warning/10 border border-accent-warning/25 rounded-xl px-4 py-2.5 text-xs text-accent-warning-text">
-          Showing the {riders.length} most recent of {total} riders. Search and sort apply only to these — narrow with the status filter to find someone older.
-        </div>
-      )}
 
       <div className="bg-surface border border-default rounded-2xl overflow-hidden">
         <div className="overflow-x-auto">
@@ -217,6 +265,31 @@ export default function RidersTable({ rentFilter, statusFilter: initialStatus }:
           </table>
         </div>
       </div>
+
+      {serverPaginate && total != null && total > PAGE_SIZE && (
+        <div className="flex items-center justify-between gap-3 text-sm">
+          <p className="text-muted">
+            Showing {rangeStart}–{rangeEnd} of {total}
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page <= 1 || loading}
+              className="px-3 py-1.5 rounded-lg border border-default text-secondary hover:text-primary disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              ← Prev
+            </button>
+            <span className="text-muted text-xs tabular-nums">Page {page} of {totalPages}</span>
+            <button
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={page >= totalPages || loading}
+              className="px-3 py-1.5 rounded-lg border border-default text-secondary hover:text-primary disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              Next →
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
