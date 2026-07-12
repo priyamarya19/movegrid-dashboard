@@ -22,6 +22,7 @@ const APPLY = process.argv.includes("--apply");
 const PAIRS = [
   { from: "mg_data_uat", to: "mg_data" },
   { from: "uat_auth", to: "auth" },
+  { from: "uat_logs", to: "logs" },   // audit_logs lives here (schemas.logs), a separate schema
 ];
 
 const client = new Client({ host: env.RDS_HOST, port: +env.RDS_PORT, user: env.RDS_USER, password: env.RDS_PASSWORD, database: env.RDS_DATABASE, ssl: { rejectUnauthorized: false } });
@@ -51,6 +52,7 @@ async function cols(schema) {
   await client.connect();
   console.log(`DB: ${env.RDS_DATABASE}   mode: ${APPLY ? "APPLY" : "DRY RUN"}\n`);
 
+  const schemasNeeded = new Set();
   const creates = [];
   const alters = [];
   const nullDrops = [];
@@ -65,6 +67,7 @@ async function cols(schema) {
         // Clone the whole table structure from UAT (columns, PK, indexes, CHECK/
         // NOT NULL, defaults). LIKE does NOT copy FK constraints — fine here, the
         // data we copy from UAT is already consistent; add FKs later if wanted.
+        schemasNeeded.add(to);
         creates.push(`CREATE TABLE IF NOT EXISTS ${to}.${tbl} (LIKE ${from}.${tbl} INCLUDING ALL);`);
         console.log(`  ⊕ CREATE TABLE ${tbl}  (clone from ${from})`);
         continue;
@@ -96,7 +99,8 @@ async function cols(schema) {
 
   // Tables must be created before column ALTERs run (though the two sets never
   // touch the same table). Creates first, then alters.
-  const stmts = [...creates, ...alters, ...nullDrops];
+  const schemaCreates = [...schemasNeeded].map((s) => `CREATE SCHEMA IF NOT EXISTS ${s};`);
+  const stmts = [...schemaCreates, ...creates, ...alters, ...nullDrops];
   if (!stmts.length) {
     console.log("✓ Nothing missing — prod base schema already matches UAT.");
   } else {
