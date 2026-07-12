@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/Toast";
+import { useConfirm } from "@/components/Confirm";
 
 type Props = {
   riderId: string;
@@ -16,6 +17,7 @@ type Props = {
 export default function BlacklistButton({ riderId, isBlacklisted, blacklistReason, blacklistedBy, blacklistedAt, role }: Props) {
   const router = useRouter();
   const toast = useToast();
+  const confirm = useConfirm();
   const [showForm, setShowForm] = useState(false);
   const [reason, setReason] = useState("");
   const [loading, setLoading] = useState(false);
@@ -41,6 +43,12 @@ export default function BlacklistButton({ riderId, isBlacklisted, blacklistReaso
   }
 
   async function handleUnblacklist() {
+    const ok = await confirm({
+      title: "Remove blacklist?",
+      message: "This rider will be eligible for allotments again.",
+      confirmLabel: "Remove blacklist",
+    });
+    if (!ok) return;
     setLoading(true);
     try {
       const res = await fetch(`/api/riders/${riderId}/blacklist`, { method: "DELETE" });

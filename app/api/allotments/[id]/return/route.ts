@@ -4,6 +4,7 @@ import { schemas } from "@/lib/schemas";
 import { requireRole } from "@/lib/auth";
 import { PAYMENT_MODES } from "@/lib/rent";
 import { istTodayISO } from "@/lib/date";
+import { writeAudit } from "@/lib/audit";
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const guard = await requireRole(req);
@@ -86,6 +87,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     );
 
     await client.query("COMMIT");
+    await writeAudit({
+      action: "vehicle_returned", entity: "assignment", entityId: id,
+      actorId: session.userId, actorName: session.name, req,
+      details: { rider_id, vehicle_id, is_issue_swap: b.is_issue_swap === true, penalty_amount: b.penalty_amount ?? null },
+    });
     return NextResponse.json({ ok: true });
   } catch (e) {
     await client.query("ROLLBACK");

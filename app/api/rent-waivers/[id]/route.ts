@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { schemas } from "@/lib/schemas";
 import { requireSession } from "@/lib/auth";
+import { writeAudit } from "@/lib/audit";
 
 async function canApprove(userId: string): Promise<boolean> {
   const res = await pool.query(
@@ -60,6 +61,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     }
 
     await client.query("COMMIT");
+    await writeAudit({
+      action: action === "approve" ? "waiver_approved" : "waiver_rejected",
+      entity: "assignment", entityId: req_.rows[0].assignment_id,
+      actorId: session.userId, actorName: session.name, req,
+      details: { waiver_id: id, non_functional_days: req_.rows[0].non_functional_days },
+    });
     return NextResponse.json({ ok: true });
   } catch (e) {
     await client.query("ROLLBACK");

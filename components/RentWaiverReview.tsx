@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useToast } from "@/components/Toast";
+import { useConfirm } from "@/components/Confirm";
 
 type WaiverRequest = {
   id: string;
@@ -17,6 +18,7 @@ type WaiverRequest = {
 
 export default function RentWaiverReview() {
   const toast = useToast();
+  const confirm = useConfirm();
   const [rows, setRows] = useState<WaiverRequest[] | null>(null);
   const [forbidden, setForbidden] = useState(false);
   const [actingOn, setActingOn] = useState<string | null>(null);
@@ -31,6 +33,17 @@ export default function RentWaiverReview() {
   useEffect(load, []);
 
   async function act(id: string, action: "approve" | "reject") {
+    const row = rows?.find((r) => r.id === id);
+    const days = row?.non_functional_days ?? 0;
+    const ok = await confirm({
+      title: action === "approve" ? "Approve this rent waiver?" : "Reject this rent waiver?",
+      message: action === "approve"
+        ? `${row?.rider_name ?? "The rider"} will be credited ${days} non-functional day${days !== 1 ? "s" : ""} of rent.`
+        : `${row?.rider_name ?? "The rider"}'s waiver request will be dismissed and full rent stays owed.`,
+      confirmLabel: action === "approve" ? "Approve" : "Reject",
+      danger: action === "reject",
+    });
+    if (!ok) return;
     setActingOn(id);
     try {
       const res = await fetch(`/api/rent-waivers/${id}`, {

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, Fragment } from "react";
 import PaymentProof, { PaymentProofValue, emptyProof, proofValid } from "@/components/PaymentProof";
+import { useConfirm } from "@/components/Confirm";
 
 type Penalty = {
   id: string; amount: number | null; detail: string | null; status: string;
@@ -10,6 +11,7 @@ type Penalty = {
 };
 
 export default function RiderPenalties({ riderId }: { riderId: string }) {
+  const confirm = useConfirm();
   const [rows, setRows] = useState<Penalty[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
@@ -54,7 +56,7 @@ export default function RiderPenalties({ riderId }: { riderId: string }) {
   }
 
   async function waive(penaltyId: string) {
-    if (!confirm("Waive this penalty?")) return;
+    if (!(await confirm({ title: "Waive this penalty?", message: "The penalty amount will be written off.", confirmLabel: "Waive" }))) return;
     await fetch(`/api/riders/${riderId}/penalties`, {
       method: "PATCH", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ penalty_id: penaltyId, action: "waive" }),

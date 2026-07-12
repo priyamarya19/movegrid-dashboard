@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { schemas } from "@/lib/schemas";
 import { requireRole } from "@/lib/auth";
+import { writeAudit } from "@/lib/audit";
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const guard = await requireRole(req, ["admin"]);
@@ -68,6 +69,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       `UPDATE ${schemas.auth}.users SET token_version = token_version + 1 WHERE id = $1`,
       [id]
     );
+    await writeAudit({
+      action: body.status !== undefined ? "user_status_changed" : "user_role_changed",
+      entity: "user", entityId: id, actorId: session.userId, actorName: session.name, req,
+      details: { role: body.role ?? undefined, status: body.status ?? undefined },
+    });
   }
 
   // A configurable per-user permission, independent of role — who can approve a

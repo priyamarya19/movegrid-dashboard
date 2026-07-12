@@ -3,6 +3,7 @@ import pool from "@/lib/db";
 import { schemas } from "@/lib/schemas";
 import { requireRole } from "@/lib/auth";
 import { istTodayISO } from "@/lib/date";
+import { writeAudit } from "@/lib/audit";
 
 export async function POST(req: NextRequest) {
   const guard = await requireRole(req);
@@ -182,6 +183,11 @@ export async function POST(req: NextRequest) {
     );
 
     await client.query("COMMIT");
+    await writeAudit({
+      action: "allotment_created", entity: "assignment", entityId: result.rows[0].id,
+      actorId: session.userId, actorName: session.name, req,
+      details: { rider_id: b.rider_id, vehicle_id: b.vehicle_id, allotment_code: result.rows[0].allotment_code, amount_collected: b.amount_collected ?? null },
+    });
     return NextResponse.json({ id: result.rows[0].id, allotment_code: result.rows[0].allotment_code }, { status: 201 });
   } catch (e) {
     await client.query("ROLLBACK");

@@ -6,6 +6,7 @@ import Sidebar from "@/components/Sidebar";
 import Footer from "@/components/Footer";
 import RentWaiverBanner from "@/components/RentWaiverBanner";
 import { ToastProvider } from "@/components/Toast";
+import { ConfirmProvider } from "@/components/Confirm";
 
 type Props = {
   role: string;
@@ -35,6 +36,7 @@ export default function DashboardShell({ role, name, children }: Props) {
 
   return (
     <ToastProvider>
+    <ConfirmProvider>
     <div className="flex h-screen overflow-hidden bg-base">
 
       {/* Mobile overlay */}
@@ -86,6 +88,7 @@ export default function DashboardShell({ role, name, children }: Props) {
         </main>
       </div>
     </div>
+    </ConfirmProvider>
     </ToastProvider>
   );
 }
