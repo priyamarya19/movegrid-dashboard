@@ -77,6 +77,7 @@ function RentToggle({ rider, onToggled }: { rider: Rider; onToggled: () => void 
 
 export default function RidersTable({ rentFilter, statusFilter: initialStatus }: { rentFilter?: string | null; statusFilter?: string | null }) {
   const [riders, setRiders] = useState<Rider[]>([]);
+  const [total, setTotal] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   // Seed the status filter from the URL (e.g. /riders?status=pending from the KYC badge).
   const [statusFilter, setStatusFilter] = useState(initialStatus ?? "");
@@ -89,6 +90,8 @@ export default function RidersTable({ rentFilter, statusFilter: initialStatus }:
     if (statusFilter) params.set("status", statusFilter);
     if (rentFilter && !statusFilter) params.set("rent", rentFilter);
     const res = await fetch(`/api/riders?${params}`);
+    const totalHeader = res.headers.get("X-Total-Count");
+    setTotal(totalHeader ? Number(totalHeader) : null);
     setRiders(await res.json());
     setLoading(false);
   };
@@ -116,7 +119,9 @@ export default function RidersTable({ rentFilter, statusFilter: initialStatus }:
           <h1 className="text-primary text-2xl font-bold">
             Riders{rentFilter === "overdue" ? " — Overdue Rent" : rentFilter === "due_soon" ? " — Due in 2 Days" : ""}
           </h1>
-          <p className="text-muted text-sm mt-1">{riders.length} riders • {counts["active"] || 0} active · {counts["inactive"] || 0} inactive</p>
+          <p className="text-muted text-sm mt-1">
+            {total != null && total > riders.length ? `${riders.length} of ${total} riders` : `${riders.length} riders`} • {counts["active"] || 0} active · {counts["inactive"] || 0} inactive
+          </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <input
@@ -142,6 +147,12 @@ export default function RidersTable({ rentFilter, statusFilter: initialStatus }:
           </Link>
         </div>
       </div>
+
+      {total != null && total > riders.length && (
+        <div className="bg-accent-warning/10 border border-accent-warning/25 rounded-xl px-4 py-2.5 text-xs text-accent-warning-text">
+          Showing the {riders.length} most recent of {total} riders. Search and sort apply only to these — narrow with the status filter to find someone older.
+        </div>
+      )}
 
       <div className="bg-surface border border-default rounded-2xl overflow-hidden">
         <div className="overflow-x-auto">

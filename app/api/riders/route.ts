@@ -161,8 +161,10 @@ export async function GET(req: NextRequest) {
     LEFT JOIN ${schemas.ops}.vehicles v ON v.id = rva.vehicle_id
   `;
 
+  const LIMIT = 200;
   let query: string;
   const params: string[] = [];
+  let total: number | null = null;
 
   if (rent === "overdue" || rent === "due_soon") {
     // 2-day grace: not chased as Overdue until paid_through_date is > 2 days stale.
@@ -179,14 +181,27 @@ export async function GET(req: NextRequest) {
     ${rentSelect}
     JOIN rent_due rd ON rd.rider_id = r.id
     WHERE ${rent === "overdue" ? overdueWhere : dueSoonWhere}
-    `;
+    ORDER BY r.created_at DESC LIMIT ${LIMIT}`;
   } else {
     query = `${baseSelect} WHERE 1=1`;
-    if (status) { params.push(status); query += ` AND r.status = $${params.length}`; }
-    if (hub) { params.push(hub); query += ` AND h.hub_name = $${params.length}`; }
+    let where = "WHERE 1=1";
+    if (status) { params.push(status); const p = `$${params.length}`; query += ` AND r.status = ${p}`; where += ` AND r.status = ${p}`; }
+    if (hub) { params.push(hub); const p = `$${params.length}`; query += ` AND h.hub_name = ${p}`; where += ` AND h.hub_name = ${p}`; }
+    query += ` ORDER BY r.created_at DESC LIMIT ${LIMIT}`;
+    // True total so the UI can show "showing N of TOTAL" and warn on truncation,
+    // instead of silently claiming the capped count is the whole fleet.
+    const countRes = await pool.query(
+      `SELECT count(*)::int AS n FROM ${schemas.ops}.riders r
+       LEFT JOIN ${schemas.ops}.hubs h ON h.id = r.assigned_hub_id ${where}`,
+      params
+    );
+    total = countRes.rows[0]?.n ?? null;
   }
-  query += ` ORDER BY r.created_at DESC LIMIT 200`;
 
   const result = await pool.query(query, params);
-  return NextResponse.json(result.rows);
+  // Backward-compatible: body is still the rows array; total rides in a header so
+  // existing consumers (mobile) are unaffected.
+  const headers: Record<string, string> = {};
+  if (total != null) headers["X-Total-Count"] = String(total);
+  return NextResponse.json(result.rows, { headers });
 }
