@@ -105,3 +105,17 @@ body {
   color: var(--text-primary);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Visible keyboard-focus indicator for interactive elements that otherwise have
+   no focus style (buttons, links, sortable headers). Only shows for keyboard
+   navigation (:focus-visible), never on mouse click. Inputs/selects keep their
+   own border-based focus. */
+a:focus-visible,
+button:focus-visible,
+[role="button"]:focus-visible,
+th[tabindex]:focus-visible,
+summary:focus-visible {
+  outline: 2px solid var(--accent-purple);
+  outline-offset: 2px;
+  border-radius: 4px;
+}

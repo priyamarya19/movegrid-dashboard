@@ -214,7 +214,7 @@ export default function UsersManager() {
                 <button
                   type="button"
                   onClick={() => setShowPassword((v) => !v)}
-                  tabIndex={-1}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-muted hover:text-secondary transition-colors"
                 >
                   {showPassword ? (

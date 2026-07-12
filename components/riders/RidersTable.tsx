@@ -207,7 +207,9 @@ export default function RidersTable({ rentFilter, statusFilter: initialStatus }:
             <thead>
               <tr className="border-b border-default">
                 {cols.map((c) => (
-                  <th key={c.key} onClick={() => toggleSort(c.key)}
+                  <th key={c.key} onClick={() => toggleSort(c.key)} tabIndex={0}
+                    aria-sort={sort.key === c.key ? (sort.dir === "asc" ? "ascending" : "descending") : "none"}
+                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleSort(c.key); } }}
                     className="text-left px-5 py-3 text-[11px] text-muted uppercase tracking-wider font-medium cursor-pointer select-none hover:text-secondary transition-colors whitespace-nowrap">
                     {c.label}
                     <span className="ml-1 opacity-60">{sort.key === c.key ? (sort.dir === "asc" ? "↑" : "↓") : "↕"}</span>
