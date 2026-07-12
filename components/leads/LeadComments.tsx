@@ -17,7 +17,7 @@ const roleLabel: Record<string, string> = {
 };
 
 const statusColor: Record<string, string> = {
-  new: "bg-blue-500/20 text-blue-400",
+  new: "bg-accent-purple-2/15 text-accent-purple-2-text",
   contacted: "bg-accent-warning/20 text-accent-warning-text",
   converted: "bg-accent-success/20 text-accent-success-text",
   rejected: "bg-accent-danger-alt/20 text-accent-danger-alt-text",
@@ -147,7 +147,7 @@ export default function LeadComments({ leadId, initialStatus, statusOptions, ini
           />
           <div className="flex justify-end mt-2">
             <button onClick={() => addComment()} disabled={submitting || !text.trim()}
-              className="px-4 py-2 bg-accent-purple text-primary text-sm font-medium rounded-xl hover:bg-accent-purple disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+              className="px-4 py-2 bg-accent-purple text-on-dark text-sm font-medium rounded-xl hover:bg-accent-purple disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
               {submitting ? "Saving..." : "Add Note"}
             </button>
           </div>

@@ -19,7 +19,7 @@ type Sort = { key: string; dir: "asc" | "desc" };
 const statusOptions = ["new", "contacted", "converted", "rejected"];
 
 const statusColor: Record<string, string> = {
-  new: "bg-blue-500/20 text-blue-400",
+  new: "bg-accent-purple-2/15 text-accent-purple-2-text",
   contacted: "bg-accent-warning/20 text-accent-warning-text",
   converted: "bg-accent-success/20 text-accent-success-text",
   rejected: "bg-accent-danger-alt/20 text-accent-danger-alt-text",
@@ -28,7 +28,7 @@ const statusColor: Record<string, string> = {
 const typeColor: Record<string, string> = {
   investor: "text-purple-400",
   rider: "text-accent-success",
-  fleet: "text-blue-400",
+  fleet: "text-accent-purple-2-text",
 };
 
 const cols: { label: string; key: string; sortable: boolean }[] = [

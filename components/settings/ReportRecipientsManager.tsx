@@ -92,7 +92,7 @@ export default function ReportRecipientsManager() {
         ))}
         <button
           type="submit"
-          className="bg-accent-success hover:bg-accent-success text-primary text-sm font-semibold px-4 py-2 rounded-xl transition-colors"
+          className="bg-accent-success hover:bg-accent-success text-on-dark text-sm font-semibold px-4 py-2 rounded-xl transition-colors"
         >
           Add
         </button>

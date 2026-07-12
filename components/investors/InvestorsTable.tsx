@@ -73,7 +73,7 @@ export default function InvestorsTable() {
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <ExportButton filename="investors" columns={cols} rows={sorted} />
-          <Link href="/investors/new" className="px-4 py-2.5 rounded-xl bg-accent-purple hover:bg-accent-purple text-primary text-sm font-semibold transition-colors shrink-0">
+          <Link href="/investors/new" className="px-4 py-2.5 rounded-xl bg-accent-purple hover:bg-accent-purple text-on-dark text-sm font-semibold transition-colors shrink-0">
             + Add Investor
           </Link>
         </div>

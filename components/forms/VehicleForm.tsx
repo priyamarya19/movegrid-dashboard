@@ -123,7 +123,7 @@ export default function VehicleForm() {
 
       <div className="flex items-center gap-3 pt-2">
         <button type="submit" disabled={submitting}
-          className="px-6 py-2.5 rounded-xl bg-accent-teal hover:bg-accent-success text-primary text-sm font-semibold disabled:opacity-60 transition-colors">
+          className="px-6 py-2.5 rounded-xl bg-accent-teal hover:bg-accent-success text-on-dark text-sm font-semibold disabled:opacity-60 transition-colors">
           {submitting ? "Saving..." : "Add Vehicle"}
         </button>
         <button type="button" onClick={() => router.back()}

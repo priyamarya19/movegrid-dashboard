@@ -57,7 +57,7 @@ async function getData(id: string) {
 
 const statusColor: Record<string, string> = {
   assigned: "bg-accent-success/20 text-accent-success-text",
-  available: "bg-blue-500/20 text-blue-400",
+  available: "bg-accent-purple-2/15 text-accent-purple-2-text",
   maintenance: "bg-accent-warning/20 text-accent-warning-text",
   retired: "bg-muted/20 text-muted",
   blocked: "bg-accent-danger-alt/20 text-accent-danger-alt-text",

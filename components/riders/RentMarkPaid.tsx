@@ -70,7 +70,7 @@ export default function RentMarkPaid({
         <PaymentProof value={proof} onChange={setProof} folder="rent-payments" />
         {error && <p className="text-accent-danger-alt-text text-[11px]">{error}</p>}
         <button onClick={markPaid} disabled={loading || !amount || !proofValid(proof)}
-          className="w-full px-3 py-2 rounded-lg text-xs font-semibold bg-accent-purple hover:bg-accent-purple text-primary disabled:opacity-50 transition-colors">
+          className="w-full px-3 py-2 rounded-lg text-xs font-semibold bg-accent-purple hover:bg-accent-purple text-on-dark disabled:opacity-50 transition-colors">
           {loading ? "Saving…" : "Mark Paid"}
         </button>
       </div>

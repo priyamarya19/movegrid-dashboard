@@ -12,7 +12,7 @@ const COLOR: Record<string, string> = {
   assigned: "bg-accent-success/20 text-accent-success-text",
   returned: "bg-accent-danger/20 text-accent-danger-text",
   under_maintenance: "bg-accent-warning/20 text-accent-warning-text",
-  mechanically_ok: "bg-blue-500/20 text-blue-400",
+  mechanically_ok: "bg-accent-purple-2/15 text-accent-purple-2-text",
   ready_to_deploy: "bg-accent-teal/20 text-accent-teal",
 };
 // Statuses ops can set (assigned/returned are system-driven).

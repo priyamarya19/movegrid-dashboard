@@ -39,7 +39,7 @@ export default async function InvestorHome({ userId }: Props) {
     { label: "Payouts Remaining", value: String(payoutsRemaining), color: "var(--accent-danger)", sub: `of ${termMonths} months` },
     { label: "ROI So Far", value: roi.toFixed(1) + "%", color: "var(--accent-warning)", sub: undefined },
     { label: "Scooters", value: vehicles.length.toLocaleString(), color: "var(--accent-success)", sub: "In your portfolio" },
-    { label: "Next Due Date", value: nextDueLabel, color: "#74b9ff", sub: nextDueDate ? "Upcoming payout" : "All payouts done" },
+    { label: "Next Due Date", value: nextDueLabel, color: "var(--accent-purple-2-text)", sub: nextDueDate ? "Upcoming payout" : "All payouts done" },
   ];
 
   const co2Display = impact.co2SavedKg >= 1000
@@ -52,11 +52,11 @@ export default async function InvestorHome({ userId }: Props) {
       icon: <path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zM12 6v6l4 2"/>,
     },
     {
-      label: "CO₂ Saved", value: co2Display, color: "#4ade80",
+      label: "CO₂ Saved", value: co2Display, color: "var(--accent-success-text)",
       icon: <path d="M3 12h4l3-9 4 18 3-9h4"/>,
     },
     {
-      label: "Trees Saved", value: Math.round(impact.treesSaved).toLocaleString(), color: "#22c55e",
+      label: "Trees Saved", value: Math.round(impact.treesSaved).toLocaleString(), color: "var(--accent-success-text)",
       icon: <path d="M12 22v-7m0 0a5 5 0 0 0 5-5c0-3-2-5-5-9-3 4-5 6-5 9a5 5 0 0 0 5 5z"/>,
     },
   ];

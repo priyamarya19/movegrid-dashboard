@@ -68,7 +68,7 @@ export default function MapVehiclesPanel({ investorId }: Props) {
   if (!open) {
     return (
       <button onClick={openPanel}
-        className="px-4 py-2 rounded-lg bg-accent-purple hover:bg-accent-purple text-primary text-xs font-semibold transition-colors">
+        className="px-4 py-2 rounded-lg bg-accent-purple hover:bg-accent-purple text-on-dark text-xs font-semibold transition-colors">
         + Map vehicles
       </button>
     );
@@ -134,7 +134,7 @@ export default function MapVehiclesPanel({ investorId }: Props) {
               Cancel
             </button>
             <button onClick={mapSelected} disabled={saving || selected.size === 0}
-              className="px-4 py-2 rounded-lg bg-accent-purple hover:bg-accent-purple text-primary text-sm font-semibold disabled:opacity-60 transition-colors">
+              className="px-4 py-2 rounded-lg bg-accent-purple hover:bg-accent-purple text-on-dark text-sm font-semibold disabled:opacity-60 transition-colors">
               {saving ? "Mapping…" : `Map ${selected.size} vehicle${selected.size === 1 ? "" : "s"}`}
             </button>
           </div>
