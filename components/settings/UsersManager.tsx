@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useToast } from "@/components/Toast";
+import { useConfirm } from "@/components/Confirm";
 
 type User = {
   id: string;
@@ -40,6 +41,7 @@ const emptyForm = { name: "", email: "", mobile: "", password: "", role: "ops_ma
 
 export default function UsersManager() {
   const toast = useToast();
+  const confirm = useConfirm();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
@@ -81,6 +83,13 @@ export default function UsersManager() {
 
   async function handleRoleChange(userId: string, newRole: string) {
     setEditingRole(null);
+    const u = users.find((x) => x.id === userId);
+    const ok = await confirm({
+      title: "Change this user's role?",
+      message: `${u?.name ?? "This user"} will become "${newRole}" and be signed out so the new access takes effect.`,
+      confirmLabel: "Change role",
+    });
+    if (!ok) return;
     const res = await fetch(`/api/users/${userId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -97,6 +106,16 @@ export default function UsersManager() {
 
   async function handleStatusToggle(userId: string, current: string) {
     const next = current === "active" ? "inactive" : "active";
+    if (next === "inactive") {
+      const u = users.find((x) => x.id === userId);
+      const ok = await confirm({
+        title: "Deactivate this user?",
+        message: `${u?.name ?? "This user"} will be signed out and lose access immediately.`,
+        confirmLabel: "Deactivate",
+        danger: true,
+      });
+      if (!ok) return;
+    }
     const res = await fetch(`/api/users/${userId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
