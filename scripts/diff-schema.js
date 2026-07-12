@@ -53,6 +53,7 @@ async function cols(schema) {
 
   const creates = [];
   const alters = [];
+  const nullDrops = [];
   const warnings = [];
 
   for (const { from, to } of PAIRS) {
@@ -69,7 +70,16 @@ async function cols(schema) {
         continue;
       }
       for (const [col, def] of srcCols) {
-        if (dstCols.has(col)) continue;
+        const dstDef = dstCols.get(col);
+        if (dstDef) {
+          // Column exists in both. If prod is NOT NULL but UAT allows NULL, prod is
+          // stricter and will reject UAT rows on copy — relax it to match UAT.
+          if (dstDef.not_null && !def.not_null) {
+            nullDrops.push(`ALTER TABLE ${to}.${tbl} ALTER COLUMN ${col} DROP NOT NULL;`);
+            console.log(`  ~ ${tbl}.${col}  DROP NOT NULL (UAT nullable, prod NOT NULL)`);
+          }
+          continue;
+        }
         // Build a safe ADD COLUMN: keep the default; only keep NOT NULL if a default
         // exists (so it can't fail on any existing rows).
         let sql = `ALTER TABLE ${to}.${tbl} ADD COLUMN IF NOT EXISTS ${col} ${def.type}`;
@@ -86,16 +96,16 @@ async function cols(schema) {
 
   // Tables must be created before column ALTERs run (though the two sets never
   // touch the same table). Creates first, then alters.
-  const stmts = [...creates, ...alters];
+  const stmts = [...creates, ...alters, ...nullDrops];
   if (!stmts.length) {
     console.log("✓ Nothing missing — prod base schema already matches UAT.");
   } else {
-    console.log(`\n${creates.length} table(s) + ${alters.length} column(s) missing. SQL:\n`);
+    console.log(`\n${creates.length} table(s) + ${alters.length} column(s) + ${nullDrops.length} nullability fix(es). SQL:\n`);
     console.log(stmts.join("\n"));
     if (APPLY) {
       console.log(`\nApplying...`);
       for (const sql of stmts) { process.stdout.write(`→ ${sql} `); await client.query(sql); console.log("ok"); }
-      console.log(`\n✓ Applied ${creates.length} table(s) + ${alters.length} column(s) to prod.`);
+      console.log(`\n✓ Applied ${creates.length} table(s) + ${alters.length} column(s) + ${nullDrops.length} nullability fix(es) to prod.`);
     } else {
       console.log(`\n(DRY RUN — nothing changed. Re-run with --apply to add these.)`);
     }
