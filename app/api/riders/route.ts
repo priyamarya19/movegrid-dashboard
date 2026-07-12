@@ -112,6 +112,20 @@ export async function GET(req: NextRequest) {
   const status = searchParams.get("status");
   const hub = searchParams.get("hub");
   const rent = searchParams.get("rent"); // "overdue" | "due_soon"
+  // Pagination is opt-in: the dashboard sends ?page=1 (and optionally q/sort/dir),
+  // the mobile app doesn't and keeps getting the full capped list unchanged.
+  const pageParam = searchParams.get("page");
+  const paginated = pageParam != null;
+  const page = Math.max(1, Number(pageParam) || 1);
+  const pageSize = Math.min(100, Math.max(5, Number(searchParams.get("pageSize")) || 25));
+  const q = (searchParams.get("q") || "").trim();
+  // Whitelist sortable columns so the value can be interpolated safely.
+  const SORTABLE: Record<string, string> = {
+    name: "r.name", rider_code: "r.rider_code", status: "r.status",
+    created_at: "r.created_at", hub_name: "h.hub_name",
+  };
+  const sortCol = SORTABLE[searchParams.get("sort") || ""] || "r.created_at";
+  const sortDir = searchParams.get("dir") === "asc" ? "ASC" : "DESC";
 
   // Use IST-aware dates
   const T = `(NOW() AT TIME ZONE 'Asia/Kolkata')::date`;           // IST today
@@ -183,25 +197,51 @@ export async function GET(req: NextRequest) {
     WHERE ${rent === "overdue" ? overdueWhere : dueSoonWhere}
     ORDER BY r.created_at DESC LIMIT ${LIMIT}`;
   } else {
-    query = `${baseSelect} WHERE 1=1`;
+    // Build the shared WHERE (status + hub + free-text q) once, so the page query
+    // and the count query stay in sync.
     let where = "WHERE 1=1";
-    if (status) { params.push(status); const p = `$${params.length}`; query += ` AND r.status = ${p}`; where += ` AND r.status = ${p}`; }
-    if (hub) { params.push(hub); const p = `$${params.length}`; query += ` AND h.hub_name = ${p}`; where += ` AND h.hub_name = ${p}`; }
-    query += ` ORDER BY r.created_at DESC LIMIT ${LIMIT}`;
-    // True total so the UI can show "showing N of TOTAL" and warn on truncation,
-    // instead of silently claiming the capped count is the whole fleet.
+    if (status) { params.push(status); where += ` AND r.status = $${params.length}`; }
+    if (hub) { params.push(hub); where += ` AND h.hub_name = $${params.length}`; }
+    if (q) {
+      // Match name, rider ID, or ANY allotment ID the rider has ever held —
+      // server-side so search covers every rider, not just the loaded page.
+      params.push(`%${q}%`);
+      const p = `$${params.length}`;
+      where += ` AND (r.name ILIKE ${p} OR r.rider_code ILIKE ${p} OR EXISTS (
+        SELECT 1 FROM ${schemas.ops}.rider_vehicle_assignments a
+        WHERE a.rider_id = r.id AND a.allotment_code ILIKE ${p}))`;
+    }
+
     const countRes = await pool.query(
       `SELECT count(*)::int AS n FROM ${schemas.ops}.riders r
        LEFT JOIN ${schemas.ops}.hubs h ON h.id = r.assigned_hub_id ${where}`,
       params
     );
     total = countRes.rows[0]?.n ?? null;
+
+    query = `${baseSelect} ${where} ORDER BY ${sortCol} ${sortDir} NULLS LAST`;
+    if (paginated) {
+      query += ` LIMIT ${pageSize} OFFSET ${(page - 1) * pageSize}`;
+    } else {
+      query += ` LIMIT ${LIMIT}`;
+    }
   }
 
   const result = await pool.query(query, params);
-  // Backward-compatible: body is still the rows array; total rides in a header so
+  // Backward-compatible: body is still the rows array; totals ride in headers so
   // existing consumers (mobile) are unaffected.
   const headers: Record<string, string> = {};
   if (total != null) headers["X-Total-Count"] = String(total);
+  // Status breakdown over ALL riders (unfiltered) so the overview badges stay
+  // accurate no matter which page/filter is shown. Only needed by the paginated
+  // dashboard; skip the extra query for the mobile/unpaginated path.
+  if (paginated) {
+    const sc = await pool.query(
+      `SELECT status, count(*)::int AS n FROM ${schemas.ops}.riders GROUP BY status`
+    );
+    const counts: Record<string, number> = {};
+    for (const row of sc.rows) counts[row.status] = row.n;
+    headers["X-Status-Counts"] = JSON.stringify(counts);
+  }
   return NextResponse.json(result.rows, { headers });
 }
