@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useToast } from "@/components/Toast";
 
 type Props = {
   riderId: string;
@@ -14,6 +15,7 @@ type Props = {
 
 export default function BlacklistButton({ riderId, isBlacklisted, blacklistReason, blacklistedBy, blacklistedAt, role }: Props) {
   const router = useRouter();
+  const toast = useToast();
   const [showForm, setShowForm] = useState(false);
   const [reason, setReason] = useState("");
   const [loading, setLoading] = useState(false);
@@ -21,21 +23,35 @@ export default function BlacklistButton({ riderId, isBlacklisted, blacklistReaso
   async function handleBlacklist() {
     if (!reason.trim()) return;
     setLoading(true);
-    await fetch(`/api/riders/${riderId}/blacklist`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ reason }),
-    });
-    setLoading(false);
-    setShowForm(false);
-    router.refresh();
+    try {
+      const res = await fetch(`/api/riders/${riderId}/blacklist`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason }),
+      });
+      if (!res.ok) throw new Error();
+      toast.show("Rider blacklisted", "success");
+      setShowForm(false);
+      router.refresh();
+    } catch {
+      toast.show("Couldn't blacklist the rider. Try again.", "error");
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function handleUnblacklist() {
     setLoading(true);
-    await fetch(`/api/riders/${riderId}/blacklist`, { method: "DELETE" });
-    setLoading(false);
-    router.refresh();
+    try {
+      const res = await fetch(`/api/riders/${riderId}/blacklist`, { method: "DELETE" });
+      if (!res.ok) throw new Error();
+      toast.show("Blacklist removed", "success");
+      router.refresh();
+    } catch {
+      toast.show("Couldn't remove the blacklist. Try again.", "error");
+    } finally {
+      setLoading(false);
+    }
   }
 
   if (isBlacklisted) {

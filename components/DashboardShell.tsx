@@ -5,6 +5,7 @@ import { useRouter, usePathname } from "next/navigation";
 import Sidebar from "@/components/Sidebar";
 import Footer from "@/components/Footer";
 import RentWaiverBanner from "@/components/RentWaiverBanner";
+import { ToastProvider } from "@/components/Toast";
 
 type Props = {
   role: string;
@@ -33,6 +34,7 @@ export default function DashboardShell({ role, name, children }: Props) {
   }, [router]);
 
   return (
+    <ToastProvider>
     <div className="flex h-screen overflow-hidden bg-base">
 
       {/* Mobile overlay */}
@@ -84,5 +86,6 @@ export default function DashboardShell({ role, name, children }: Props) {
         </main>
       </div>
     </div>
+    </ToastProvider>
   );
 }
