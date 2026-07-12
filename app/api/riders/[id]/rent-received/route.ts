@@ -4,6 +4,7 @@ import { schemas } from "@/lib/schemas";
 import { requireRole, requireSession } from "@/lib/auth";
 import { PAYMENT_MODES } from "@/lib/rent";
 import { beginIdempotency, finishIdempotency, abortIdempotency } from "@/lib/idempotency";
+import { writeAudit } from "@/lib/audit";
 
 // Record a rent payment of any amount. Rolling-balance model: the amount converts to
 // (amount / daily_rate) days and extends the rider's paid_through_date on their active
@@ -77,6 +78,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     );
 
     await client.query("COMMIT");
+    await writeAudit({
+      action: "rent_received", entity: "rider", entityId: id,
+      actorId: guard.session.userId, actorName: guard.session.name, req,
+      details: { amount: amountNum, payment_mode, days_added: daysToAdd, paid_through_date: newPaidThrough },
+    });
     const respBody = { ok: true, paid_through_date: newPaidThrough, days_added: daysToAdd };
     if (idem.mode === "claimed") await finishIdempotency(idem, 200, respBody);
     return NextResponse.json(respBody);

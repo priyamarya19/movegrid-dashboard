@@ -3,6 +3,7 @@ import pool from "@/lib/db";
 import { schemas } from "@/lib/schemas";
 import { requireRole } from "@/lib/auth";
 import { IST } from "@/lib/rent";
+import { writeAudit } from "@/lib/audit";
 
 // rental_mode is constrained by riders_rental_mode_check to ('weekly','monthly').
 // Normalize known display labels; reject anything else with a 400 rather than
@@ -69,6 +70,11 @@ export async function POST(req: NextRequest) {
       b.profile_photo_url ?? null, b.assigned_hub_id ?? null, "pending", session.name,
     ]
     );
+    await writeAudit({
+      action: "rider_created", entity: "rider", entityId: result.rows[0].id,
+      actorId: session.userId, actorName: session.name, req,
+      details: { rider_code: result.rows[0].rider_code, name: result.rows[0].name, mobile: result.rows[0].mobile },
+    });
     return NextResponse.json(result.rows[0], { status: 201 });
   } catch (err) {
     const e = err as { code?: string; constraint?: string };
