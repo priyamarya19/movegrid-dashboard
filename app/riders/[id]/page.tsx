@@ -347,7 +347,15 @@ export default async function RiderDetailPage({ params }: { params: Promise<{ id
               <tbody>
                 {cycle.length === 0 ? (
                   <tr><td colSpan={7} className="px-5 py-8 text-center text-muted">No rent cycle yet (no allotment)</td></tr>
-                ) : [...cycle].reverse().map((w, i) => {
+                ) : (() => {
+                  // Running total of everything unpaid up to and including each week
+                  // (chronological), so a Pending/Partial hover can show the rider's
+                  // full balance — this week's rent plus any earlier shortfall.
+                  const cumOutstanding: number[] = [];
+                  let run = 0;
+                  for (const w of cycle) { run += Math.max(Math.round(w.amount - w.paid), 0); cumOutstanding.push(run); }
+                  return [...cycle].reverse().map((w, i) => {
+                  const totalDue = cumOutstanding[cycle.length - 1 - i];
                   const color = w.status === "Collected" ? "bg-accent-success/15 text-accent-success-text"
                     : w.status === "Partial" ? "bg-accent-danger/15 text-accent-danger-text"
                     : w.status === "Overdue" ? "bg-accent-danger-alt/15 text-accent-danger-alt-text"
@@ -370,6 +378,19 @@ export default async function RiderDetailPage({ params }: { params: Promise<{ id
                               <span className="text-accent-teal font-semibold">₹{Math.round(w.paid).toLocaleString("en-IN")} paid</span>
                               <span className="text-muted"> · </span>
                               <span className="text-accent-danger-text font-semibold">₹{balance.toLocaleString("en-IN")} pending</span>
+                              {totalDue > balance && (
+                                <span className="block mt-0.5 text-secondary">Total pending incl. earlier weeks: <span className="font-semibold text-accent-danger-text">₹{totalDue.toLocaleString("en-IN")}</span></span>
+                              )}
+                            </span>
+                          </span>
+                        ) : (w.status === "Pending" || w.status === "Overdue") && totalDue > 0 ? (
+                          <span className={`relative group cursor-default px-2 py-0.5 rounded-full text-[11px] font-semibold ${color}`}>
+                            {w.status}
+                            <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 hidden group-hover:block whitespace-nowrap bg-surface border border-default rounded-lg px-3 py-1.5 text-[11px] font-normal shadow-lg z-10">
+                              <span className="text-secondary">This week: <span className="font-semibold text-primary">₹{balance.toLocaleString("en-IN")}</span></span>
+                              {totalDue > balance && (
+                                <span className="block mt-0.5 text-secondary">Total pending incl. earlier weeks: <span className="font-semibold text-accent-danger-text">₹{totalDue.toLocaleString("en-IN")}</span></span>
+                              )}
                             </span>
                           </span>
                         ) : (
@@ -397,7 +418,8 @@ export default async function RiderDetailPage({ params }: { params: Promise<{ id
                       </td>
                     </tr>
                   );
-                })}
+                  });
+                })()}
               </tbody>
             </table>
           </div>
