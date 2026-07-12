@@ -76,6 +76,40 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     });
   }
 
+  // Editable profile fields (name / email / mobile). These don't affect access,
+  // so no token revoke. Built dynamically so any subset can be sent.
+  const profileSets: string[] = [];
+  const profileVals: unknown[] = [];
+  if (body.name !== undefined) {
+    if (!String(body.name).trim()) return NextResponse.json({ error: "Name is required", field: "name" }, { status: 400 });
+    profileVals.push(String(body.name).trim()); profileSets.push(`name = $${profileVals.length}`);
+  }
+  if (body.email !== undefined) {
+    const email = String(body.email).trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return NextResponse.json({ error: "Enter a valid email", field: "email" }, { status: 400 });
+    profileVals.push(email); profileSets.push(`email = $${profileVals.length}`);
+  }
+  if (body.mobile !== undefined) {
+    if (!String(body.mobile).trim()) return NextResponse.json({ error: "Mobile is required", field: "mobile" }, { status: 400 });
+    profileVals.push(String(body.mobile).trim()); profileSets.push(`mobile = $${profileVals.length}`);
+  }
+  if (profileSets.length) {
+    profileVals.push(id);
+    try {
+      await pool.query(`UPDATE ${schemas.auth}.users SET ${profileSets.join(", ")} WHERE id = $${profileVals.length}`, profileVals);
+    } catch (e) {
+      if ((e as { code?: string }).code === "23505") {
+        return NextResponse.json({ error: "That email is already in use", field: "email" }, { status: 409 });
+      }
+      throw e;
+    }
+    await writeAudit({
+      action: "user_profile_updated", entity: "user", entityId: id,
+      actorId: session.userId, actorName: session.name, req,
+      details: { fields: profileSets.map((s) => s.split(" ")[0]) },
+    });
+  }
+
   // A configurable per-user permission, independent of role — who can approve a
   // pending rent waiver request (see app/api/rent-waivers).
   if (body.can_approve_rent_waivers !== undefined) {

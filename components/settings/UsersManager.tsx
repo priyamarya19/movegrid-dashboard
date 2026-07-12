@@ -50,6 +50,9 @@ export default function UsersManager() {
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState("");
   const [editingRole, setEditingRole] = useState<string | null>(null);
+  const [editingProfile, setEditingProfile] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState({ name: "", email: "", mobile: "" });
+  const [savingProfile, setSavingProfile] = useState(false);
 
   useEffect(() => {
     fetch("/api/users")
@@ -127,6 +130,33 @@ export default function UsersManager() {
     } else {
       const msg = await res.json().catch(() => ({}));
       toast.show(msg.error || "Couldn't update user", "error");
+    }
+  }
+
+  function startEdit(user: User) {
+    setEditingProfile(user.id);
+    setEditForm({ name: user.name, email: user.email, mobile: user.mobile });
+  }
+
+  async function handleSaveProfile(userId: string) {
+    setSavingProfile(true);
+    try {
+      const res = await fetch(`/api/users/${userId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(editForm),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.show(data.error || "Couldn't save changes", "error");
+        return;
+      }
+      const email = editForm.email.trim().toLowerCase();
+      setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, name: editForm.name.trim(), email, mobile: editForm.mobile.trim() } : u)));
+      toast.show("User updated", "success");
+      setEditingProfile(null);
+    } finally {
+      setSavingProfile(false);
     }
   }
 
@@ -282,15 +312,43 @@ export default function UsersManager() {
               ) : users.map((user) => (
                 <tr key={user.id} className="border-b border-subtle hover:bg-overlay-hover">
                   <td className="px-5 py-3.5">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-7 h-7 rounded-full bg-accent-success/20 flex items-center justify-center text-accent-success text-xs font-bold shrink-0">
-                        {user.name.charAt(0).toUpperCase()}
+                    {editingProfile === user.id ? (
+                      <input
+                        value={editForm.name}
+                        onChange={(e) => setEditForm((p) => ({ ...p, name: e.target.value }))}
+                        aria-label="Name"
+                        className="w-full min-w-[8rem] bg-base border border-accent-success rounded-lg px-2 py-1 text-primary text-xs focus:outline-none"
+                      />
+                    ) : (
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-7 h-7 rounded-full bg-accent-success/20 flex items-center justify-center text-accent-success text-xs font-bold shrink-0">
+                          {user.name.charAt(0).toUpperCase()}
+                        </div>
+                        <span className="text-primary font-medium whitespace-nowrap">{user.name}</span>
                       </div>
-                      <span className="text-primary font-medium whitespace-nowrap">{user.name}</span>
-                    </div>
+                    )}
                   </td>
-                  <td className="px-5 py-3.5 text-secondary text-xs">{user.email}</td>
-                  <td className="px-5 py-3.5 text-secondary text-xs whitespace-nowrap">{user.mobile}</td>
+                  <td className="px-5 py-3.5 text-secondary text-xs">
+                    {editingProfile === user.id ? (
+                      <input
+                        value={editForm.email}
+                        onChange={(e) => setEditForm((p) => ({ ...p, email: e.target.value }))}
+                        type="email"
+                        aria-label="Email"
+                        className="w-full min-w-[10rem] bg-base border border-accent-success rounded-lg px-2 py-1 text-primary text-xs focus:outline-none"
+                      />
+                    ) : user.email}
+                  </td>
+                  <td className="px-5 py-3.5 text-secondary text-xs whitespace-nowrap">
+                    {editingProfile === user.id ? (
+                      <input
+                        value={editForm.mobile}
+                        onChange={(e) => setEditForm((p) => ({ ...p, mobile: e.target.value }))}
+                        aria-label="Mobile"
+                        className="w-full min-w-[7rem] bg-base border border-accent-success rounded-lg px-2 py-1 text-primary text-xs focus:outline-none"
+                      />
+                    ) : user.mobile}
+                  </td>
                   <td className="px-5 py-3.5">
                     {editingRole === user.id ? (
                       <select
@@ -334,12 +392,38 @@ export default function UsersManager() {
                     {new Date(user.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
                   </td>
                   <td className="px-5 py-3.5">
-                    <button
-                      onClick={() => handleStatusToggle(user.id, user.status)}
-                      className={`text-xs font-medium transition-colors whitespace-nowrap ${user.status === "active" ? "text-muted hover:text-accent-danger-alt-text" : "text-muted hover:text-accent-success-text"}`}
-                    >
-                      {user.status === "active" ? "Deactivate" : "Activate"}
-                    </button>
+                    {editingProfile === user.id ? (
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleSaveProfile(user.id)}
+                          disabled={savingProfile}
+                          className="px-3 py-1 rounded-lg bg-accent-success hover:bg-accent-success text-on-dark text-xs font-semibold disabled:opacity-60 transition-colors"
+                        >
+                          {savingProfile ? "Saving..." : "Save"}
+                        </button>
+                        <button
+                          onClick={() => setEditingProfile(null)}
+                          className="text-xs font-medium text-muted hover:text-primary transition-colors"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-3 whitespace-nowrap">
+                        <button
+                          onClick={() => startEdit(user)}
+                          className="text-xs font-medium text-muted hover:text-primary transition-colors"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleStatusToggle(user.id, user.status)}
+                          className={`text-xs font-medium transition-colors ${user.status === "active" ? "text-muted hover:text-accent-danger-alt-text" : "text-muted hover:text-accent-success-text"}`}
+                        >
+                          {user.status === "active" ? "Deactivate" : "Activate"}
+                        </button>
+                      </div>
+                    )}
                   </td>
                 </tr>
               ))}
