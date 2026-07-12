@@ -42,6 +42,15 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const status = searchParams.get("status");
   const unassigned = searchParams.get("unassigned");
+  // Opt-in pagination (dashboard sends ?page=); mobile/unpaginated path unchanged.
+  const pageParam = searchParams.get("page");
+  const paginated = pageParam != null;
+  const page = Math.max(1, Number(pageParam) || 1);
+  const pageSize = Math.min(100, Math.max(5, Number(searchParams.get("pageSize")) || 25));
+  const q = (searchParams.get("q") || "").trim();
+  const SORTABLE: Record<string, string> = { ev_number: "v.ev_number", status: "v.status", model_name: "m.model_name" };
+  const sortCol = SORTABLE[searchParams.get("sort") || ""] || "v.ev_number";
+  const sortDir = searchParams.get("dir") === "desc" ? "DESC" : "ASC";
 
   let query = `
     SELECT v.id, v.ev_number, v.status, v.purchase_date, v.price,
@@ -69,11 +78,30 @@ export async function GET(req: NextRequest) {
     query += cond; where += cond;
   }
   if (unassigned) { query += ` AND v.investor_id IS NULL`; where += ` AND v.investor_id IS NULL`; }
-  query += ` ORDER BY v.ev_number ASC LIMIT 500`;
+  if (q) {
+    // Search EV number, chassis, or the current rider's name (EXISTS keeps the
+    // count query join-free).
+    params.push(`%${q}%`);
+    const p = `$${params.length}`;
+    const cond = ` AND (v.ev_number ILIKE ${p} OR v.chassis_number ILIKE ${p} OR EXISTS (
+      SELECT 1 FROM ${schemas.ops}.rider_vehicle_assignments a2
+      JOIN ${schemas.ops}.riders r2 ON r2.id = a2.rider_id
+      WHERE a2.vehicle_id = v.id AND a2.status = 'active' AND r2.name ILIKE ${p}))`;
+    query += cond; where += cond;
+  }
+  query += ` ORDER BY ${sortCol} ${sortDir} NULLS LAST`;
+  query += paginated ? ` LIMIT ${pageSize} OFFSET ${(page - 1) * pageSize}` : ` LIMIT 500`;
 
   const [result, countRes] = await Promise.all([
     pool.query(query, params),
     pool.query(`SELECT count(*)::int AS n FROM ${schemas.ops}.vehicles v ${where}`, params),
   ]);
-  return NextResponse.json(result.rows, { headers: { "X-Total-Count": String(countRes.rows[0]?.n ?? result.rows.length) } });
+  const headers: Record<string, string> = { "X-Total-Count": String(countRes.rows[0]?.n ?? result.rows.length) };
+  if (paginated) {
+    const sc = await pool.query(`SELECT status, count(*)::int AS n FROM ${schemas.ops}.vehicles GROUP BY status`);
+    const counts: Record<string, number> = {};
+    for (const row of sc.rows) counts[row.status] = row.n;
+    headers["X-Status-Counts"] = JSON.stringify(counts);
+  }
+  return NextResponse.json(result.rows, { headers });
 }

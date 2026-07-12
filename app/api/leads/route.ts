@@ -11,23 +11,32 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const type = searchParams.get("type");
   const status = searchParams.get("status");
+  const q = (searchParams.get("q") || "").trim();
+  const pageParam = searchParams.get("page");
+  const paginated = pageParam != null;
+  const page = Math.max(1, Number(pageParam) || 1);
+  const pageSize = Math.min(100, Math.max(5, Number(searchParams.get("pageSize")) || 25));
 
-  let query = `SELECT id, type, name, phone, email, city, fleet_size, amount, status, created_at
-               FROM ${schemas.leads}.leads WHERE 1=1`;
+  let where = "WHERE 1=1";
   const params: string[] = [];
 
   // ops_manager cannot see investor leads
   if (session.role === "ops_manager") {
-    query += ` AND type != 'investor'`;
+    where += ` AND type != 'investor'`;
   }
+  if (type) { params.push(type); where += ` AND type = $${params.length}`; }
+  if (status) { params.push(status); where += ` AND status = $${params.length}`; }
+  if (q) { params.push(`%${q}%`); const p = `$${params.length}`; where += ` AND (name ILIKE ${p} OR phone ILIKE ${p} OR email ILIKE ${p})`; }
 
-  if (type) { params.push(type); query += ` AND type = $${params.length}`; }
-  if (status) { params.push(status); query += ` AND status = $${params.length}`; }
+  let query = `SELECT id, type, name, phone, email, city, fleet_size, amount, status, created_at
+               FROM ${schemas.leads}.leads ${where} ORDER BY created_at DESC`;
+  query += paginated ? ` LIMIT ${pageSize} OFFSET ${(page - 1) * pageSize}` : ` LIMIT 100`;
 
-  query += ` ORDER BY created_at DESC LIMIT 100`;
-
-  const result = await pool.query(query, params);
-  return NextResponse.json(result.rows);
+  const [result, countRes] = await Promise.all([
+    pool.query(query, params),
+    pool.query(`SELECT count(*)::int AS n FROM ${schemas.leads}.leads ${where}`, params),
+  ]);
+  return NextResponse.json(result.rows, { headers: { "X-Total-Count": String(countRes.rows[0]?.n ?? result.rows.length) } });
 }
 
 export async function PATCH(req: NextRequest) {
