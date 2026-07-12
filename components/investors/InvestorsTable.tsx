@@ -73,7 +73,7 @@ export default function InvestorsTable() {
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <ExportButton filename="investors" columns={cols} rows={sorted} />
-          <Link href="/investors/new" className="px-4 py-2.5 rounded-xl bg-accent-purple hover:bg-accent-purple text-primary text-sm font-semibold transition-colors shrink-0">
+          <Link href="/investors/new" className="px-4 py-2.5 rounded-xl bg-accent-purple hover:bg-accent-purple text-on-dark text-sm font-semibold transition-colors shrink-0">
             + Add Investor
           </Link>
         </div>
@@ -127,7 +127,9 @@ export default function InvestorsTable() {
             <thead>
               <tr className="border-b border-default">
                 {cols.map((c) => (
-                  <th key={c.key} onClick={() => toggleSort(c.key)}
+                  <th key={c.key} onClick={() => toggleSort(c.key)} tabIndex={0}
+                    aria-sort={sort.key === c.key ? (sort.dir === "asc" ? "ascending" : "descending") : "none"}
+                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleSort(c.key); } }}
                     className="text-left px-5 py-3 text-[11px] text-muted uppercase tracking-wider font-medium cursor-pointer select-none hover:text-secondary transition-colors">
                     {c.label}
                     <span className="ml-1 opacity-60">{sort.key === c.key ? (sort.dir === "asc" ? "↑" : "↓") : "↕"}</span>

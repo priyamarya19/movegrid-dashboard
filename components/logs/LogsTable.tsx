@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import ExportButton from "@/components/ExportButton";
 import Pagination from "@/components/Pagination";
 import { fetchList } from "@/lib/listFetch";
+import { timeAgo } from "@/lib/format";
 
 const PAGE_SIZE = 25;
 
@@ -22,15 +23,6 @@ const dotColor: Record<string, string> = {
   payout_marked: "var(--accent-purple-2)",
   new_lead: "var(--accent-teal)",
 };
-
-function timeAgo(date: string) {
-  const diff = Date.now() - new Date(date).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  return `${Math.floor(hrs / 24)}d ago`;
-}
 
 const cols: { label: string; key: string }[] = [
   { label: "Action", key: "action" },
@@ -104,7 +96,9 @@ export default function LogsTable() {
             <thead>
               <tr className="border-b border-default">
                 {cols.map((c) => (
-                  <th key={c.key} onClick={() => toggleSort(c.key)}
+                  <th key={c.key} onClick={() => toggleSort(c.key)} tabIndex={0}
+                    aria-sort={sort.key === c.key ? (sort.dir === "asc" ? "ascending" : "descending") : "none"}
+                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleSort(c.key); } }}
                     className="text-left px-5 py-3 text-[11px] text-muted uppercase tracking-wider font-medium cursor-pointer select-none hover:text-secondary transition-colors">
                     {c.label}
                     <span className="ml-1 opacity-60">{sort.key === c.key ? (sort.dir === "asc" ? "↑" : "↓") : "↕"}</span>

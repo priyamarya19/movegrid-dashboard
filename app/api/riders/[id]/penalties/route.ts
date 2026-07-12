@@ -74,13 +74,16 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (action === "pay" && (!payment_mode || !payment_proof_url)) {
     return NextResponse.json({ error: "Payment mode and a proof image are required to mark paid" }, { status: 400 });
   }
-  if (action === "waive") {
-    await pool.query(`UPDATE ${schemas.ops}.rider_penalties SET status='waived' WHERE id=$1 AND rider_id=$2`, [penalty_id, id]);
-  } else {
-    await pool.query(
-      `UPDATE ${schemas.ops}.rider_penalties SET status='paid', payment_mode=$1, payment_utr=$2, payment_proof_url=$3, paid_at=now() WHERE id=$4 AND rider_id=$5`,
-      [payment_mode, payment_utr || null, payment_proof_url, penalty_id, id]
-    );
+  const upd = action === "waive"
+    ? await pool.query(`UPDATE ${schemas.ops}.rider_penalties SET status='waived' WHERE id=$1 AND rider_id=$2`, [penalty_id, id])
+    : await pool.query(
+        `UPDATE ${schemas.ops}.rider_penalties SET status='paid', payment_mode=$1, payment_utr=$2, payment_proof_url=$3, paid_at=now() WHERE id=$4 AND rider_id=$5`,
+        [payment_mode, payment_utr || null, payment_proof_url, penalty_id, id]
+      );
+  // Report a miss instead of a false success when no penalty matched (wrong id,
+  // or it belongs to another rider).
+  if (upd.rowCount === 0) {
+    return NextResponse.json({ error: "Penalty not found" }, { status: 404 });
   }
   return NextResponse.json({ ok: true });
 }

@@ -3,12 +3,7 @@ import { getLedgerSummary, getOverdueRiders, getDueSoonRiders } from "@/lib/rent
 import { getFleetRiderCounts } from "@/lib/fleetStats";
 import { getRecentRiders } from "@/lib/riderStats";
 import { VSTATUS, NOT_AVAILABLE } from "@/lib/vehicleStatus";
-
-const fmt = (n: number) => {
-  if (n >= 100000) return "₹" + (n / 100000).toFixed(1) + "L";
-  if (n >= 1000) return "₹" + (n / 1000).toFixed(0) + "K";
-  return "₹" + Math.round(n);
-};
+import { inrCompact } from "@/lib/format";
 
 const statusColor: Record<string, string> = {
   active: "bg-accent-success/20 text-accent-success-text",
@@ -60,15 +55,15 @@ export default async function OpsManagerHome() {
         <div className="flex flex-wrap items-end gap-x-10 gap-y-4">
           <div>
             <p className="text-[11px] text-muted uppercase tracking-wider mb-1">Collected</p>
-            <p className="text-2xl font-bold text-accent-teal">{fmt(collection.collected)}</p>
+            <p className="text-2xl font-bold text-accent-teal">{inrCompact(collection.collected)}</p>
           </div>
           <Link href="/collections" className="group" title="See which riders' rent is pending">
             <p className="text-[11px] text-muted group-hover:text-accent-purple-2 uppercase tracking-wider mb-1">Expected ↗</p>
-            <p className="text-2xl font-bold text-accent-purple-2 group-hover:underline">{fmt(collection.expected)}</p>
+            <p className="text-2xl font-bold text-accent-purple-2 group-hover:underline">{inrCompact(collection.expected)}</p>
           </Link>
           <Link href="/collections" className="group" title="See which riders' rent is pending">
             <p className="text-[11px] text-muted uppercase tracking-wider mb-1">Pending ↗</p>
-            <p className="text-2xl font-bold text-accent-danger-alt group-hover:underline">{fmt(collection.pending)}</p>
+            <p className="text-2xl font-bold text-accent-danger-alt group-hover:underline">{inrCompact(collection.pending)}</p>
           </Link>
         </div>
         <div className="mt-4 h-2 bg-default rounded-full overflow-hidden">

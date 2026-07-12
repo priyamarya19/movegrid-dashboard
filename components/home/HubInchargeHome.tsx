@@ -3,6 +3,7 @@ import { schemas } from "@/lib/schemas";
 import { unstable_cache } from "next/cache";
 import Link from "next/link";
 import { VSTATUS } from "@/lib/vehicleStatus";
+import { greeting } from "@/lib/format";
 
 type Props = { name: string };
 
@@ -59,7 +60,7 @@ export default async function HubInchargeHome({ name }: Props) {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-primary text-2xl font-bold">Good morning, {firstName} 👋</h1>
+        <h1 className="text-primary text-2xl font-bold">{greeting()}, {firstName} 👋</h1>
         <p className="text-muted text-sm mt-1">Here&apos;s your hub overview for today</p>
       </div>
 

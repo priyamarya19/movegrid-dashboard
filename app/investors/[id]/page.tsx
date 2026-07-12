@@ -8,6 +8,7 @@ import { getSession } from "@/lib/auth";
 import MapVehiclesPanel from "@/components/investors/MapVehiclesPanel";
 import RecordPayoutModal from "@/components/investors/RecordPayoutModal";
 import { vehicleStatusColor, vehicleStatusLabel } from "@/lib/vehicleStatus";
+import { inr } from "@/lib/format";
 
 async function getData(id: string) {
   const [investor, vehicles, payouts] = await Promise.all([
@@ -88,9 +89,9 @@ export default async function InvestorDetailPage({ params }: { params: Promise<{
 
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[
-            { label: "Total Invested", value: "₹" + Number(investor.total_invested).toLocaleString(), color: "var(--accent-purple)" },
-            { label: "Total Paid Out", value: "₹" + Number(totalPaid).toLocaleString(), color: "var(--accent-teal)" },
-            { label: "Pending Payouts", value: "₹" + Number(totalPending).toLocaleString(), color: "var(--accent-danger)" },
+            { label: "Total Invested", value: inr(investor.total_invested), color: "var(--accent-purple)" },
+            { label: "Total Paid Out", value: inr(totalPaid), color: "var(--accent-teal)" },
+            { label: "Pending Payouts", value: inr(totalPending), color: "var(--accent-danger)" },
             { label: "ROI So Far", value: roi + "%", color: "var(--accent-warning)" },
           ].map((c) => (
             <div key={c.label} className="bg-surface border border-default rounded-xl p-5">
@@ -181,7 +182,7 @@ export default async function InvestorDetailPage({ params }: { params: Promise<{
                   <td className="px-5 py-3 text-secondary">{(p.period_month ?? p.due_date) ? new Date(p.period_month ?? p.due_date).toLocaleDateString("en-IN", { month: "short", year: "numeric" }) : "—"}</td>
                   <td className="px-5 py-3 text-accent-purple">{p.ev_number ?? "—"}</td>
                   <td className="px-5 py-3 text-secondary">{p.paid_date ? new Date(p.paid_date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "—"}</td>
-                  <td className="px-5 py-3 text-accent-teal font-semibold">₹{Number(p.amount).toLocaleString()}</td>
+                  <td className="px-5 py-3 text-accent-teal font-semibold">{inr(p.amount)}</td>
                   <td className="px-5 py-3"><span className={`px-2 py-0.5 rounded-full text-xs capitalize ${payoutStatus[p.status] ?? "bg-muted/20 text-muted"}`}>{p.status}</span></td>
                   <td className="px-5 py-3">
                     {p.proof_url ? (

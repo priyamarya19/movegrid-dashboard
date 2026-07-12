@@ -4,6 +4,7 @@ import { getSession } from "@/lib/auth";
 import { getPortfolioByUser } from "@/lib/portfolio";
 import BankDetailsForm from "@/components/investors/BankDetailsForm";
 import AadhaarImageViewer from "@/components/investors/AadhaarImageViewer";
+import { inr } from "@/lib/format";
 
 const fmtDate = (d: string | null) =>
   d ? new Date(d).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "—";
@@ -41,7 +42,7 @@ export default async function ProfilePage() {
                 { label: "Email", value: session.email },
                 { label: "PAN", value: portfolio.profile.pan ?? "—" },
                 { label: "Aadhaar", value: maskAadhaar(portfolio.profile.aadhaar), icon: portfolio.profile.aadhaar_url ? <AadhaarImageViewer imageKey={portfolio.profile.aadhaar_url} /> : null },
-                { label: "Total Invested", value: "₹" + Number(portfolio.profile.total_invested).toLocaleString() },
+                { label: "Total Invested", value: inr(portfolio.profile.total_invested) },
                 { label: "Investment Date", value: fmtDate(portfolio.profile.investment_date) },
                 { label: "Status", value: portfolio.profile.status },
               ] as { label: string; value: string; icon?: React.ReactNode }[]).map((row) => (

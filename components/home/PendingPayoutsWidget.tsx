@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { inrCompact } from "@/lib/format";
 
 type Payout = {
   id: string;
@@ -10,12 +11,6 @@ type Payout = {
   ev_number: string | null;
   amount: number;
   due_date: string;
-};
-
-const fmt = (n: number) => {
-  if (n >= 100000) return "₹" + (n / 100000).toFixed(1) + "L";
-  if (n >= 1000) return "₹" + (n / 1000).toFixed(0) + "K";
-  return "₹" + n;
 };
 
 export default function PendingPayoutsWidget({ initialPayouts }: { initialPayouts: Payout[] }) {
@@ -68,7 +63,7 @@ export default function PendingPayoutsWidget({ initialPayouts }: { initialPayout
             <tr key={p.id} className="border-b border-subtle hover:bg-overlay-hover">
               <td className="px-5 py-3 text-primary font-medium">{p.investor_name}</td>
               <td className="px-5 py-3 text-accent-purple">{p.ev_number ?? "—"}</td>
-              <td className="px-5 py-3 text-accent-teal font-semibold">{fmt(Number(p.amount))}</td>
+              <td className="px-5 py-3 text-accent-teal font-semibold">{inrCompact(Number(p.amount))}</td>
               <td className="px-5 py-3 text-secondary whitespace-nowrap">
                 {new Date(p.due_date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
               </td>

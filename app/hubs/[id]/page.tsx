@@ -5,6 +5,7 @@ import pool from "@/lib/db";
 import { schemas } from "@/lib/schemas";
 import BackButton from "@/components/BackButton";
 import { vehicleStatusColor, vehicleStatusLabel } from "@/lib/vehicleStatus";
+import { inr } from "@/lib/format";
 
 async function getData(id: string) {
   const [hub, riders, vehicles] = await Promise.all([
@@ -92,8 +93,8 @@ export default async function HubDetailPage({ params }: { params: Promise<{ id: 
             {[
               { label: "Owner Name", value: hub.owner_name ?? "—" },
               { label: "Owner Mobile", value: hub.owner_mobile ?? "—" },
-              { label: "Security Deposit", value: hub.security_deposit ? "₹" + Number(hub.security_deposit).toLocaleString() : "—" },
-              { label: "Monthly Rent", value: hub.monthly_rent ? "₹" + Number(hub.monthly_rent).toLocaleString() : "—" },
+              { label: "Security Deposit", value: hub.security_deposit ? inr(hub.security_deposit) : "—" },
+              { label: "Monthly Rent", value: hub.monthly_rent ? inr(hub.monthly_rent) : "—" },
             ].map((row) => (
               <div key={row.label} className="flex justify-between py-2 border-b border-default last:border-0">
                 <span className="text-muted text-sm">{row.label}</span>

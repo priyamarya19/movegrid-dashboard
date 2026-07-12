@@ -155,7 +155,7 @@ export default function UsersManager() {
         </div>
         <button
           onClick={() => { setShowAdd(!showAdd); setFormError(""); }}
-          className="flex items-center gap-2 bg-accent-success hover:bg-accent-success text-primary text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors"
+          className="flex items-center gap-2 bg-accent-success hover:bg-accent-success text-on-dark text-sm font-semibold px-4 py-2.5 rounded-xl transition-colors"
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
             <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
@@ -214,7 +214,7 @@ export default function UsersManager() {
                 <button
                   type="button"
                   onClick={() => setShowPassword((v) => !v)}
-                  tabIndex={-1}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-muted hover:text-secondary transition-colors"
                 >
                   {showPassword ? (
@@ -243,7 +243,7 @@ export default function UsersManager() {
               <button
                 type="submit"
                 disabled={submitting}
-                className="flex-1 py-2.5 rounded-xl bg-accent-success hover:bg-accent-success text-primary text-sm font-semibold disabled:opacity-60 transition-colors"
+                className="flex-1 py-2.5 rounded-xl bg-accent-success hover:bg-accent-success text-on-dark text-sm font-semibold disabled:opacity-60 transition-colors"
               >
                 {submitting ? "Creating..." : "Create User"}
               </button>

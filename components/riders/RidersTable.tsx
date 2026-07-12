@@ -194,7 +194,7 @@ export default function RidersTable({ rentFilter, statusFilter: initialStatus }:
             <option value="suspended">Suspended</option>
           </select>
           <Link href="/riders/new"
-            className="inline-flex items-center gap-2 bg-accent-purple hover:bg-accent-purple text-primary text-sm font-medium px-4 py-2 rounded-xl transition-colors">
+            className="inline-flex items-center gap-2 bg-accent-purple hover:bg-accent-purple text-on-dark text-sm font-medium px-4 py-2 rounded-xl transition-colors">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
             Add Rider
           </Link>
@@ -207,7 +207,9 @@ export default function RidersTable({ rentFilter, statusFilter: initialStatus }:
             <thead>
               <tr className="border-b border-default">
                 {cols.map((c) => (
-                  <th key={c.key} onClick={() => toggleSort(c.key)}
+                  <th key={c.key} onClick={() => toggleSort(c.key)} tabIndex={0}
+                    aria-sort={sort.key === c.key ? (sort.dir === "asc" ? "ascending" : "descending") : "none"}
+                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleSort(c.key); } }}
                     className="text-left px-5 py-3 text-[11px] text-muted uppercase tracking-wider font-medium cursor-pointer select-none hover:text-secondary transition-colors whitespace-nowrap">
                     {c.label}
                     <span className="ml-1 opacity-60">{sort.key === c.key ? (sort.dir === "asc" ? "↑" : "↓") : "↕"}</span>

@@ -151,7 +151,7 @@ export default function RiderPenalties({ riderId }: { riderId: string }) {
                         <p className="text-xs text-muted">Record payment for this penalty — proof image is required.</p>
                         <PaymentProof value={proof} onChange={setProof} folder="penalties" />
                         <button onClick={() => markPaid(p.id)} disabled={busy || !proofValid(proof)}
-                          className="px-4 py-2 rounded-lg bg-accent-success hover:bg-accent-success text-primary text-sm font-semibold disabled:opacity-50">
+                          className="px-4 py-2 rounded-lg bg-accent-success hover:bg-accent-success text-on-dark text-sm font-semibold disabled:opacity-50">
                           {busy ? "Saving…" : "Confirm paid"}
                         </button>
                       </div>

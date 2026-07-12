@@ -12,6 +12,7 @@ import RiderPenalties from "@/components/riders/RiderPenalties";
 import ExportButton from "@/components/ExportButton";
 import { maskPan, maskAccount, maskDl } from "@/lib/mask";
 import { getSession } from "@/lib/auth";
+import { inr } from "@/lib/format";
 
 function toISTMidnight(d: Date): Date {
   // Returns a Date whose y/m/d components (in local time) match the IST date of d
@@ -134,9 +135,9 @@ export default async function RiderDetailPage({ params }: { params: Promise<{ id
 
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[
-            { label: "Total Collected", value: "₹" + Number(totalCollected).toLocaleString(), color: "var(--accent-teal)" },
-            { label: "Onboarding Fee", value: "₹" + Number(rider.onboarding_fee || 0).toLocaleString(), color: "var(--accent-purple)" },
-            { label: "Security Deposit", value: "₹" + Number(rider.security_deposit || 0).toLocaleString(), color: "var(--accent-warning)" },
+            { label: "Total Collected", value: inr(totalCollected), color: "var(--accent-teal)" },
+            { label: "Onboarding Fee", value: inr(rider.onboarding_fee || 0), color: "var(--accent-purple)" },
+            { label: "Security Deposit", value: inr(rider.security_deposit || 0), color: "var(--accent-warning)" },
             { label: "Payments Made", value: payments.length.toString(), color: "var(--accent-purple-2)" },
           ].map((c) => (
             <div key={c.label} className="bg-surface border border-default rounded-xl p-5">

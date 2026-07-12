@@ -19,7 +19,7 @@ type Sort = { key: string; dir: "asc" | "desc" };
 const statusOptions = ["new", "contacted", "converted", "rejected"];
 
 const statusColor: Record<string, string> = {
-  new: "bg-blue-500/20 text-blue-400",
+  new: "bg-accent-purple-2/15 text-accent-purple-2-text",
   contacted: "bg-accent-warning/20 text-accent-warning-text",
   converted: "bg-accent-success/20 text-accent-success-text",
   rejected: "bg-accent-danger-alt/20 text-accent-danger-alt-text",
@@ -28,7 +28,7 @@ const statusColor: Record<string, string> = {
 const typeColor: Record<string, string> = {
   investor: "text-purple-400",
   rider: "text-accent-success",
-  fleet: "text-blue-400",
+  fleet: "text-accent-purple-2-text",
 };
 
 const cols: { label: string; key: string; sortable: boolean }[] = [
@@ -121,7 +121,9 @@ export default function LeadsTable() {
             <thead>
               <tr className="border-b border-default">
                 {cols.map((c) => (
-                  <th key={c.key} onClick={() => toggleSort(c.key)}
+                  <th key={c.key} onClick={() => toggleSort(c.key)} tabIndex={0}
+                    aria-sort={sort.key === c.key ? (sort.dir === "asc" ? "ascending" : "descending") : "none"}
+                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleSort(c.key); } }}
                     className="text-left px-5 py-3 text-muted font-medium text-xs uppercase tracking-wider cursor-pointer select-none hover:text-secondary transition-colors">
                     {c.label}
                     <span className="ml-1 opacity-60">{sort.key === c.key ? (sort.dir === "asc" ? "↑" : "↓") : "↕"}</span>
