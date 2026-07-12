@@ -1,4 +1,14 @@
 import { Pool } from "pg";
+import fs from "fs";
+
+// TLS to RDS. By default the connection is encrypted but the server cert isn't
+// verified (rejectUnauthorized:false) — MITM-able. Set RDS_CA_PATH to the AWS RDS
+// CA bundle (download the global bundle from AWS onto the box) to turn on full
+// verification. Opt-in so enabling it can't unexpectedly break a live connection.
+const caPath = process.env.RDS_CA_PATH;
+const sslConfig = caPath
+  ? { ca: fs.readFileSync(caPath, "utf8"), rejectUnauthorized: true }
+  : { rejectUnauthorized: false };
 
 // Reuse a single pool across HMR reloads (dev) and the process lifetime (prod),
 // so we never stack pools or keep-alive timers.
@@ -15,7 +25,7 @@ const pool =
     user: process.env.RDS_USER,
     password: process.env.RDS_PASSWORD,
     database: process.env.RDS_DATABASE,
-    ssl: { rejectUnauthorized: false },
+    ssl: sslConfig,
     max: 10,
     // Keep idle connections around for 5 min instead of 30s, so navigations
     // after a short pause reuse a warm connection rather than reconnecting.

@@ -29,6 +29,9 @@ export async function POST(req: NextRequest) {
   if (!name || !email || !mobile || !password || !role) {
     return NextResponse.json({ error: "All fields are required" }, { status: 400 });
   }
+  if (String(password).length < 8) {
+    return NextResponse.json({ error: "Password must be at least 8 characters", field: "password" }, { status: 400 });
+  }
 
   const roleResult = await pool.query(
     `SELECT id FROM ${schemas.auth}.roles WHERE name = $1`,

@@ -12,6 +12,11 @@ export async function POST(req: NextRequest) {
   if (!Array.isArray(columns) || !Array.isArray(rows)) {
     return NextResponse.json({ error: "columns and rows are required" }, { status: 400 });
   }
+  // Cap the workbook size — an authenticated client could otherwise send an
+  // unbounded row array and exhaust server memory building the sheet.
+  if (rows.length > 50000 || columns.length > 200) {
+    return NextResponse.json({ error: "Export too large (max 50,000 rows). Filter and try again." }, { status: 413 });
+  }
 
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet("Sheet1");
