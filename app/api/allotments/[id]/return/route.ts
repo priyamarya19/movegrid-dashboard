@@ -3,6 +3,7 @@ import pool from "@/lib/db";
 import { schemas } from "@/lib/schemas";
 import { requireRole } from "@/lib/auth";
 import { PAYMENT_MODES } from "@/lib/rent";
+import { istTodayISO } from "@/lib/date";
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const guard = await requireRole(req);
@@ -54,7 +55,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         non_functional_days = $12
       WHERE id = $13`,
       [
-        b.returned_date || new Date().toISOString().split("T")[0],
+        b.returned_date || istTodayISO(),
         b.rent_cleared ?? null, b.penalty_amount ?? null,
         b.condition_on_return ?? null, b.return_photos ?? null,
         b.return_remarks ?? null, session.name,

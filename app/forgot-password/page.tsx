@@ -7,9 +7,8 @@ import Footer from "@/components/Footer";
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<{ name?: string; resetUrl?: string } | null>(null);
+  const [sent, setSent] = useState(false);
   const [error, setError] = useState("");
-  const [copied, setCopied] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -26,19 +25,12 @@ export default function ForgotPasswordPage() {
         setError(data.error || "Something went wrong");
         return;
       }
-      setResult(data);
+      setSent(true);
     } catch {
       setError("Something went wrong. Try again.");
     } finally {
       setLoading(false);
     }
-  }
-
-  function handleCopy() {
-    if (!result?.resetUrl) return;
-    navigator.clipboard.writeText(result.resetUrl);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
   }
 
   return (
@@ -59,7 +51,7 @@ export default function ForgotPasswordPage() {
           <p className="text-muted text-sm mt-1">Enter your email to get a reset link</p>
         </div>
 
-        {!result ? (
+        {!sent ? (
           <form onSubmit={handleSubmit} className="bg-surface-alt border border-default rounded-2xl p-6 space-y-4">
             <div>
               <label className="block text-xs font-semibold text-muted uppercase tracking-wider mb-1.5">
@@ -89,39 +81,6 @@ export default function ForgotPasswordPage() {
               <Link href="/login" className="text-accent-success hover:underline">← Back to login</Link>
             </p>
           </form>
-        ) : result.resetUrl ? (
-          <div className="bg-surface-alt border border-default rounded-2xl p-6 space-y-4">
-            <div className="flex items-center justify-center w-12 h-12 bg-accent-success/20 rounded-full mx-auto">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent-success)" strokeWidth="2">
-                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-              </svg>
-            </div>
-            <div className="text-center">
-              <p className="text-primary font-semibold">Reset link ready</p>
-              <p className="text-muted text-xs mt-1">
-                {result.name ? `For ${result.name} · ` : ""}Expires in 1 hour
-              </p>
-            </div>
-
-            <div className="bg-base border border-default rounded-xl p-3 break-all text-xs text-accent-success font-mono select-all">
-              {result.resetUrl}
-            </div>
-
-            <button
-              onClick={handleCopy}
-              className={`w-full py-2.5 rounded-xl text-sm font-semibold transition-colors ${copied ? "bg-accent-success/20 text-accent-success-text" : "bg-accent-success/15 text-accent-success hover:bg-accent-success/25"}`}
-            >
-              {copied ? "✓ Copied!" : "Copy Reset Link"}
-            </button>
-
-            <div className="bg-accent-warning/10 border border-accent-warning/20 rounded-xl px-3 py-2.5 text-xs text-accent-warning-text">
-              Email delivery is not configured yet. Share this link with the user via WhatsApp or any other channel.
-            </div>
-
-            <p className="text-center text-xs text-faint">
-              <Link href="/login" className="text-accent-success hover:underline">← Back to login</Link>
-            </p>
-          </div>
         ) : (
           <div className="bg-surface-alt border border-default rounded-2xl p-6 text-center space-y-4">
             <div className="flex items-center justify-center w-12 h-12 bg-accent-success/20 rounded-full mx-auto">
@@ -130,7 +89,7 @@ export default function ForgotPasswordPage() {
               </svg>
             </div>
             <p className="text-primary font-semibold">Check your email</p>
-            <p className="text-muted text-sm">If this email exists in our system, a reset link has been sent.</p>
+            <p className="text-muted text-sm">If this email exists in our system, a reset link has been sent. The link expires in 1 hour.</p>
             <Link href="/login" className="block text-xs text-accent-success hover:underline">← Back to login</Link>
           </div>
         )}

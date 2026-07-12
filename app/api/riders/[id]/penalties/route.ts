@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { schemas } from "@/lib/schemas";
 import { requireRole } from "@/lib/auth";
+import { beginIdempotency, finishIdempotency, abortIdempotency } from "@/lib/idempotency";
 
 // GET /api/riders/[id]/penalties — a rider's penalties (newest first), with the vehicle each was raised on.
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -34,19 +35,31 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: "A penalty detail or amount is required" }, { status: 400 });
   }
 
-  const cur = await pool.query(
-    `SELECT id, vehicle_id FROM ${schemas.ops}.rider_vehicle_assignments
-      WHERE rider_id = $1 AND status = 'active' ORDER BY assigned_date DESC LIMIT 1`,
-    [id]
-  );
-  const a = cur.rows[0];
+  // Dedupe a retried submission (same Idempotency-Key) so it can't create two
+  // penalty rows for one action.
+  const idem = await beginIdempotency(req, "penalty-create", session.userId);
+  if (idem.mode === "replay") return idem.response;
 
-  const res = await pool.query(
-    `INSERT INTO ${schemas.ops}.rider_penalties (rider_id, vehicle_id, assignment_id, amount, detail, status, created_by)
-     VALUES ($1, $2, $3, $4, $5, 'pending', $6) RETURNING id`,
-    [id, a?.vehicle_id ?? null, a?.id ?? null, hasAmount ? Number(amount) : null, detail || null, session.name]
-  );
-  return NextResponse.json({ id: res.rows[0].id }, { status: 201 });
+  try {
+    const cur = await pool.query(
+      `SELECT id, vehicle_id FROM ${schemas.ops}.rider_vehicle_assignments
+        WHERE rider_id = $1 AND status = 'active' ORDER BY assigned_date DESC LIMIT 1`,
+      [id]
+    );
+    const a = cur.rows[0];
+
+    const res = await pool.query(
+      `INSERT INTO ${schemas.ops}.rider_penalties (rider_id, vehicle_id, assignment_id, amount, detail, status, created_by)
+       VALUES ($1, $2, $3, $4, $5, 'pending', $6) RETURNING id`,
+      [id, a?.vehicle_id ?? null, a?.id ?? null, hasAmount ? Number(amount) : null, detail || null, session.name]
+    );
+    const respBody = { id: res.rows[0].id };
+    if (idem.mode === "claimed") await finishIdempotency(idem, 201, respBody);
+    return NextResponse.json(respBody, { status: 201 });
+  } catch (e) {
+    if (idem.mode === "claimed") await abortIdempotency(idem);
+    throw e;
+  }
 }
 
 // PATCH /api/riders/[id]/penalties — mark a penalty paid (proof required) or waived.

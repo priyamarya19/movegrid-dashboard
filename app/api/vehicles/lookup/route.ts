@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { schemas } from "@/lib/schemas";
-import { requireSession } from "@/lib/auth";
+import { requireRole } from "@/lib/auth";
 
 // GET /api/vehicles/lookup?ev_number=MG001 — returns vehicle details for allotment form auto-fill
 export async function GET(req: NextRequest) {
-  const guard = await requireSession(req);
+  const guard = await requireRole(req);
   if ("response" in guard) return guard.response;
 
   const ev = req.nextUrl.searchParams.get("ev_number");

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useToast } from "@/components/Toast";
 
 type WaiverRequest = {
   id: string;
@@ -15,6 +16,7 @@ type WaiverRequest = {
 };
 
 export default function RentWaiverReview() {
+  const toast = useToast();
   const [rows, setRows] = useState<WaiverRequest[] | null>(null);
   const [forbidden, setForbidden] = useState(false);
   const [actingOn, setActingOn] = useState<string | null>(null);
@@ -36,7 +38,15 @@ export default function RentWaiverReview() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action }),
       });
-      if (res.ok) setRows((prev) => (prev ? prev.filter((r) => r.id !== id) : prev));
+      if (res.ok) {
+        setRows((prev) => (prev ? prev.filter((r) => r.id !== id) : prev));
+        toast.show(action === "approve" ? "Waiver approved" : "Waiver rejected", "success");
+      } else {
+        const msg = await res.json().catch(() => ({}));
+        toast.show(msg.error || `Couldn't ${action} the waiver`, "error");
+      }
+    } catch {
+      toast.show(`Couldn't ${action} the waiver. Try again.`, "error");
     } finally {
       setActingOn(null);
     }

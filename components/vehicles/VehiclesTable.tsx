@@ -42,6 +42,7 @@ function sortData(data: Vehicle[], sort: Sort): Vehicle[] {
 
 export default function VehiclesTable({ statusFilter: initialStatus }: { statusFilter?: string | null } = {}) {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [total, setTotal] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState(initialStatus ?? "");
   const [search, setSearch] = useState("");
@@ -52,6 +53,8 @@ export default function VehiclesTable({ statusFilter: initialStatus }: { statusF
     const params = new URLSearchParams();
     if (statusFilter) params.set("status", statusFilter);
     const res = await fetch(`/api/vehicles?${params}`);
+    const t = res.headers.get("X-Total-Count");
+    setTotal(t ? Number(t) : null);
     setVehicles(await res.json());
     setLoading(false);
   };
@@ -72,7 +75,7 @@ export default function VehiclesTable({ statusFilter: initialStatus }: { statusF
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-primary text-2xl font-bold">Vehicles</h1>
-          <p className="text-muted text-sm mt-1">{vehicles.length} total • {counts[VSTATUS.assigned] || 0} assigned · {counts[VSTATUS.available] || 0} available · {counts[VSTATUS.maintenance] || 0} maintenance</p>
+          <p className="text-muted text-sm mt-1">{total != null && total > vehicles.length ? `${vehicles.length} of ${total}` : `${vehicles.length}`} total • {counts[VSTATUS.assigned] || 0} assigned · {counts[VSTATUS.available] || 0} available · {counts[VSTATUS.maintenance] || 0} maintenance</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <input
@@ -94,6 +97,12 @@ export default function VehiclesTable({ statusFilter: initialStatus }: { statusF
           </Link>
         </div>
       </div>
+
+      {total != null && total > vehicles.length && (
+        <div className="bg-accent-warning/10 border border-accent-warning/25 rounded-xl px-4 py-2.5 text-xs text-accent-warning-text">
+          Showing {vehicles.length} of {total} vehicles. Search and sort apply only to these — use the status filter to narrow.
+        </div>
+      )}
 
       <div className="bg-surface border border-default rounded-2xl overflow-hidden">
         <div className="overflow-x-auto">

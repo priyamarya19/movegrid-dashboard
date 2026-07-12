@@ -1,14 +1,16 @@
 import { SignJWT, jwtVerify, errors as joseErrors } from "jose";
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
-
-const secret = new TextEncoder().encode(process.env.JWT_SECRET || "fallback_secret");
+import { JWT_SECRET as secret } from "@/lib/jwt";
+import pool from "@/lib/db";
+import { schemas } from "@/lib/schemas";
 
 export type JWTPayload = {
   userId: string;
   name: string;
   email: string;
   role: string;
+  tv?: number; // token_version at sign time — see lib/jwt.ts / requireRole freshness check
 };
 
 // Why a token failed to resolve to a session:
@@ -31,6 +33,27 @@ export async function signToken(payload: JWTPayload) {
     .setIssuedAt()
     .setExpirationTime("8h")
     .sign(secret);
+}
+
+// Confirm the session is still valid against current DB state: the user must be
+// active AND their token_version must match what's embedded in the token. Bumping
+// token_version (deactivate, role change, password change) revokes every existing
+// token immediately, instead of letting a suspended employee keep access until the
+// 8h expiry. Tokens signed before this field existed (tv undefined) fail the match
+// against the default 0 and are forced to re-login once — acceptable on rollout.
+async function isSessionCurrent(session: JWTPayload): Promise<boolean> {
+  try {
+    const { rows } = await pool.query(
+      `SELECT status, token_version FROM ${schemas.auth}.users WHERE id = $1`,
+      [session.userId]
+    );
+    const u = rows[0];
+    if (!u || u.status !== "active") return false;
+    return Number(u.token_version) === Number(session.tv ?? -1);
+  } catch {
+    // If the freshness check itself errors, fail closed — do not grant access.
+    return false;
+  }
 }
 
 // Verify a token, distinguishing an expired token from an otherwise-invalid one.
@@ -103,6 +126,7 @@ export async function requireRole(
 ): Promise<{ session: JWTPayload } | { response: NextResponse }> {
   const { session, reason } = await getAuth(req);
   if (!session) return { response: unauthorizedResponse(reason) };
+  if (!(await isSessionCurrent(session))) return { response: unauthorizedResponse("expired") };
   if (!roles.includes(session.role)) return { response: forbiddenResponse() };
   return { session };
 }
@@ -113,5 +137,6 @@ export async function requireSession(
 ): Promise<{ session: JWTPayload } | { response: NextResponse }> {
   const { session, reason } = await getAuth(req);
   if (!session) return { response: unauthorizedResponse(reason) };
+  if (!(await isSessionCurrent(session))) return { response: unauthorizedResponse("expired") };
   return { session };
 }

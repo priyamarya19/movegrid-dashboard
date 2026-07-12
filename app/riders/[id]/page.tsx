@@ -10,6 +10,7 @@ import RecordPayment from "@/components/riders/RecordPayment";
 import { getRiderCycle } from "@/lib/rent";
 import RiderPenalties from "@/components/riders/RiderPenalties";
 import ExportButton from "@/components/ExportButton";
+import { maskPan, maskAccount, maskDl } from "@/lib/mask";
 import { getSession } from "@/lib/auth";
 
 function toISTMidnight(d: Date): Date {
@@ -153,11 +154,11 @@ export default async function RiderDetailPage({ params }: { params: Promise<{ id
               { label: "Mobile", value: rider.mobile },
               { label: "Employer", value: rider.employer ?? "—" },
               { label: "Aadhaar", value: rider.aadhaar ? "XXXX XXXX " + rider.aadhaar.slice(-4) : "—" },
-              { label: "PAN", value: rider.pan ?? "—" },
-              { label: "DL Number", value: rider.dl_number ?? "—" },
+              { label: "PAN", value: maskPan(rider.pan) },
+              { label: "DL Number", value: maskDl(rider.dl_number) },
               { label: "Bank", value: rider.bank ?? "—" },
               { label: "IFSC", value: rider.ifsc ?? "—" },
-              { label: "Account", value: rider.account_number ? "XXXX" + rider.account_number.slice(-4) : "—" },
+              { label: "Account", value: maskAccount(rider.account_number) },
               { label: "Current Address", value: rider.current_address ?? "—" },
               { label: "Permanent Address", value: rider.permanent_address ?? "—" },
             ].map((row) => (

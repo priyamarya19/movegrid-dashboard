@@ -59,15 +59,21 @@ export async function GET(req: NextRequest) {
     WHERE 1=1
   `;
   const params: string[] = [];
+  let where = "WHERE 1=1";
   if (status === NOT_AVAILABLE) {
     params.push(VSTATUS.assigned, VSTATUS.available);
-    query += ` AND v.status NOT IN ($${params.length - 1}, $${params.length})`;
+    const cond = ` AND v.status NOT IN ($${params.length - 1}, $${params.length})`;
+    query += cond; where += cond;
   } else if (status) {
-    params.push(status); query += ` AND v.status = $${params.length}`;
+    params.push(status); const cond = ` AND v.status = $${params.length}`;
+    query += cond; where += cond;
   }
-  if (unassigned) { query += ` AND v.investor_id IS NULL`; }
+  if (unassigned) { query += ` AND v.investor_id IS NULL`; where += ` AND v.investor_id IS NULL`; }
   query += ` ORDER BY v.ev_number ASC LIMIT 500`;
 
-  const result = await pool.query(query, params);
-  return NextResponse.json(result.rows);
+  const [result, countRes] = await Promise.all([
+    pool.query(query, params),
+    pool.query(`SELECT count(*)::int AS n FROM ${schemas.ops}.vehicles v ${where}`, params),
+  ]);
+  return NextResponse.json(result.rows, { headers: { "X-Total-Count": String(countRes.rows[0]?.n ?? result.rows.length) } });
 }

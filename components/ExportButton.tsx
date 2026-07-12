@@ -1,5 +1,7 @@
 "use client";
 
+import { useToast } from "@/components/Toast";
+
 // Reusable "download table as Excel" button — hands formatted rows to
 // /api/export/xlsx, which returns a real .xlsx via exceljs.
 export type ExportColumn<T = Record<string, unknown>> = {
@@ -17,6 +19,7 @@ export default function ExportButton<T>({
   rows: T[];
   label?: string;
 }) {
+  const toast = useToast();
   async function download() {
     const flatRows = rows.map((r) =>
       Object.fromEntries(
@@ -32,7 +35,10 @@ export default function ExportButton<T>({
         rows: flatRows,
       }),
     });
-    if (!res.ok) return;
+    if (!res.ok) {
+      toast.show("Export failed. Try again.", "error");
+      return;
+    }
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");

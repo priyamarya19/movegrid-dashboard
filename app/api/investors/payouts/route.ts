@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
   const result = await pool.query(
     `INSERT INTO ${schemas.ops}.investor_payouts
        (investor_id, vehicle_id, amount, due_date, paid_date, status, period_month, proof_url, note)
-     VALUES ($1, $2, $3, $4, COALESCE($5, CURRENT_DATE), 'paid', $4, $6, $7)
+     VALUES ($1, $2, $3, $4, COALESCE($5, (now() AT TIME ZONE 'Asia/Kolkata')::date), 'paid', $4, $6, $7)
      RETURNING id`,
     [investorId, vehicleId, amount, periodMonth, paidDate, proofUrl, note]
   );
@@ -58,7 +58,7 @@ export async function PATCH(req: NextRequest) {
 
   const result = await pool.query(
     `UPDATE ${schemas.ops}.investor_payouts
-     SET status = 'paid', paid_date = CURRENT_DATE
+     SET status = 'paid', paid_date = (now() AT TIME ZONE 'Asia/Kolkata')::date
      WHERE id = $1 AND status = 'pending'
      RETURNING id, amount, paid_date`,
     [payout_id]

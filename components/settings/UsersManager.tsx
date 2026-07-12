@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useToast } from "@/components/Toast";
 
 type User = {
   id: string;
@@ -38,6 +39,7 @@ const statusColor: Record<string, string> = {
 const emptyForm = { name: "", email: "", mobile: "", password: "", role: "ops_manager" };
 
 export default function UsersManager() {
+  const toast = useToast();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
@@ -86,6 +88,10 @@ export default function UsersManager() {
     });
     if (res.ok) {
       setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, role: newRole } : u)));
+      toast.show("Role updated", "success");
+    } else {
+      const msg = await res.json().catch(() => ({}));
+      toast.show(msg.error || "Couldn't update role", "error");
     }
   }
 
@@ -98,6 +104,10 @@ export default function UsersManager() {
     });
     if (res.ok) {
       setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, status: next } : u)));
+      toast.show(next === "active" ? "User activated" : "User deactivated", "success");
+    } else {
+      const msg = await res.json().catch(() => ({}));
+      toast.show(msg.error || "Couldn't update user", "error");
     }
   }
 
@@ -109,6 +119,10 @@ export default function UsersManager() {
     });
     if (res.ok) {
       setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, can_approve_rent_waivers: !current } : u)));
+      toast.show("Permission updated", "success");
+    } else {
+      const msg = await res.json().catch(() => ({}));
+      toast.show(msg.error || "Couldn't update permission", "error");
     }
   }
 

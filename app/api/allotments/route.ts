@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { schemas } from "@/lib/schemas";
 import { requireRole } from "@/lib/auth";
+import { istTodayISO } from "@/lib/date";
 
 export async function POST(req: NextRequest) {
   const guard = await requireRole(req);
@@ -17,9 +18,13 @@ export async function POST(req: NextRequest) {
   try {
     await client.query("BEGIN");
 
-    // Check vehicle is available
+    // Check vehicle is available. FOR UPDATE locks the vehicle row for the length
+    // of this transaction so two allotments submitted at the same instant can't
+    // both read 'ready_to_deploy' and double-assign one vehicle to two riders. The
+    // partial unique index (scripts/add-active-assignment-guard.js) is the DB-level
+    // backstop if this check is ever bypassed.
     const vCheck = await client.query(
-      `SELECT id, status FROM ${schemas.ops}.vehicles WHERE id = $1`, [b.vehicle_id]
+      `SELECT id, status FROM ${schemas.ops}.vehicles WHERE id = $1 FOR UPDATE`, [b.vehicle_id]
     );
     if (!vCheck.rows[0]) {
       await client.query("ROLLBACK");
@@ -42,7 +47,7 @@ export async function POST(req: NextRequest) {
       [b.rider_id]
     );
     await client.query(
-      `UPDATE ${schemas.ops}.rider_vehicle_assignments SET status = 'returned', returned_date = CURRENT_DATE
+      `UPDATE ${schemas.ops}.rider_vehicle_assignments SET status = 'returned', returned_date = (now() AT TIME ZONE 'Asia/Kolkata')::date
        WHERE rider_id = $1 AND status = 'active'`,
       [b.rider_id]
     );
@@ -61,7 +66,7 @@ export async function POST(req: NextRequest) {
       [b.vehicle_id]
     );
     const dailyRent = Number(rateRes.rows[0]?.rate ?? 240);
-    const assignedDate = b.assigned_date || new Date().toISOString().split("T")[0];
+    const assignedDate = b.assigned_date || istTodayISO();
 
     // Rent is always collected one week in advance at allotment (see RENT_SHEET_GUIDE.md).
     // Whatever cash amount ops records as "amount_collected" (rent + deposit + fees bundled
