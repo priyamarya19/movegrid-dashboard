@@ -27,6 +27,8 @@ const S = rdsEnv === "uat" ? "mg_data_uat" : "mg_data";
 // MB-Unlimited riders (₹260/day) by mobile — everyone else defaults by model.
 const MB_UNLIMITED = new Set(["7982212139", "7319845124", "9560759578", "9568080124"]);
 
+const { generateWeeks, addDaysISO } = require("../lib/rentMath");
+
 const istToday = () => { const d = new Date(Date.now() + 5.5 * 3600 * 1000); return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())); };
 const addDays = (d, n) => { const x = new Date(d); x.setUTCDate(x.getUTCDate() + n); return x; };
 const iso = (d) => d.toISOString().slice(0, 10);
@@ -93,28 +95,28 @@ async function run() {
     const lastWeekByAssignment = {};
     const lastPeriodEndByAssignment = {};
     for (const a of asg.rows) {
-      const cutoff = a.returned_date ? new Date(a.returned_date + "T00:00:00Z") : addDays(today, 1);
+      // cutoff is exclusive: a week is billable only if it STARTS before it.
+      const cutoffISO = a.returned_date || iso(addDays(today, 1));
       const amount = Number(a.daily_rent) * 7;
       // wipe + regenerate this assignment's dues so stale/over-generated weeks are removed
       await client.query(`DELETE FROM ${S}.rent_dues WHERE assignment_id = $1`, [a.id]);
 
+      // A continuation (issue-swap) picks up both its week number AND its period
+      // cadence from where the linked assignment left off — see lib/rentMath.
       const linkedEnd = a.continues_from_assignment_id && lastPeriodEndByAssignment[a.continues_from_assignment_id];
+      const startISO = linkedEnd ? addDaysISO(linkedEnd, 1) : a.assigned_date;
       const startWeek = linkedEnd ? (lastWeekByAssignment[a.continues_from_assignment_id] || 0) + 1 : 1;
-      const start = linkedEnd ? addDays(linkedEnd, 1) : new Date(a.assigned_date + "T00:00:00Z");
 
-      let week = startWeek;
-      let lastPe = addDays(start, -1);
-      for (let ps = new Date(start); ps < cutoff; ps = addDays(ps, 7), week++) {
-        const pe = addDays(ps, 6);
+      const { weeks, lastWeekNo, lastPeriodEnd } = generateWeeks({ startISO, cutoffISO, startWeekNo: startWeek });
+      for (const w of weeks) {
         await client.query(`
           INSERT INTO ${S}.rent_dues (assignment_id, rider_id, vehicle_id, week_no, period_start, period_end, due_date, amount)
           VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-          [a.id, a.rider_id, a.vehicle_id, week, iso(ps), iso(pe), iso(addDays(ps, -1)), amount]); // rent in advance: due = day before cycle start
+          [a.id, a.rider_id, a.vehicle_id, w.weekNo, w.periodStart, w.periodEnd, w.dueDate, amount]);
         duesUpserted++;
-        lastPe = pe;
       }
-      lastWeekByAssignment[a.id] = week - 1;
-      lastPeriodEndByAssignment[a.id] = lastPe;
+      lastWeekByAssignment[a.id] = lastWeekNo;
+      lastPeriodEndByAssignment[a.id] = lastPeriodEnd;
     }
     console.log(`✓ rent_dues regenerated: ${duesUpserted} weekly dues across ${asg.rows.length} assignments`);
 
