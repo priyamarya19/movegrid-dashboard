@@ -4,6 +4,7 @@ import { schemas } from "@/lib/schemas";
 import { requireRole } from "@/lib/auth";
 import { IST } from "@/lib/rent";
 import { writeAudit } from "@/lib/audit";
+import { beginIdempotency, finishIdempotency, abortIdempotency } from "@/lib/idempotency";
 
 // rental_mode is constrained by riders_rental_mode_check to ('weekly','monthly').
 // Normalize known display labels; reject anything else with a 400 rather than
@@ -22,12 +23,18 @@ export async function POST(req: NextRequest) {
   if ("response" in guard) return guard.response;
   const session = guard.session;
 
+  // A retried create (mobile outbox replaying a network-dropped submit) returns
+  // the original result instead of a confusing "already exists" 409.
+  const idem = await beginIdempotency(req, "rider-create", session.userId);
+  if (idem.mode === "replay") return idem.response;
+
   try {
     const b = await req.json();
-    if (!b.name || !b.mobile) return NextResponse.json({ error: "Name and mobile are required" }, { status: 400 });
+    if (!b.name || !b.mobile) { if (idem.mode === "claimed") await abortIdempotency(idem); return NextResponse.json({ error: "Name and mobile are required" }, { status: 400 }); }
 
     const rentalMode = normalizeRentalMode(b.rental_mode);
     if (rentalMode === null) {
+      if (idem.mode === "claimed") await abortIdempotency(idem);
       return NextResponse.json(
         { error: "rental_mode must be one of: weekly, monthly", field: "rental_mode" },
         { status: 400 }
@@ -37,7 +44,7 @@ export async function POST(req: NextRequest) {
     // Pre-check duplicate mobile (fast, friendly path). The DB UNIQUE
     // constraints below are the real guard against races.
     const dup = await pool.query(`SELECT id FROM ${schemas.ops}.riders WHERE mobile = $1`, [b.mobile]);
-    if (dup.rows[0]) return NextResponse.json({ error: "A rider with this mobile number already exists", field: "mobile" }, { status: 409 });
+    if (dup.rows[0]) { if (idem.mode === "claimed") await abortIdempotency(idem); return NextResponse.json({ error: "A rider with this mobile number already exists", field: "mobile" }, { status: 409 }); }
 
     const result = await pool.query(`
     INSERT INTO ${schemas.ops}.riders (
@@ -75,8 +82,10 @@ export async function POST(req: NextRequest) {
       actorId: session.userId, actorName: session.name, req,
       details: { rider_code: result.rows[0].rider_code, name: result.rows[0].name, mobile: result.rows[0].mobile },
     });
+    if (idem.mode === "claimed") await finishIdempotency(idem, 201, result.rows[0]);
     return NextResponse.json(result.rows[0], { status: 201 });
   } catch (err) {
+    if (idem.mode === "claimed") await abortIdempotency(idem);
     const e = err as { code?: string; constraint?: string };
     // 23505 unique_violation — name the duplicated field.
     if (e.code === "23505") {

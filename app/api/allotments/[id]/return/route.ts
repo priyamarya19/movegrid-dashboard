@@ -28,13 +28,21 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   try {
     await client.query("BEGIN");
 
-    // Get the assignment to find vehicle_id and rider_id
+    // Get the assignment to find vehicle_id and rider_id. FOR UPDATE + the status
+    // check make this idempotent: a retried return (e.g. the mobile outbox
+    // replaying a network-dropped submit) of an already-returned assignment is a
+    // no-op success, so it can't insert a duplicate penalty or re-run the state
+    // changes.
     const asgn = await client.query(
-      `SELECT vehicle_id, rider_id FROM ${schemas.ops}.rider_vehicle_assignments WHERE id = $1`, [id]
+      `SELECT vehicle_id, rider_id, status FROM ${schemas.ops}.rider_vehicle_assignments WHERE id = $1 FOR UPDATE`, [id]
     );
     if (!asgn.rows[0]) {
       await client.query("ROLLBACK");
       return NextResponse.json({ error: "Assignment not found" }, { status: 404 });
+    }
+    if (asgn.rows[0].status !== "active") {
+      await client.query("ROLLBACK");
+      return NextResponse.json({ ok: true, already_returned: true });
     }
     const { vehicle_id, rider_id } = asgn.rows[0];
 

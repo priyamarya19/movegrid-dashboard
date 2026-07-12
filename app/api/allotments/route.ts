@@ -4,6 +4,7 @@ import { schemas } from "@/lib/schemas";
 import { requireRole } from "@/lib/auth";
 import { istTodayISO } from "@/lib/date";
 import { writeAudit } from "@/lib/audit";
+import { beginIdempotency, finishIdempotency, abortIdempotency } from "@/lib/idempotency";
 
 export async function POST(req: NextRequest) {
   const guard = await requireRole(req);
@@ -14,6 +15,11 @@ export async function POST(req: NextRequest) {
   if (!b.rider_id || !b.vehicle_id) {
     return NextResponse.json({ error: "Rider and vehicle are required" }, { status: 400 });
   }
+
+  // A retried allotment (mobile outbox replaying a network-dropped submit) returns
+  // the original result instead of a confusing "already assigned" 409.
+  const idem = await beginIdempotency(req, "allotment-create", session.userId);
+  if (idem.mode === "replay") return idem.response;
 
   const client = await pool.connect();
   try {
@@ -29,15 +35,18 @@ export async function POST(req: NextRequest) {
     );
     if (!vCheck.rows[0]) {
       await client.query("ROLLBACK");
+      if (idem.mode === "claimed") await abortIdempotency(idem);
       return NextResponse.json({ error: "Vehicle not found" }, { status: 404 });
     }
     if (vCheck.rows[0].status === "assigned") {
       await client.query("ROLLBACK");
+      if (idem.mode === "claimed") await abortIdempotency(idem);
       return NextResponse.json({ error: "Vehicle is already assigned to another rider" }, { status: 409 });
     }
     // Only vehicles cleared by ops (Ready to Deploy) can be allotted.
     if (vCheck.rows[0].status !== "ready_to_deploy") {
       await client.query("ROLLBACK");
+      if (idem.mode === "claimed") await abortIdempotency(idem);
       return NextResponse.json({ error: "Vehicle must be 'Ready to Deploy' before it can be allotted. Set its status first." }, { status: 409 });
     }
 
@@ -188,9 +197,12 @@ export async function POST(req: NextRequest) {
       actorId: session.userId, actorName: session.name, req,
       details: { rider_id: b.rider_id, vehicle_id: b.vehicle_id, allotment_code: result.rows[0].allotment_code, amount_collected: b.amount_collected ?? null },
     });
-    return NextResponse.json({ id: result.rows[0].id, allotment_code: result.rows[0].allotment_code }, { status: 201 });
+    const respBody = { id: result.rows[0].id, allotment_code: result.rows[0].allotment_code };
+    if (idem.mode === "claimed") await finishIdempotency(idem, 201, respBody);
+    return NextResponse.json(respBody, { status: 201 });
   } catch (e) {
     await client.query("ROLLBACK");
+    if (idem.mode === "claimed") await abortIdempotency(idem);
     throw e;
   } finally {
     client.release();
