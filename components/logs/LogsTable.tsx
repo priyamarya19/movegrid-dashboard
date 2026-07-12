@@ -1,7 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import ExportButton from "@/components/ExportButton";
+import Pagination from "@/components/Pagination";
+
+const PAGE_SIZE = 25;
 
 type Log = {
   id: string; action: string; entity: string; entity_id: string;
@@ -49,20 +52,25 @@ function sortData(data: Log[], sort: Sort): Log[] {
 
 export default function LogsTable() {
   const [logs, setLogs] = useState<Log[]>([]);
+  const [total, setTotal] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("");
+  const [page, setPage] = useState(1);
   const [sort, setSort] = useState<Sort>({ key: "created_at", dir: "desc" });
 
-  const fetch_ = async () => {
+  const fetch_ = useCallback(async () => {
     setLoading(true);
     const params = new URLSearchParams();
     if (filter) params.set("action", filter);
+    params.set("page", String(page));
+    params.set("pageSize", String(PAGE_SIZE));
     const res = await fetch(`/api/logs?${params}`);
+    setTotal(Number(res.headers.get("X-Total-Count")) || null);
     setLogs(await res.json());
     setLoading(false);
-  };
+  }, [filter, page]);
 
-  useEffect(() => { fetch_(); }, [filter]);
+  useEffect(() => { fetch_(); }, [fetch_]);
 
   const toggleSort = (key: string) =>
     setSort(s => s.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: "asc" });
@@ -75,11 +83,11 @@ export default function LogsTable() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-primary text-2xl font-bold">Audit Logs</h1>
-          <p className="text-muted text-sm mt-1">{logs.length} entries — complete activity trail</p>
+          <p className="text-muted text-sm mt-1">{total ?? logs.length} entries — complete activity trail</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <ExportButton filename="audit-logs" columns={cols} rows={sorted} />
-        <select value={filter} onChange={(e) => setFilter(e.target.value)}
+        <select value={filter} onChange={(e) => { setFilter(e.target.value); setPage(1); }}
           className="bg-surface border border-default rounded-xl px-3 py-2 text-sm text-secondary focus:outline-none focus:border-accent-purple">
           <option value="">All Actions</option>
           {actions.map((a) => <option key={a} value={a}>{a.replace(/_/g, " ")}</option>)}
@@ -132,6 +140,8 @@ export default function LogsTable() {
           </table>
         </div>
       </div>
+
+      <Pagination page={page} pageSize={PAGE_SIZE} total={total} loaded={logs.length} loading={loading} onPage={setPage} />
     </div>
   );
 }

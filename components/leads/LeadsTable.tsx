@@ -1,8 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import ExportButton from "@/components/ExportButton";
+import Pagination from "@/components/Pagination";
+
+const PAGE_SIZE = 25;
 
 type Lead = {
   id: string; type: string; name: string; phone: string;
@@ -49,24 +52,28 @@ function sortData(data: Lead[], sort: Sort): Lead[] {
 
 export default function LeadsTable() {
   const [leads, setLeads] = useState<Lead[]>([]);
+  const [total, setTotal] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [typeFilter, setTypeFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [page, setPage] = useState(1);
   const [updating, setUpdating] = useState<string | null>(null);
   const [sort, setSort] = useState<Sort>({ key: "created_at", dir: "desc" });
 
-  const fetchLeads = async () => {
+  const fetchLeads = useCallback(async () => {
     setLoading(true);
     const params = new URLSearchParams();
     if (typeFilter) params.set("type", typeFilter);
     if (statusFilter) params.set("status", statusFilter);
+    params.set("page", String(page));
+    params.set("pageSize", String(PAGE_SIZE));
     const res = await fetch(`/api/leads?${params}`);
-    const data = await res.json();
-    setLeads(data);
+    setTotal(Number(res.headers.get("X-Total-Count")) || null);
+    setLeads(await res.json());
     setLoading(false);
-  };
+  }, [typeFilter, statusFilter, page]);
 
-  useEffect(() => { fetchLeads(); }, [typeFilter, statusFilter]);
+  useEffect(() => { fetchLeads(); }, [fetchLeads]);
 
   const updateStatus = async (id: string, status: string) => {
     setUpdating(id);
@@ -90,14 +97,14 @@ export default function LeadsTable() {
         <h1 className="text-primary text-2xl font-bold">Leads</h1>
         <div className="flex flex-wrap items-center gap-3">
           <ExportButton filename="leads" columns={cols} rows={sorted} />
-          <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}
+          <select value={typeFilter} onChange={(e) => { setTypeFilter(e.target.value); setPage(1); }}
             className="bg-surface-alt border border-default rounded-xl px-3 py-2 text-sm text-secondary focus:outline-none focus:border-accent-success">
             <option value="">All Types</option>
             <option value="rider">Rider</option>
             <option value="fleet">Fleet</option>
             <option value="investor">Investor</option>
           </select>
-          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
+          <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
             className="bg-surface-alt border border-default rounded-xl px-3 py-2 text-sm text-secondary focus:outline-none focus:border-accent-success">
             <option value="">All Status</option>
             {statusOptions.map((s) => <option key={s} value={s}>{s}</option>)}
@@ -154,6 +161,8 @@ export default function LeadsTable() {
           </table>
         </div>
       </div>
+
+      <Pagination page={page} pageSize={PAGE_SIZE} total={total} loaded={leads.length} loading={loading} onPage={setPage} />
     </div>
   );
 }

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import ExportButton from "@/components/ExportButton";
+import Pagination from "@/components/Pagination";
 import RecordPayment from "@/components/riders/RecordPayment";
 
 type Rider = {
@@ -162,9 +163,6 @@ export default function RidersTable({ rentFilter, statusFilter: initialStatus }:
     ? serverCounts
     : riders.reduce((acc, r) => { acc[r.status] = (acc[r.status] || 0) + 1; return acc; }, {} as Record<string, number>);
 
-  const totalPages = total != null ? Math.max(1, Math.ceil(total / PAGE_SIZE)) : 1;
-  const rangeStart = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
-  const rangeEnd = (page - 1) * PAGE_SIZE + riders.length;
 
   return (
     <div className="space-y-5">
@@ -266,29 +264,8 @@ export default function RidersTable({ rentFilter, statusFilter: initialStatus }:
         </div>
       </div>
 
-      {serverPaginate && total != null && total > PAGE_SIZE && (
-        <div className="flex items-center justify-between gap-3 text-sm">
-          <p className="text-muted">
-            Showing {rangeStart}–{rangeEnd} of {total}
-          </p>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={page <= 1 || loading}
-              className="px-3 py-1.5 rounded-lg border border-default text-secondary hover:text-primary disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-            >
-              ← Prev
-            </button>
-            <span className="text-muted text-xs tabular-nums">Page {page} of {totalPages}</span>
-            <button
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              disabled={page >= totalPages || loading}
-              className="px-3 py-1.5 rounded-lg border border-default text-secondary hover:text-primary disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-            >
-              Next →
-            </button>
-          </div>
-        </div>
+      {serverPaginate && (
+        <Pagination page={page} pageSize={PAGE_SIZE} total={total} loaded={riders.length} loading={loading} onPage={setPage} />
       )}
     </div>
   );
