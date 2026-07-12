@@ -6,6 +6,7 @@ import { getPortfolioByUser } from "@/lib/portfolio";
 import { maskMobile, maskAadhaar } from "@/lib/mask";
 import RevealNumberButton from "@/components/investors/RevealNumberButton";
 import { vehicleStatusColor, vehicleStatusLabel } from "@/lib/vehicleStatus";
+import { inr } from "@/lib/format";
 
 const payoutStatus: Record<string, string> = {
   paid: "bg-accent-success/20 text-accent-success-text",
@@ -51,8 +52,8 @@ function PortfolioView({
     : null;
 
   const cards = [
-    { label: "Total Invested", value: "₹" + Number(profile.total_invested).toLocaleString(), color: "var(--accent-purple)", sub: sinceMonth ? "Since " + sinceMonth : undefined },
-    { label: "Earned So Far", value: "₹" + Number(totalPaid).toLocaleString(), color: "var(--accent-teal)", sub: `${payoutsMade} of ${termMonths} payouts received` },
+    { label: "Total Invested", value: inr(profile.total_invested), color: "var(--accent-purple)", sub: sinceMonth ? "Since " + sinceMonth : undefined },
+    { label: "Earned So Far", value: inr(totalPaid), color: "var(--accent-teal)", sub: `${payoutsMade} of ${termMonths} payouts received` },
     { label: "Payouts Remaining", value: String(payoutsRemaining), color: "var(--accent-danger)", sub: `of ${termMonths} months` },
     { label: "ROI So Far", value: roi.toFixed(1) + "%", color: "var(--accent-warning)", sub: undefined },
   ];
@@ -141,7 +142,7 @@ function PortfolioView({
                   <td className="px-5 py-3 text-secondary">{p.period_month ?? p.due_date ? new Date(p.period_month ?? p.due_date).toLocaleDateString("en-IN", { month: "short", year: "numeric" }) : "—"}</td>
                   <td className="px-5 py-3 text-accent-purple">{p.ev_number ?? "—"}</td>
                   <td className="px-5 py-3 text-secondary">{fmtDate(p.paid_date)}</td>
-                  <td className="px-5 py-3 text-accent-teal font-semibold">₹{Number(p.amount).toLocaleString()}</td>
+                  <td className="px-5 py-3 text-accent-teal font-semibold">{inr(p.amount)}</td>
                   <td className="px-5 py-3"><span className={`px-2 py-0.5 rounded-full text-xs capitalize ${payoutStatus[p.status] ?? "bg-muted/20 text-muted"}`}>{p.status}</span></td>
                   <td className="px-5 py-3">
                     {p.proof_url ? (

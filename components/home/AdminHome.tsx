@@ -9,6 +9,7 @@ import { getLedgerSummary } from "@/lib/rent";
 import { getFleetRiderCounts } from "@/lib/fleetStats";
 import { getFinancialStats } from "@/lib/financialStats";
 import { VSTATUS, NOT_AVAILABLE } from "@/lib/vehicleStatus";
+import { inrCompact, timeAgo, greeting } from "@/lib/format";
 
 type Props = { role: string; name: string };
 
@@ -88,12 +89,6 @@ const getRevenueSummary = unstable_cache(async function getRevenueSummary() {
   return res.rows;
 }, ["admin-revenue-v1"], { revalidate: 300 });
 
-const fmt = (n: number) => {
-  if (n >= 100000) return "₹" + (n / 100000).toFixed(1) + "L";
-  if (n >= 1000) return "₹" + (n / 1000).toFixed(0) + "K";
-  return "₹" + n;
-};
-
 const statusColor: Record<string, string> = {
   new: "bg-accent-purple/13 text-accent-purple",
   contacted: "bg-accent-teal/13 text-accent-teal",
@@ -116,15 +111,6 @@ const dotColor: Record<string, string> = {
   new_lead: "var(--accent-teal)",
 };
 
-function timeAgo(date: string) {
-  const diff = Date.now() - new Date(date).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  return `${Math.floor(hrs / 24)}d ago`;
-}
-
 const actionLabel: Record<string, string> = {
   onboard_rider: "Rider onboarded",
   assign_vehicle: "Vehicle assigned",
@@ -146,9 +132,9 @@ function activityText(log: { action: string; details: unknown }) {
     switch (log.action) {
       case "onboard_rider": return d.name ? <>Rider <strong>{String(d.name)}</strong> onboarded</> : <>Rider onboarded</>;
       case "assign_vehicle": return d.vehicle ? <>Vehicle <strong>{String(d.vehicle)}</strong> assigned</> : <>Vehicle assigned</>;
-      case "record_payment": return d.amount ? <>Payment <strong>{fmt(Number(d.amount))}</strong>{d.rider ? <> · {String(d.rider)}</> : ""}</> : <>Payment recorded</>;
+      case "record_payment": return d.amount ? <>Payment <strong>{inrCompact(Number(d.amount))}</strong>{d.rider ? <> · {String(d.rider)}</> : ""}</> : <>Payment recorded</>;
       case "update_lead": return d.name ? <>Lead <strong>{String(d.name)}</strong> → {d.status ? String(d.status) : "updated"}</> : <>Lead updated</>;
-      case "payout_marked": return d.amount ? <>Payout <strong>{fmt(Number(d.amount))}</strong> marked paid</> : <>Payout marked paid</>;
+      case "payout_marked": return d.amount ? <>Payout <strong>{inrCompact(Number(d.amount))}</strong> marked paid</> : <>Payout marked paid</>;
       case "new_lead": return d.name ? <>New lead: <strong>{String(d.name)}</strong></> : <>New lead</>;
       default: return <>{actionLabel[log.action] ?? log.action.replace(/_/g, " ")}</>;
     }
@@ -172,7 +158,7 @@ export default async function AdminHome({ role, name }: Props) {
       {/* Topbar */}
       <div className="flex items-center justify-between px-4 py-4 lg:px-7 lg:py-5 border-b border-default bg-base">
         <div>
-          <h2 className="text-lg font-semibold text-primary">Good morning, {name} 👋</h2>
+          <h2 className="text-lg font-semibold text-primary">{greeting()}, {name} 👋</h2>
           <p className="text-muted text-sm mt-0.5">Business overview — {currentMonth}</p>
         </div>
         <span className="text-xs text-muted uppercase tracking-wider">{roleLabel[role] ?? role}</span>
@@ -205,10 +191,10 @@ export default async function AdminHome({ role, name }: Props) {
           <p className="text-[11px] text-muted uppercase tracking-widest mb-3">Financials</p>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             {[
-              { label: "Rent This Month", value: fmt(stats.rentMTD), sub: `+${fmt(stats.onboardMTD)} onboarding`, accent: "var(--accent-teal)", href: "/riders" },
-              { label: "Total Collected", value: fmt(stats.totalCollected), sub: "all time rent", accent: "var(--accent-purple)", href: "/riders" },
-              { label: "Total Investment", value: fmt(stats.totalInvestments), sub: `${fmt(stats.payoutsDone)} paid out`, accent: "var(--accent-warning)", href: "/investors" },
-              { label: "Payouts Pending", value: fmt(stats.payoutsPending), sub: "to investors", accent: stats.payoutsPending > 0 ? "var(--accent-danger-alt)" : "var(--text-muted)", href: "/investors" },
+              { label: "Rent This Month", value: inrCompact(stats.rentMTD), sub: `+${inrCompact(stats.onboardMTD)} onboarding`, accent: "var(--accent-teal)", href: "/riders" },
+              { label: "Total Collected", value: inrCompact(stats.totalCollected), sub: "all time rent", accent: "var(--accent-purple)", href: "/riders" },
+              { label: "Total Investment", value: inrCompact(stats.totalInvestments), sub: `${inrCompact(stats.payoutsDone)} paid out`, accent: "var(--accent-warning)", href: "/investors" },
+              { label: "Payouts Pending", value: inrCompact(stats.payoutsPending), sub: "to investors", accent: stats.payoutsPending > 0 ? "var(--accent-danger-alt)" : "var(--text-muted)", href: "/investors" },
             ].map((c) => (
               <Link key={c.label} href={c.href} className="bg-surface border border-default rounded-xl p-5 relative overflow-hidden hover:border-strong hover:bg-surface-hover transition-colors block">
                 <div className="absolute top-0 left-0 right-0 h-[3px]" style={{ background: c.accent }} />
@@ -227,15 +213,15 @@ export default async function AdminHome({ role, name }: Props) {
             <div className="flex flex-wrap items-end gap-x-10 gap-y-4">
               <div>
                 <p className="text-[11px] text-muted uppercase tracking-wider mb-1">Collected</p>
-                <p className="text-[28px] font-bold text-accent-teal">{fmt(collection.collected)}</p>
+                <p className="text-[28px] font-bold text-accent-teal">{inrCompact(collection.collected)}</p>
               </div>
               <Link href="/collections" className="group" title="See which riders' rent is pending">
                 <p className="text-[11px] text-muted group-hover:text-accent-purple-2 uppercase tracking-wider mb-1">Expected ↗</p>
-                <p className="text-[28px] font-bold text-accent-purple-2 group-hover:underline">{fmt(collection.expected)}</p>
+                <p className="text-[28px] font-bold text-accent-purple-2 group-hover:underline">{inrCompact(collection.expected)}</p>
               </Link>
               <Link href="/collections" className="group" title="See which riders' rent is pending">
                 <p className="text-[11px] text-muted uppercase tracking-wider mb-1">Pending ↗</p>
-                <p className="text-[28px] font-bold text-accent-danger-alt group-hover:underline">{fmt(collection.pending)}</p>
+                <p className="text-[28px] font-bold text-accent-danger-alt group-hover:underline">{inrCompact(collection.pending)}</p>
               </Link>
               <div className="ml-auto text-right">
                 <p className="text-[11px] text-muted uppercase tracking-wider mb-1">Collection</p>
@@ -307,11 +293,11 @@ export default async function AdminHome({ role, name }: Props) {
                   return (
                     <tr key={row.month} className="border-b border-subtle">
                       <td className={`py-2.5 ${i === 0 ? "font-bold text-primary" : "text-secondary"}`}>{row.month}</td>
-                      <td className="py-2.5 text-accent-teal">{fmt(Number(row.rent))}</td>
-                      <td className="py-2.5 text-accent-purple">{fmt(Number(row.onboard))}</td>
-                      <td className="py-2.5 text-accent-purple-2">{fmt(Number(row.security))}</td>
-                      <td className="py-2.5 text-accent-danger">{Number(row.payouts) > 0 ? `−${fmt(Number(row.payouts))}` : "—"}</td>
-                      <td className={`py-2.5 font-bold ${i === 0 ? "text-accent-teal" : "text-primary"}`}>{fmt(net)}</td>
+                      <td className="py-2.5 text-accent-teal">{inrCompact(Number(row.rent))}</td>
+                      <td className="py-2.5 text-accent-purple">{inrCompact(Number(row.onboard))}</td>
+                      <td className="py-2.5 text-accent-purple-2">{inrCompact(Number(row.security))}</td>
+                      <td className="py-2.5 text-accent-danger">{Number(row.payouts) > 0 ? `−${inrCompact(Number(row.payouts))}` : "—"}</td>
+                      <td className={`py-2.5 font-bold ${i === 0 ? "text-accent-teal" : "text-primary"}`}>{inrCompact(net)}</td>
                     </tr>
                   );
                 })}
@@ -323,11 +309,11 @@ export default async function AdminHome({ role, name }: Props) {
                   return (
                     <tr className="border-t-2 border-accent-purple/25">
                       <td className="py-2.5 font-bold text-accent-purple">YTD</td>
-                      <td className="py-2.5 font-bold text-accent-teal">{fmt(ytdRent)}</td>
-                      <td className="py-2.5 font-bold text-accent-purple">{fmt(ytdOnboard)}</td>
-                      <td className="py-2.5 font-bold text-accent-purple-2">{fmt(ytdSecurity)}</td>
-                      <td className="py-2.5 font-bold text-accent-danger">{ytdPayouts > 0 ? `−${fmt(ytdPayouts)}` : "—"}</td>
-                      <td className="py-2.5 font-bold text-accent-teal text-[15px]">{fmt(ytdRent + ytdOnboard + ytdSecurity - ytdPayouts)}</td>
+                      <td className="py-2.5 font-bold text-accent-teal">{inrCompact(ytdRent)}</td>
+                      <td className="py-2.5 font-bold text-accent-purple">{inrCompact(ytdOnboard)}</td>
+                      <td className="py-2.5 font-bold text-accent-purple-2">{inrCompact(ytdSecurity)}</td>
+                      <td className="py-2.5 font-bold text-accent-danger">{ytdPayouts > 0 ? `−${inrCompact(ytdPayouts)}` : "—"}</td>
+                      <td className="py-2.5 font-bold text-accent-teal text-[15px]">{inrCompact(ytdRent + ytdOnboard + ytdSecurity - ytdPayouts)}</td>
                     </tr>
                   );
                 })()}

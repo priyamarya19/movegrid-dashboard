@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getPortfolioByUser } from "@/lib/portfolio";
 import { vehicleStatusColor, vehicleStatusLabel } from "@/lib/vehicleStatus";
+import { inr } from "@/lib/format";
 
 type Props = { userId: string };
 
@@ -33,8 +34,8 @@ export default async function InvestorHome({ userId }: Props) {
     : "—";
 
   const cards = [
-    { label: "Total Invested", value: "₹" + Number(profile.total_invested).toLocaleString(), color: "var(--accent-purple)", sub: sinceMonth ? "Since " + sinceMonth : undefined },
-    { label: "Earned So Far", value: "₹" + Number(totalPaid).toLocaleString(), color: "var(--accent-teal)", sub: `${payoutsMade} of ${termMonths} payouts received` },
+    { label: "Total Invested", value: inr(profile.total_invested), color: "var(--accent-purple)", sub: sinceMonth ? "Since " + sinceMonth : undefined },
+    { label: "Earned So Far", value: inr(totalPaid), color: "var(--accent-teal)", sub: `${payoutsMade} of ${termMonths} payouts received` },
     { label: "Payouts Remaining", value: String(payoutsRemaining), color: "var(--accent-danger)", sub: `of ${termMonths} months` },
     { label: "ROI So Far", value: roi.toFixed(1) + "%", color: "var(--accent-warning)", sub: undefined },
     { label: "Scooters", value: vehicles.length.toLocaleString(), color: "var(--accent-success)", sub: "In your portfolio" },
