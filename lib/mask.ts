@@ -15,3 +15,27 @@ export function maskAadhaar(raw: string | null | undefined): string {
   if (digits.length <= 4) return digits;
   return "X".repeat(digits.length - 4) + digits.slice(-4);
 }
+
+/** PAN: first 2 and last 2 visible, middle masked (e.g. AB••••••0A). "—" if absent. */
+export function maskPan(raw: string | null | undefined): string {
+  const s = (raw ?? "").trim();
+  if (!s) return "—";
+  if (s.length <= 4) return "•".repeat(s.length);
+  return s.slice(0, 2) + "•".repeat(s.length - 4) + s.slice(-2);
+}
+
+/** Bank account: only the last 4 visible (e.g. •••• 1461). "—" if absent. */
+export function maskAccount(raw: string | null | undefined): string {
+  const s = (raw ?? "").trim();
+  if (!s) return "—";
+  if (s.length <= 4) return "•".repeat(s.length);
+  return "•••• " + s.slice(-4);
+}
+
+/** Driving licence: first 2 and last 2 visible, middle masked. "—" if absent. */
+export function maskDl(raw: string | null | undefined): string {
+  const s = (raw ?? "").trim();
+  if (!s) return "—";
+  if (s.length <= 4) return "•".repeat(s.length);
+  return s.slice(0, 2) + "•".repeat(s.length - 4) + s.slice(-2);
+}
