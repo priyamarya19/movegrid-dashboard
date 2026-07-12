@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import ExportButton from "@/components/ExportButton";
 import Pagination from "@/components/Pagination";
+import { fetchList } from "@/lib/listFetch";
 
 const PAGE_SIZE = 25;
 
@@ -54,6 +55,7 @@ export default function LeadsTable() {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [total, setTotal] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [typeFilter, setTypeFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [page, setPage] = useState(1);
@@ -67,9 +69,10 @@ export default function LeadsTable() {
     if (statusFilter) params.set("status", statusFilter);
     params.set("page", String(page));
     params.set("pageSize", String(PAGE_SIZE));
-    const res = await fetch(`/api/leads?${params}`);
-    setTotal(Number(res.headers.get("X-Total-Count")) || null);
-    setLeads(await res.json());
+    const r = await fetchList<Lead>(`/api/leads?${params}`);
+    setLoadError(!r.ok);
+    setTotal(r.total);
+    setLeads(r.rows);
     setLoading(false);
   }, [typeFilter, statusFilter, page]);
 
@@ -129,6 +132,11 @@ export default function LeadsTable() {
             <tbody>
               {loading ? (
                 <tr><td colSpan={6} className="px-5 py-10 text-center text-muted">Loading...</td></tr>
+              ) : loadError ? (
+                <tr><td colSpan={6} className="px-5 py-10 text-center">
+                  <p className="text-accent-danger-alt-text text-sm">Couldn&apos;t load leads.</p>
+                  <button onClick={() => fetchLeads()} className="mt-2 text-xs text-accent-purple hover:underline">Try again</button>
+                </td></tr>
               ) : sorted.length === 0 ? (
                 <tr><td colSpan={6} className="px-5 py-10 text-center text-muted">No leads found</td></tr>
               ) : sorted.map((lead) => (

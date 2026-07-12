@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import ExportButton from "@/components/ExportButton";
 import Pagination from "@/components/Pagination";
+import { fetchList } from "@/lib/listFetch";
 import { VSTATUS, VEHICLE_FILTERS, vehicleStatusColor, vehicleStatusLabel } from "@/lib/vehicleStatus";
 
 const PAGE_SIZE = 25;
@@ -38,6 +39,7 @@ export default function VehiclesTable({ statusFilter: initialStatus }: { statusF
   const [total, setTotal] = useState<number | null>(null);
   const [serverCounts, setServerCounts] = useState<Record<string, number> | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState(initialStatus ?? "");
   const [search, setSearch] = useState("");
@@ -58,12 +60,11 @@ export default function VehiclesTable({ statusFilter: initialStatus }: { statusF
     params.set("sort", sort.key);
     params.set("dir", sort.dir);
     if (debouncedQ) params.set("q", debouncedQ);
-    const res = await fetch(`/api/vehicles?${params}`);
-    const t = res.headers.get("X-Total-Count");
-    setTotal(t ? Number(t) : null);
-    const sc = res.headers.get("X-Status-Counts");
-    setServerCounts(sc ? JSON.parse(sc) : null);
-    setVehicles(await res.json());
+    const r = await fetchList<Vehicle>(`/api/vehicles?${params}`);
+    setLoadError(!r.ok);
+    setTotal(r.total);
+    setServerCounts(r.counts);
+    setVehicles(r.rows);
     setLoading(false);
   }, [statusFilter, page, sort, debouncedQ]);
 
@@ -141,6 +142,11 @@ export default function VehiclesTable({ statusFilter: initialStatus }: { statusF
             <tbody>
               {loading ? (
                 <tr><td colSpan={8} className="px-5 py-10 text-center text-muted">Loading...</td></tr>
+              ) : loadError ? (
+                <tr><td colSpan={8} className="px-5 py-10 text-center">
+                  <p className="text-accent-danger-alt-text text-sm">Couldn&apos;t load vehicles.</p>
+                  <button onClick={() => fetch_()} className="mt-2 text-xs text-accent-purple hover:underline">Try again</button>
+                </td></tr>
               ) : sorted.length === 0 ? (
                 <tr><td colSpan={8} className="px-5 py-10 text-center text-muted">No vehicles found</td></tr>
               ) : sorted.map((v) => (
