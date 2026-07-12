@@ -1,10 +1,17 @@
 import DashboardLayout from "@/components/DashboardLayout";
-import PendingRentTable from "@/components/collections/PendingRentTable";
+import CollectionsView from "@/components/collections/CollectionsView";
+import { getWeeklyCollections, getChaseList } from "@/lib/collections";
+import { getLedgerSummary } from "@/lib/rent";
 
-export default function CollectionsPage() {
+export default async function CollectionsPage() {
+  const [summary, weekly, chase] = await Promise.all([
+    getLedgerSummary(),
+    getWeeklyCollections(),
+    getChaseList(),
+  ]);
   return (
     <DashboardLayout allowedRoles={["admin", "ops_manager", "hub_incharge"]}>
-      <PendingRentTable />
+      <CollectionsView summary={summary} weekly={weekly} chase={chase} />
     </DashboardLayout>
   );
 }

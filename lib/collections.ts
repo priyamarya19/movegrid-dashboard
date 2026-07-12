@@ -83,3 +83,43 @@ export const getPendingByRider = unstable_cache(async function getPendingByRider
     days: Number(r.days), expected: Number(r.expected), collected: Number(r.collected), pending: Number(r.pending),
   }));
 }, ["pending-by-rider-v1"], { revalidate: 60 });
+
+// Expected vs collected per calendar week (by rent-due period start), for the
+// Collections funnel chart. Only weeks that have started are included; a "paid"
+// figure is derived from paid_through_date (same rolling-balance model as the
+// rest of the app), capped at the week's amount.
+export type WeeklyCollection = { week: string; expected: number; collected: number };
+export const getWeeklyCollections = unstable_cache(async function getWeeklyCollections(): Promise<WeeklyCollection[]> {
+  const S = schemas.ops;
+  const res = await pool.query(`
+    SELECT to_char(date_trunc('week', d.period_start), 'YYYY-MM-DD') AS week,
+           SUM(d.amount)::numeric AS expected,
+           SUM(LEAST(GREATEST(0, LEAST(COALESCE(a.paid_through_date, a.assigned_date - 1), d.period_end) - d.period_start + 1) * a.daily_rent, d.amount))::numeric AS collected
+    FROM ${S}.rent_dues d
+    JOIN ${S}.rider_vehicle_assignments a ON a.id = d.assignment_id
+    WHERE d.period_start <= ${IST}
+    GROUP BY 1 ORDER BY 1`);
+  return res.rows.map((r) => ({ week: r.week, expected: Number(r.expected), collected: Number(r.collected) }));
+}, ["weekly-collections-v1"], { revalidate: 60 });
+
+// Live chase list: every active rider with an outstanding balance, how many days
+// behind they are (from paid_through_date), and the ops sheet note if any.
+export type ChaseRow = {
+  rider_id: string; rider_code: string | null; name: string;
+  allotment_code: string | null; days_behind: number; outstanding: number; sheet_note: string | null;
+};
+export const getChaseList = unstable_cache(async function getChaseList(): Promise<ChaseRow[]> {
+  const S = schemas.ops;
+  const res = await pool.query(`
+    SELECT r.id AS rider_id, r.rider_code, r.name, a.allotment_code, a.sheet_note,
+      GREATEST(0, ${IST} - COALESCE(a.paid_through_date, a.assigned_date - 1)) AS days_behind,
+      GREATEST(0, ${IST} - COALESCE(a.paid_through_date, a.assigned_date - 1)) * a.daily_rent AS outstanding
+    FROM ${S}.rider_vehicle_assignments a
+    JOIN ${S}.riders r ON r.id = a.rider_id
+    WHERE a.status = 'active'
+    ORDER BY outstanding DESC`);
+  return res.rows.map((r) => ({
+    rider_id: r.rider_id, rider_code: r.rider_code, name: r.name, allotment_code: r.allotment_code,
+    days_behind: Number(r.days_behind), outstanding: Number(r.outstanding), sheet_note: r.sheet_note,
+  }));
+}, ["chase-list-v1"], { revalidate: 60 });
