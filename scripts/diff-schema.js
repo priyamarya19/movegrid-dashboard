@@ -51,6 +51,7 @@ async function cols(schema) {
   await client.connect();
   console.log(`DB: ${env.RDS_DATABASE}   mode: ${APPLY ? "APPLY" : "DRY RUN"}\n`);
 
+  const creates = [];
   const alters = [];
   const warnings = [];
 
@@ -60,8 +61,11 @@ async function cols(schema) {
     for (const [tbl, srcCols] of src) {
       const dstCols = dst.get(tbl);
       if (!dstCols) {
-        warnings.push(`TABLE MISSING in ${to}: ${tbl}  (create it separately — this script only adds columns)`);
-        console.log(`  ⚠ table ${tbl} absent in ${to}`);
+        // Clone the whole table structure from UAT (columns, PK, indexes, CHECK/
+        // NOT NULL, defaults). LIKE does NOT copy FK constraints — fine here, the
+        // data we copy from UAT is already consistent; add FKs later if wanted.
+        creates.push(`CREATE TABLE IF NOT EXISTS ${to}.${tbl} (LIKE ${from}.${tbl} INCLUDING ALL);`);
+        console.log(`  ⊕ CREATE TABLE ${tbl}  (clone from ${from})`);
         continue;
       }
       for (const [col, def] of srcCols) {
@@ -80,15 +84,18 @@ async function cols(schema) {
     console.log("");
   }
 
-  if (!alters.length) {
-    console.log("✓ No missing columns — prod base schema already matches UAT.");
+  // Tables must be created before column ALTERs run (though the two sets never
+  // touch the same table). Creates first, then alters.
+  const stmts = [...creates, ...alters];
+  if (!stmts.length) {
+    console.log("✓ Nothing missing — prod base schema already matches UAT.");
   } else {
-    console.log(`\n${alters.length} missing column(s). SQL:\n`);
-    console.log(alters.join("\n"));
+    console.log(`\n${creates.length} table(s) + ${alters.length} column(s) missing. SQL:\n`);
+    console.log(stmts.join("\n"));
     if (APPLY) {
       console.log(`\nApplying...`);
-      for (const sql of alters) { process.stdout.write(`→ ${sql} `); await client.query(sql); console.log("ok"); }
-      console.log(`\n✓ Applied ${alters.length} column(s) to prod.`);
+      for (const sql of stmts) { process.stdout.write(`→ ${sql} `); await client.query(sql); console.log("ok"); }
+      console.log(`\n✓ Applied ${creates.length} table(s) + ${alters.length} column(s) to prod.`);
     } else {
       console.log(`\n(DRY RUN — nothing changed. Re-run with --apply to add these.)`);
     }
