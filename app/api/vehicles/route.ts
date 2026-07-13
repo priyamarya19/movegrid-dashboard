@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
     [
       b.ev_number, b.chassis_number ?? null, b.motor_number ?? null, b.controller_number ?? null,
       b.iot_imei ?? null, b.iot_partner ?? null, b.battery_number ?? null, b.battery_partner ?? null,
-      model.rows[0].id, b.hub_id ?? null, b.purchase_date ?? null, b.price ?? null,
+      model.rows[0].id, b.hub_id ?? null, b.purchase_date || null, b.price ?? null,
       b.vehicle_photo_url ?? null, b.rc_book_url ?? null,
     ]
   );

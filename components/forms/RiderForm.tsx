@@ -6,7 +6,9 @@ import ImageUpload from "@/components/ImageUpload";
 
 type Hub = { id: string; hub_name: string; city: string };
 
-const RENTAL_MODES = ["monthly", "weekly", "fortnightly"];
+// Only 'weekly' and 'monthly' are allowed by the riders_rental_mode_check DB
+// constraint — "fortnightly" here used to 500 on submit.
+const RENTAL_MODES = ["weekly", "monthly"];
 const B2B_COMPANIES = ["Swiggy", "Zomato", "Blinkit", "Dunzo", "Zepto", "Porter", "Other"];
 
 function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {

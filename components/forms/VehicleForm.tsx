@@ -110,7 +110,7 @@ export default function VehicleForm() {
         </Field>
 
         <Section title="Purchase Info" />
-        <Field label="Purchase Date"><input type="date" className={inp} value={form.purchase_date} onChange={e => set("purchase_date", e.target.value)} /></Field>
+        <Field label="Purchase Date" required><input type="date" className={inp} value={form.purchase_date} onChange={e => set("purchase_date", e.target.value)} required /></Field>
         <Field label="Purchase Price (₹)"><input type="number" className={inp} value={form.price} onChange={e => set("price", e.target.value)} placeholder="0" /></Field>
 
         <Section title="Documents & Photos" />

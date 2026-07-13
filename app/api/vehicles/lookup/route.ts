@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
   if (ev) {
     const result = await pool.query(`
       SELECT v.id, v.ev_number, v.chassis_number, v.motor_number, v.controller_number,
-             v.battery_number, v.status, m.oem, m.model_name, h.id AS hub_id, h.hub_name
+             v.battery_number, v.status, m.oem, m.model_name, m.rental_per_day, h.id AS hub_id, h.hub_name
       FROM ${schemas.ops}.vehicles v
       LEFT JOIN ${schemas.ops}.vehicle_models m ON m.id = v.model_id
       LEFT JOIN ${schemas.ops}.hubs h ON h.id = v.hub_id
@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
 
   if (mobile) {
     const result = await pool.query(`
-      SELECT r.id, r.name, r.nickname, r.mobile, r.status, r.rental_mode,
+      SELECT r.id, r.name, r.nickname, r.mobile, r.status, r.rental_mode, r.rider_mode,
              r.onboarding_fee, r.security_deposit, h.id AS hub_id, h.hub_name
       FROM ${schemas.ops}.riders r
       LEFT JOIN ${schemas.ops}.hubs h ON h.id = r.assigned_hub_id
