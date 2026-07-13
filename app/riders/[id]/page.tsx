@@ -7,6 +7,7 @@ import KycVerifyButton from "@/components/riders/KycVerifyButton";
 import BackButton from "@/components/BackButton";
 import BlacklistButton from "@/components/riders/BlacklistButton";
 import RecordPayment from "@/components/riders/RecordPayment";
+import ChangeRate from "@/components/riders/ChangeRate";
 import { getRiderCycle } from "@/lib/rent";
 import RiderPenalties from "@/components/riders/RiderPenalties";
 import ExportButton from "@/components/ExportButton";
@@ -43,7 +44,7 @@ async function getData(id: string) {
     `, [id]),
 
     pool.query(`
-      SELECT rva.assigned_date, rva.status AS assignment_status,
+      SELECT rva.id AS assignment_id, rva.assigned_date, rva.status AS assignment_status,
              rva.daily_rent, to_char(rva.paid_through_date, 'YYYY-MM-DD') AS paid_through_date,
              rva.allotment_code,
              v.ev_number, v.id AS vehicle_id,
@@ -333,7 +334,10 @@ export default async function RiderDetailPage({ params }: { params: Promise<{ id
                 { label: "Paid", key: "paid" }, { label: "Status", key: "status" },
               ]} />
               {activeAssignment && (
-                <RecordPayment riderId={rider.id} dailyRent={activeAssignment.daily_rent ? Number(activeAssignment.daily_rent) : null} />
+                <>
+                  <ChangeRate assignmentId={activeAssignment.assignment_id} currentRate={activeAssignment.daily_rent ? Number(activeAssignment.daily_rent) : null} />
+                  <RecordPayment riderId={rider.id} dailyRent={activeAssignment.daily_rent ? Number(activeAssignment.daily_rent) : null} />
+                </>
               )}
             </div>
           </div>
