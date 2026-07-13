@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { istTodayISO } from "@/lib/date";
 
 // Change the daily rate on an ACTIVE allotment without a full re-allotment — e.g. the
 // rider switches km/usage plan on the same vehicle. The backend models it as a
@@ -11,8 +12,7 @@ export default function ChangeRate({ assignmentId, currentRate }: { assignmentId
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [rate, setRate] = useState(currentRate != null ? String(currentRate) : "");
-  // Default the picker to IST "today" (shift by +5:30 before slicing the ISO date).
-  const [effectiveDate, setEffectiveDate] = useState(() => new Date(Date.now() + 5.5 * 3600 * 1000).toISOString().slice(0, 10));
+  const [effectiveDate, setEffectiveDate] = useState(istTodayISO);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
