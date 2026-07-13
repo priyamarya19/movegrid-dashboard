@@ -75,7 +75,12 @@ export async function POST(req: NextRequest) {
        WHERE v.id = $1`,
       [b.vehicle_id]
     );
-    const dailyRent = Number(rateRes.rows[0]?.rate ?? 240);
+    // Daily rate is set per-allotment: use the rate ops entered on the form (it can
+    // vary by the km/usage deal), falling back to the vehicle model's default rate.
+    const formRate = b.daily_rent != null && b.daily_rent !== "" ? Number(b.daily_rent) : null;
+    const dailyRent = formRate != null && !Number.isNaN(formRate) && formRate > 0
+      ? formRate
+      : Number(rateRes.rows[0]?.rate ?? 240);
     const assignedDate = b.assigned_date || istTodayISO();
 
     // Rent is always collected one week in advance at allotment (see RENT_SHEET_GUIDE.md).
@@ -179,10 +184,11 @@ export async function POST(req: NextRequest) {
 
     // Update rider: status → active, rental_mode, onboarding_fee, security_deposit
     await client.query(
-      `UPDATE ${schemas.ops}.riders SET status = 'active', rental_mode = COALESCE($1, rental_mode),
-       onboarding_fee = COALESCE($2, onboarding_fee), security_deposit = COALESCE($3, security_deposit)
-       WHERE id = $4`,
-      [b.rental_mode ?? null, onboardingFeeValue, b.security_deposit ?? null, b.rider_id]
+      `UPDATE ${schemas.ops}.riders SET status = 'active',
+       rental_mode = COALESCE($1, rental_mode), rider_mode = COALESCE($2, rider_mode),
+       onboarding_fee = COALESCE($3, onboarding_fee), security_deposit = COALESCE($4, security_deposit)
+       WHERE id = $5`,
+      [b.rental_mode ?? null, b.rider_mode ?? null, onboardingFeeValue, b.security_deposit ?? null, b.rider_id]
     );
 
     // Update vehicle status → assigned

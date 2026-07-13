@@ -4,7 +4,8 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import ImageUpload from "@/components/ImageUpload";
 
-const RENTAL_MODES = ["B2B fleet rental", "Rider rental", "B2B rider"];
+const RIDER_MODES = ["B2B fleet rental", "Rider rental", "B2B rider"];
+const RENTAL_PLANS = ["weekly", "monthly"];
 
 function Field({ label, required, hint, children }: { label: string; required?: boolean; hint?: string; children: React.ReactNode }) {
   return (
@@ -21,8 +22,8 @@ function Field({ label, required, hint, children }: { label: string; required?: 
 const inp = "w-full bg-base border border-default rounded-xl px-4 py-2.5 text-primary text-sm placeholder-faint focus:outline-none focus:border-accent-warning transition-colors";
 const sel = "w-full bg-base border border-default rounded-xl px-4 py-2.5 text-primary text-sm focus:outline-none focus:border-accent-warning transition-colors";
 
-type VehicleInfo = { id: string; ev_number: string; chassis_number?: string; motor_number?: string; controller_number?: string; battery_number?: string; oem?: string; model_name?: string; status?: string; hub_id?: string; hub_name?: string };
-type RiderInfo = { id: string; name: string; nickname?: string; mobile: string; rental_mode?: string; onboarding_fee?: number; security_deposit?: number };
+type VehicleInfo = { id: string; ev_number: string; chassis_number?: string; motor_number?: string; controller_number?: string; battery_number?: string; oem?: string; model_name?: string; rental_per_day?: number; status?: string; hub_id?: string; hub_name?: string };
+type RiderInfo = { id: string; name: string; nickname?: string; mobile: string; rental_mode?: string; rider_mode?: string; onboarding_fee?: number; security_deposit?: number };
 
 export default function AllotmentForm() {
   const router = useRouter();
@@ -52,7 +53,8 @@ export default function AllotmentForm() {
   const [riderError, setRiderError] = useState("");
 
   const [form, setForm] = useState({
-    rental_mode: "", onboarding_fee: "", security_deposit: "",
+    rider_mode: "", rental_plan: "", daily_rent: "",
+    onboarding_fee: "", security_deposit: "",
     amount_collected: "", payment_screenshot_url: "",
     undertaking_url: "",
     allotment_pics: ["", "", "", "", ""],
@@ -70,7 +72,12 @@ export default function AllotmentForm() {
       setEvError("");
       try {
         const res = await fetch(`/api/vehicles/lookup?ev_number=${encodeURIComponent(evInput.trim())}`);
-        if (res.ok) { setVehicle(await res.json()); }
+        if (res.ok) {
+          const v: VehicleInfo = await res.json();
+          setVehicle(v);
+          // Prefill the daily rate from the vehicle's model default — ops can override.
+          if (v.rental_per_day != null) setForm(p => ({ ...p, daily_rent: String(v.rental_per_day) }));
+        }
         else { setVehicle(null); setEvError("Vehicle not found"); }
       } finally { setEvLookingUp(false); }
     }, 600);
@@ -85,7 +92,7 @@ export default function AllotmentForm() {
       if (res.ok) {
         const data = await res.json();
         setRider(data);
-        setForm(p => ({ ...p, rental_mode: data.rental_mode ?? "", onboarding_fee: data.onboarding_fee ?? "", security_deposit: data.security_deposit ?? "" }));
+        setForm(p => ({ ...p, rider_mode: data.rider_mode ?? "", rental_plan: data.rental_mode ?? "", onboarding_fee: data.onboarding_fee ?? "", security_deposit: data.security_deposit ?? "" }));
       } else { setRider(null); setRiderError("Rider not found with this mobile"); }
     } finally { setRiderLookingUp(false); }
   }
@@ -106,7 +113,9 @@ export default function AllotmentForm() {
         body: JSON.stringify({
           rider_id: rider.id, vehicle_id: vehicle.id,
           hub_id: vehicle.hub_id ?? null,
-          rental_mode: form.rental_mode || null,
+          rider_mode: form.rider_mode || null,
+          rental_mode: form.rental_plan || null,
+          daily_rent: form.daily_rent ? Number(form.daily_rent) : null,
           onboarding_fee: form.onboarding_fee ? Number(form.onboarding_fee) : null,
           security_deposit: form.security_deposit ? Number(form.security_deposit) : null,
           amount_collected: form.amount_collected ? Number(form.amount_collected) : null,
@@ -171,10 +180,19 @@ export default function AllotmentForm() {
 
         <Section title="Allotment Terms" />
         <Field label="Rider Mode" required>
-          <select className={sel} value={form.rental_mode} onChange={e => set("rental_mode", e.target.value)} required>
+          <select className={sel} value={form.rider_mode} onChange={e => set("rider_mode", e.target.value)} required>
             <option value="">Select mode</option>
-            {RENTAL_MODES.map(m => <option key={m} value={m}>{m}</option>)}
+            {RIDER_MODES.map(m => <option key={m} value={m}>{m}</option>)}
           </select>
+        </Field>
+        <Field label="Rental Plan" required>
+          <select className={sel} value={form.rental_plan} onChange={e => set("rental_plan", e.target.value)} required>
+            <option value="">Select plan</option>
+            {RENTAL_PLANS.map(m => <option key={m} value={m}>{m[0].toUpperCase() + m.slice(1)}</option>)}
+          </select>
+        </Field>
+        <Field label="Daily Rental (₹)" required hint="Prefilled from the vehicle's model rate — edit if the rider's km/usage deal differs">
+          <input type="number" className={inp} value={form.daily_rent} onChange={e => set("daily_rent", e.target.value)} placeholder="e.g. 240" required />
         </Field>
         <Field label="Onboarding Fee (₹)"><input type="number" className={inp} value={form.onboarding_fee} onChange={e => set("onboarding_fee", e.target.value)} placeholder="0" /></Field>
         <Field label="Security Deposit (₹)"><input type="number" className={inp} value={form.security_deposit} onChange={e => set("security_deposit", e.target.value)} placeholder="0" /></Field>
