@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import ImageUpload from "@/components/ImageUpload";
+import { istTodayISO } from "@/lib/date";
 
 const RIDER_MODES = ["B2B fleet rental", "Rider rental", "B2B rider"];
 const RENTAL_PLANS = ["weekly", "monthly"];
@@ -58,7 +59,7 @@ export default function AllotmentForm() {
     amount_collected: "", payment_screenshot_url: "",
     undertaking_url: "",
     allotment_pics: ["", "", "", "", ""],
-    assigned_date: new Date().toISOString().split("T")[0],
+    assigned_date: istTodayISO(),
   });
 
   function set(k: string, v: string) { setForm(p => ({ ...p, [k]: v })); }

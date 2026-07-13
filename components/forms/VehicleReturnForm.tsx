@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import ImageUpload from "@/components/ImageUpload";
 import PaymentProof, { PaymentProofValue, emptyProof, proofValid } from "@/components/PaymentProof";
+import { istTodayISO } from "@/lib/date";
 
 const CONDITIONS = ["Same as allotted", "Motor damaged", "Controller issue", "Branding issue", "Any other issue"];
 
@@ -42,7 +43,7 @@ export default function VehicleReturnForm() {
     condition_on_return: [] as string[],
     return_remarks: "",
     return_photos: ["", "", ""],
-    returned_date: new Date().toISOString().split("T")[0],
+    returned_date: istTodayISO(),
     is_issue_swap: false,
     non_functional_days: "",
   });
