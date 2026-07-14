@@ -5,6 +5,7 @@ import Link from "next/link";
 import ExportButton from "@/components/ExportButton";
 import Pagination from "@/components/Pagination";
 import { fetchList } from "@/lib/listFetch";
+import { dateIN } from "@/lib/format";
 import { VSTATUS, VEHICLE_FILTERS, vehicleStatusColor, vehicleStatusLabel } from "@/lib/vehicleStatus";
 
 const PAGE_SIZE = 25;
@@ -166,7 +167,7 @@ export default function VehiclesTable({ statusFilter: initialStatus }: { statusF
                   <td className="px-5 py-3">
                     {v.rider_id ? <Link href={`/riders/${v.rider_id}`} className="text-secondary hover:text-accent-warning hover:underline transition-colors">{v.assigned_rider}</Link> : <span className="text-muted">—</span>}
                   </td>
-                  <td className="px-5 py-3 text-muted text-xs">{v.purchase_date ? new Date(v.purchase_date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "—"}</td>
+                  <td className="px-5 py-3 text-muted text-xs">{v.purchase_date ? dateIN(v.purchase_date, { day: "numeric", month: "short", year: "numeric" }) : "—"}</td>
                   <td className="px-5 py-3 text-accent-warning">{v.price ? "₹" + Number(v.price).toLocaleString() : "—"}</td>
                   <td className="px-5 py-3">
                     <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${vehicleStatusColor[v.status] ?? "bg-muted/20 text-muted"}`}>{vehicleStatusLabel(v.status)}</span>

@@ -8,7 +8,7 @@ import { getSession } from "@/lib/auth";
 import VehicleInvestorCard from "@/components/vehicles/VehicleInvestorCard";
 import VehicleStatusControl from "@/components/vehicles/VehicleStatusControl";
 import VehicleRepairsCard from "@/components/vehicles/VehicleRepairsCard";
-import { inr } from "@/lib/format";
+import { inr, dateIN } from "@/lib/format";
 
 async function getData(id: string) {
   const [vehicle, assignments, payouts, repairs] = await Promise.all([
@@ -121,7 +121,7 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
               { label: "Motor No.", value: vehicle.motor_number ?? "—" },
               { label: "Controller No.", value: vehicle.controller_number ?? "—" },
               { label: "Model", value: `${vehicle.model_name} (${vehicle.oem})` },
-              { label: "Purchase Date", value: vehicle.purchase_date ? new Date(vehicle.purchase_date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "—" },
+              { label: "Purchase Date", value: vehicle.purchase_date ? dateIN(vehicle.purchase_date, { day: "numeric", month: "short", year: "numeric" }) : "—" },
             ].map((row) => (
               <div key={row.label} className="flex justify-between py-2 border-b border-default last:border-0">
                 <span className="text-muted text-sm">{row.label}</span>
@@ -206,8 +206,8 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
                     <p className="text-muted text-xs">{a.rider_code} · {a.rider_mobile}</p>
                   </td>
                   <td className="px-5 py-3 text-secondary text-xs">{a.allotment_code ?? "—"}</td>
-                  <td className="px-5 py-3 text-secondary text-xs">{new Date(a.assigned_date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</td>
-                  <td className="px-5 py-3 text-secondary text-xs">{a.returned_date ? new Date(a.returned_date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "Active"}</td>
+                  <td className="px-5 py-3 text-secondary text-xs">{dateIN(a.assigned_date, { day: "numeric", month: "short", year: "numeric" })}</td>
+                  <td className="px-5 py-3 text-secondary text-xs">{a.returned_date ? dateIN(a.returned_date, { day: "numeric", month: "short", year: "numeric" }) : "Active"}</td>
                   <td className="px-5 py-3"><span className={`px-2 py-0.5 rounded-full text-xs capitalize ${statusColor[a.status] ?? "bg-muted/20 text-muted"}`}>{a.status}</span></td>
                 </tr>
               ))}
@@ -234,8 +234,8 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
                 <tr><td colSpan={4} className="px-5 py-8 text-center text-muted">No payouts yet</td></tr>
               ) : payouts.map((p: { due_date: string; paid_date: string; amount: number; status: string }, i: number) => (
                 <tr key={i} className="border-b border-subtle">
-                  <td className="px-5 py-3 text-secondary">{new Date(p.due_date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</td>
-                  <td className="px-5 py-3 text-secondary">{p.paid_date ? new Date(p.paid_date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "—"}</td>
+                  <td className="px-5 py-3 text-secondary">{dateIN(p.due_date, { day: "numeric", month: "short", year: "numeric" })}</td>
+                  <td className="px-5 py-3 text-secondary">{p.paid_date ? dateIN(p.paid_date, { day: "numeric", month: "short", year: "numeric" }) : "—"}</td>
                   <td className="px-5 py-3 text-accent-teal font-semibold">{inr(p.amount)}</td>
                   <td className="px-5 py-3"><span className={`px-2 py-0.5 rounded-full text-xs capitalize ${payoutStatus[p.status] ?? "bg-muted/20 text-muted"}`}>{p.status}</span></td>
                 </tr>

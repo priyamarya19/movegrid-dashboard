@@ -3,7 +3,7 @@ import { getLedgerSummary, getOverdueRiders, getDueSoonRiders } from "@/lib/rent
 import { getFleetRiderCounts } from "@/lib/fleetStats";
 import { getRecentRiders } from "@/lib/riderStats";
 import { VSTATUS, NOT_AVAILABLE } from "@/lib/vehicleStatus";
-import { inrCompact } from "@/lib/format";
+import { inrCompact, dateIN } from "@/lib/format";
 
 const statusColor: Record<string, string> = {
   active: "bg-accent-success/20 text-accent-success-text",
@@ -122,7 +122,7 @@ export default async function OpsManagerHome() {
                     <span className={`px-2 py-0.5 rounded-full text-xs capitalize ${statusColor[r.status] ?? "bg-muted/20 text-muted"}`}>{r.status}</span>
                   </td>
                   <td className="px-5 py-3 text-muted text-xs whitespace-nowrap">
-                    {new Date(r.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
+                    {dateIN(r.created_at, { day: "numeric", month: "short" })}
                   </td>
                 </tr>
               ))}

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useToast } from "@/components/Toast";
 import { useConfirm } from "@/components/Confirm";
+import { dateIN } from "@/lib/format";
 
 type WaiverRequest = {
   id: string;
@@ -108,7 +109,7 @@ export default function RentWaiverReview() {
                   <td className="px-5 py-3.5 text-primary font-semibold">{r.non_functional_days} day{r.non_functional_days !== 1 ? "s" : ""}</td>
                   <td className="px-5 py-3.5 text-secondary text-xs">{r.requested_by ?? "—"}</td>
                   <td className="px-5 py-3.5 text-muted text-xs whitespace-nowrap">
-                    {new Date(r.requested_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                    {dateIN(r.requested_at, { day: "numeric", month: "short", year: "numeric" })}
                   </td>
                   <td className="px-5 py-3.5">
                     <div className="flex items-center gap-2">

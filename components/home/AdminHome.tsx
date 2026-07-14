@@ -9,7 +9,7 @@ import { getLedgerSummary } from "@/lib/rent";
 import { getFleetRiderCounts } from "@/lib/fleetStats";
 import { getFinancialStats } from "@/lib/financialStats";
 import { VSTATUS, NOT_AVAILABLE } from "@/lib/vehicleStatus";
-import { inrCompact, timeAgo, greeting } from "@/lib/format";
+import { inrCompact, timeAgo, greeting, dateIN } from "@/lib/format";
 
 type Props = { role: string; name: string };
 
@@ -149,7 +149,7 @@ export default async function AdminHome({ role, name }: Props) {
   // Single source: same ledger figures used by Ops & Investor dashboards.
   const collection = { collected: ledger.collected, expected: ledger.expectedToDate, pending: ledger.overdue, pct: ledger.pct };
 
-  const currentMonth = new Date().toLocaleDateString("en-IN", { month: "long", year: "numeric" });
+  const currentMonth = dateIN(new Date(), { month: "long", year: "numeric" });
   const pctColor = collection.pct >= 80 ? "var(--accent-teal)" : collection.pct >= 50 ? "var(--accent-warning)" : "var(--accent-danger-alt)";
   const roleLabel: Record<string, string> = { admin: "Admin", ops_manager: "Ops Manager", hub_incharge: "Hub Incharge" };
 

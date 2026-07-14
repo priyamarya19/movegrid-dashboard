@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import ExportButton from "@/components/ExportButton";
+import { dateIN } from "@/lib/format";
 
 type Investor = {
   id: string; name: string; email: string; mobile: string;
@@ -153,7 +154,7 @@ export default function InvestorsTable() {
                   <td className="px-5 py-3 text-accent-purple font-semibold">{inv.vehicle_count}</td>
                   <td className="px-5 py-3 text-accent-success-text">₹{Number(inv.total_paid).toLocaleString()}</td>
                   <td className="px-5 py-3 text-accent-danger">₹{Number(inv.pending_amount).toLocaleString()}</td>
-                  <td className="px-5 py-3 text-muted text-xs">{inv.investment_date ? new Date(inv.investment_date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "—"}</td>
+                  <td className="px-5 py-3 text-muted text-xs">{inv.investment_date ? dateIN(inv.investment_date, { day: "numeric", month: "short", year: "numeric" }) : "—"}</td>
                   <td className="px-5 py-3">
                     <span className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize ${inv.status === "active" ? "bg-accent-success/20 text-accent-success-text" : "bg-muted/20 text-muted"}`}>{inv.status}</span>
                   </td>

@@ -3,7 +3,7 @@ import { schemas } from "@/lib/schemas";
 import { unstable_cache } from "next/cache";
 import Link from "next/link";
 import { VSTATUS } from "@/lib/vehicleStatus";
-import { greeting } from "@/lib/format";
+import { greeting, dateIN } from "@/lib/format";
 
 type Props = { name: string };
 
@@ -127,7 +127,7 @@ export default async function HubInchargeHome({ name }: Props) {
                     <span className={`px-2 py-0.5 rounded-full text-xs capitalize ${statusColor[r.status] ?? "bg-muted/20 text-muted"}`}>{r.status}</span>
                   </td>
                   <td className="px-5 py-3 text-muted text-xs">
-                    {new Date(r.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
+                    {dateIN(r.created_at, { day: "numeric", month: "short" })}
                   </td>
                 </tr>
               ))}

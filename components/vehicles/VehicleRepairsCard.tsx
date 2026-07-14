@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { dateIN } from "@/lib/format";
 
 type Repair = {
   id: string;
@@ -24,7 +25,7 @@ type Props = {
 };
 
 const fmtDate = (d: string | null) =>
-  d ? new Date(d + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "—";
+  d ? dateIN(d + "T00:00:00", { day: "numeric", month: "short", year: "numeric" }) : "—";
 
 export default function VehicleRepairsCard({ vehicleId, repairs, canEdit }: Props) {
   const router = useRouter();

@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import DashboardLayout from "@/components/DashboardLayout";
 import pool from "@/lib/db";
+import { dateIN, dateTimeIN } from "@/lib/format";
 import { schemas } from "@/lib/schemas";
 import { getSession } from "@/lib/auth";
 import LeadComments from "@/components/leads/LeadComments";
@@ -73,7 +74,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
               {lead.city && <span> · {lead.city}</span>}
             </p>
             <p className="text-muted text-xs mt-1">
-              Received {new Date(lead.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+              Received {dateTimeIN(lead.created_at)}
             </p>
           </div>
           <span className={`px-3 py-1 rounded-full text-sm font-medium capitalize ${statusColor[lead.status] ?? "bg-muted/20 text-muted"}`}>{lead.status}</span>
@@ -89,7 +90,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
               { label: "Email", value: lead.email ?? "—" },
               { label: "City", value: lead.city ?? "—" },
               { label: "Lead Type", value: lead.type },
-              { label: "Received On", value: new Date(lead.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) },
+              { label: "Received On", value: dateIN(lead.created_at, { day: "numeric", month: "short", year: "numeric" }) },
             ].map((row) => (
               <div key={row.label} className="flex justify-between py-2 border-b border-default last:border-0">
                 <span className="text-muted text-sm">{row.label}</span>

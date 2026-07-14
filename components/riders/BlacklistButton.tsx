@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/Toast";
 import { useConfirm } from "@/components/Confirm";
+import { dateIN } from "@/lib/format";
 
 type Props = {
   riderId: string;
@@ -78,7 +79,7 @@ export default function BlacklistButton({ riderId, isBlacklisted, blacklistReaso
           )}
         </div>
         {blacklistReason && <p className="text-accent-danger-alt-text/80 text-xs">Reason: {blacklistReason}</p>}
-        {blacklistedBy && <p className="text-muted text-xs">By {blacklistedBy}{blacklistedAt ? ` · ${new Date(blacklistedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}` : ""}</p>}
+        {blacklistedBy && <p className="text-muted text-xs">By {blacklistedBy}{blacklistedAt ? ` · ${dateIN(blacklistedAt, { day: "numeric", month: "short", year: "numeric" })}` : ""}</p>}
       </div>
     );
   }

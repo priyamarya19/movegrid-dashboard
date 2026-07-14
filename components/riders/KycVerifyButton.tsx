@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { dateIN } from "@/lib/format";
 
 type Props = {
   riderId: string;
@@ -45,7 +46,7 @@ export default function KycVerifyButton({ riderId, document, initialVerified, in
           {verifiedBy && (
             <p className="text-faint text-[10px] mt-0.5">
               by {verifiedBy}
-              {verifiedAt ? " · " + new Date(verifiedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) : ""}
+              {verifiedAt ? " · " + dateIN(verifiedAt, { day: "numeric", month: "short" }) : ""}
             </p>
           )}
         </div>

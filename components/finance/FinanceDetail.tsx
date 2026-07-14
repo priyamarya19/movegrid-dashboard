@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import ExportButton from "@/components/ExportButton";
+import { dateIN } from "@/lib/format";
 
 type Row = { date: string; source: string; rider_id: string; rider_name: string; amount: number };
 
@@ -72,7 +73,7 @@ export default function FinanceDetail({ source, bucket }: { source: string; buck
               ) : rows.map((r, i) => (
                 <tr key={i} className="border-b border-subtle hover:bg-overlay-hover transition-colors">
                   <td className="px-5 py-3 text-secondary whitespace-nowrap">
-                    {new Date(r.date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                    {dateIN(r.date, { day: "numeric", month: "short", year: "numeric" })}
                   </td>
                   <td className="px-5 py-3 text-secondary">{r.source}</td>
                   <td className="px-5 py-3">

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import ImageUpload from "@/components/ImageUpload";
 import PaymentProof, { PaymentProofValue, emptyProof, proofValid } from "@/components/PaymentProof";
 import { istTodayISO } from "@/lib/date";
+import { dateIN } from "@/lib/format";
 
 const CONDITIONS = ["Same as allotted", "Motor damaged", "Controller issue", "Branding issue", "Any other issue"];
 
@@ -135,7 +136,7 @@ export default function VehicleReturnForm() {
         </Field>
         {assignment && (
           <Field label="Allotment Date">
-            <input className={inp + " opacity-60"} value={assignment.assigned_date ? new Date(assignment.assigned_date).toLocaleDateString("en-IN") : "—"} readOnly />
+            <input className={inp + " opacity-60"} value={assignment.assigned_date ? dateIN(assignment.assigned_date) : "—"} readOnly />
           </Field>
         )}
         <Field label="Submission / Return Date" required>

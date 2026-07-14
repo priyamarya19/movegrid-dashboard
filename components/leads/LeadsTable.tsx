@@ -5,6 +5,7 @@ import Link from "next/link";
 import ExportButton from "@/components/ExportButton";
 import Pagination from "@/components/Pagination";
 import { fetchList } from "@/lib/listFetch";
+import { dateIN } from "@/lib/format";
 
 const PAGE_SIZE = 25;
 
@@ -163,7 +164,7 @@ export default function LeadsTable() {
                     </select>
                   </td>
                   <td className="px-5 py-3 text-muted text-xs">
-                    {new Date(lead.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "2-digit" })}
+                    {dateIN(lead.created_at, { day: "numeric", month: "short", year: "2-digit" })}
                   </td>
                 </tr>
               ))}

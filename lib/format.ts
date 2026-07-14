@@ -14,10 +14,27 @@ export function inrCompact(n: number): string {
   return "₹" + Math.round(n);
 }
 
-/** Date in en-IN, e.g. 12 Jul 2026. Accepts an ISO string or Date. */
+// All display times are rendered in IST — the business timezone — regardless of
+// where the render happens (the UTC server during SSR, or the viewer's browser).
+// Backend/storage stays UTC; only the *display* is pinned here.
+const IST = "Asia/Kolkata";
+
+/** Date in IST, e.g. 12 Jul 2026. Accepts an ISO string or Date. */
 export function dateIN(d: string | Date | null | undefined, opts?: Intl.DateTimeFormatOptions): string {
   if (!d) return "—";
-  return new Date(d).toLocaleDateString("en-IN", opts ?? { day: "numeric", month: "short", year: "numeric" });
+  return new Date(d).toLocaleDateString("en-IN", { timeZone: IST, ...(opts ?? { day: "numeric", month: "short", year: "numeric" }) });
+}
+
+/** Date + time in IST, e.g. 12 Jul 2026, 8:27 pm. */
+export function dateTimeIN(d: string | Date | null | undefined): string {
+  if (!d) return "—";
+  return new Date(d).toLocaleString("en-IN", { timeZone: IST, day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit", hour12: true });
+}
+
+/** Time-of-day in IST, e.g. 8:27 pm. */
+export function timeIN(d: string | Date | null | undefined): string {
+  if (!d) return "—";
+  return new Date(d).toLocaleTimeString("en-IN", { timeZone: IST, hour: "numeric", minute: "2-digit", hour12: true });
 }
 
 /** Relative time, e.g. 5m ago / 3h ago / 2d ago. */

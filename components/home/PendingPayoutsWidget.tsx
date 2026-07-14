@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { inrCompact } from "@/lib/format";
+import { inrCompact, dateIN } from "@/lib/format";
 
 type Payout = {
   id: string;
@@ -65,7 +65,7 @@ export default function PendingPayoutsWidget({ initialPayouts }: { initialPayout
               <td className="px-5 py-3 text-accent-purple">{p.ev_number ?? "—"}</td>
               <td className="px-5 py-3 text-accent-teal font-semibold">{inrCompact(Number(p.amount))}</td>
               <td className="px-5 py-3 text-secondary whitespace-nowrap">
-                {new Date(p.due_date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                {dateIN(p.due_date, { day: "numeric", month: "short", year: "numeric" })}
               </td>
               <td className="px-5 py-3">
                 <button
