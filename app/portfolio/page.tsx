@@ -6,7 +6,7 @@ import { getPortfolioByUser } from "@/lib/portfolio";
 import { maskMobile, maskAadhaar } from "@/lib/mask";
 import RevealNumberButton from "@/components/investors/RevealNumberButton";
 import { vehicleStatusColor, vehicleStatusLabel } from "@/lib/vehicleStatus";
-import { inr } from "@/lib/format";
+import { inr, dateIN } from "@/lib/format";
 
 const payoutStatus: Record<string, string> = {
   paid: "bg-accent-success/20 text-accent-success-text",
@@ -15,7 +15,7 @@ const payoutStatus: Record<string, string> = {
 };
 
 const fmtDate = (d: string | null) =>
-  d ? new Date(d).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "—";
+  d ? dateIN(d, { day: "numeric", month: "short", year: "numeric" }) : "—";
 
 export default async function PortfolioPage() {
   const session = await getSession();
@@ -48,7 +48,7 @@ function PortfolioView({
   const { profile, vehicles, payouts, totalPaid, roi, payoutsMade, payoutsRemaining, termMonths } = portfolio;
 
   const sinceMonth = profile.investment_date
-    ? new Date(profile.investment_date).toLocaleDateString("en-IN", { month: "short", year: "numeric" })
+    ? dateIN(profile.investment_date, { month: "short", year: "numeric" })
     : null;
 
   const cards = [
@@ -139,7 +139,7 @@ function PortfolioView({
                 <tr><td colSpan={6} className="px-5 py-8 text-center text-muted">No payouts yet</td></tr>
               ) : payouts.map((p, i) => (
                 <tr key={i} className="border-b border-subtle">
-                  <td className="px-5 py-3 text-secondary">{p.period_month ?? p.due_date ? new Date(p.period_month ?? p.due_date).toLocaleDateString("en-IN", { month: "short", year: "numeric" }) : "—"}</td>
+                  <td className="px-5 py-3 text-secondary">{p.period_month ?? p.due_date ? dateIN(p.period_month ?? p.due_date, { month: "short", year: "numeric" }) : "—"}</td>
                   <td className="px-5 py-3 text-accent-purple">{p.ev_number ?? "—"}</td>
                   <td className="px-5 py-3 text-secondary">{fmtDate(p.paid_date)}</td>
                   <td className="px-5 py-3 text-accent-teal font-semibold">{inr(p.amount)}</td>

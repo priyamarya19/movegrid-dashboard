@@ -13,7 +13,7 @@ import RiderPenalties from "@/components/riders/RiderPenalties";
 import ExportButton from "@/components/ExportButton";
 import { maskPan, maskAccount, maskDl } from "@/lib/mask";
 import { getSession } from "@/lib/auth";
-import { inr } from "@/lib/format";
+import { inr, dateIN } from "@/lib/format";
 
 function toISTMidnight(d: Date): Date {
   // Returns a Date whose y/m/d components (in local time) match the IST date of d
@@ -152,7 +152,7 @@ export default async function RiderDetailPage({ params }: { params: Promise<{ id
           <div className="bg-surface border border-default rounded-xl p-5 space-y-3">
             <h2 className="text-primary font-semibold mb-4">Rider Details</h2>
             {[
-              { label: "Onboarded", value: rider.created_at ? new Date(rider.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "—" },
+              { label: "Onboarded", value: rider.created_at ? dateIN(rider.created_at, { day: "numeric", month: "short", year: "numeric" }) : "—" },
               { label: "Mobile", value: rider.mobile },
               { label: "Employer", value: rider.employer ?? "—" },
               { label: "Aadhaar", value: rider.aadhaar ? "XXXX XXXX " + rider.aadhaar.slice(-4) : "—" },
@@ -212,7 +212,7 @@ export default async function RiderDetailPage({ params }: { params: Promise<{ id
                     <p className="text-accent-teal font-medium group-hover:underline">{activeAssignment.ev_number}</p>
                     <p className="text-muted text-xs mt-0.5">{activeAssignment.model_name} · {activeAssignment.oem}</p>
                     {activeAssignment.allotment_code && <p className="text-muted text-xs">Allotment ID: {activeAssignment.allotment_code}</p>}
-                    <p className="text-muted text-xs">Assigned: {new Date(activeAssignment.assigned_date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</p>
+                    <p className="text-muted text-xs">Assigned: {dateIN(activeAssignment.assigned_date, { day: "numeric", month: "short", year: "numeric" })}</p>
                   </div>
                   <span className="text-muted group-hover:text-primary transition-colors">→</span>
                 </Link>
@@ -322,7 +322,7 @@ export default async function RiderDetailPage({ params }: { params: Promise<{ id
               <h2 className="text-primary font-semibold">Rent Cycle</h2>
               {activeAssignment?.paid_through_date && (
                 <p className="text-[11px] text-accent-teal mt-0.5">
-                  Paid through {new Date(activeAssignment.paid_through_date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                  Paid through {dateIN(activeAssignment.paid_through_date, { day: "numeric", month: "short", year: "numeric" })}
                 </p>
               )}
             </div>
@@ -366,7 +366,7 @@ export default async function RiderDetailPage({ params }: { params: Promise<{ id
                     : w.status === "Partial" ? "bg-accent-danger/15 text-accent-danger-text"
                     : w.status === "Overdue" ? "bg-accent-danger-alt/15 text-accent-danger-alt-text"
                     : "bg-accent-warning/15 text-accent-warning-text";
-                  const fmtD = (s: string) => new Date(s).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+                  const fmtD = (s: string) => dateIN(s, { day: "numeric", month: "short" });
                   const daysLeft = Math.round((new Date(w.due_date).getTime() - todayIST.getTime()) / 86400000);
                   const balance = Math.max(Math.round(w.amount - w.paid), 0);
                   return (

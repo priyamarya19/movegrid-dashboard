@@ -3,11 +3,12 @@
 import { useState } from "react";
 import Link from "next/link";
 import type { WeeklyCollection, ChaseRow } from "@/lib/collections";
+import { dateIN } from "@/lib/format";
 
 type Summary = { expectedToDate: number; collected: number; overdue: number; overdueRiders: number; pct: number };
 
 const inr = (n: number) => "₹" + Math.round(n).toLocaleString("en-IN");
-const fmtWk = (iso: string) => new Date(iso + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+const fmtWk = (iso: string) => dateIN(iso + "T00:00:00", { day: "numeric", month: "short" });
 
 // Aging buckets by days behind. Colours are semantic (good→critical), separate
 // from the brand accent.

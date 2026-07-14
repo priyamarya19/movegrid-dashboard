@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { dateTimeIN } from "@/lib/format";
 
 type Comment = {
   id: string;
@@ -34,10 +35,7 @@ const quickNotes = [
 ];
 
 function timeStr(date: string) {
-  return new Date(date).toLocaleString("en-IN", {
-    day: "numeric", month: "short", year: "numeric",
-    hour: "2-digit", minute: "2-digit"
-  });
+  return dateTimeIN(date);
 }
 
 type Props = {

@@ -8,7 +8,7 @@ import { getSession } from "@/lib/auth";
 import MapVehiclesPanel from "@/components/investors/MapVehiclesPanel";
 import RecordPayoutModal from "@/components/investors/RecordPayoutModal";
 import { vehicleStatusColor, vehicleStatusLabel } from "@/lib/vehicleStatus";
-import { inr } from "@/lib/format";
+import { inr, dateIN } from "@/lib/format";
 
 async function getData(id: string) {
   const [investor, vehicles, payouts] = await Promise.all([
@@ -111,7 +111,7 @@ export default async function InvestorDetailPage({ params }: { params: Promise<{
               { label: "PAN", value: investor.pan ?? "—" },
               { label: "Aadhaar", value: investor.aadhaar ? "XXXX XXXX " + investor.aadhaar.slice(-4) : "—" },
               { label: "Bank", value: investor.bank ?? "—" },
-              { label: "Investment Date", value: investor.investment_date ? new Date(investor.investment_date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "—" },
+              { label: "Investment Date", value: investor.investment_date ? dateIN(investor.investment_date, { day: "numeric", month: "short", year: "numeric" }) : "—" },
             ].map((row) => (
               <div key={row.label} className="flex justify-between py-2 border-b border-default last:border-0">
                 <span className="text-muted text-sm">{row.label}</span>
@@ -179,9 +179,9 @@ export default async function InvestorDetailPage({ params }: { params: Promise<{
                 <tr><td colSpan={6} className="px-5 py-8 text-center text-muted">No payouts yet</td></tr>
               ) : payouts.map((p: { ev_number: string; due_date: string; paid_date: string; amount: number; status: string; period_month: string | null; proof_url: string | null }, i: number) => (
                 <tr key={i} className="border-b border-subtle">
-                  <td className="px-5 py-3 text-secondary">{(p.period_month ?? p.due_date) ? new Date(p.period_month ?? p.due_date).toLocaleDateString("en-IN", { month: "short", year: "numeric" }) : "—"}</td>
+                  <td className="px-5 py-3 text-secondary">{(p.period_month ?? p.due_date) ? dateIN(p.period_month ?? p.due_date, { month: "short", year: "numeric" }) : "—"}</td>
                   <td className="px-5 py-3 text-accent-purple">{p.ev_number ?? "—"}</td>
-                  <td className="px-5 py-3 text-secondary">{p.paid_date ? new Date(p.paid_date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "—"}</td>
+                  <td className="px-5 py-3 text-secondary">{p.paid_date ? dateIN(p.paid_date, { day: "numeric", month: "short", year: "numeric" }) : "—"}</td>
                   <td className="px-5 py-3 text-accent-teal font-semibold">{inr(p.amount)}</td>
                   <td className="px-5 py-3"><span className={`px-2 py-0.5 rounded-full text-xs capitalize ${payoutStatus[p.status] ?? "bg-muted/20 text-muted"}`}>{p.status}</span></td>
                   <td className="px-5 py-3">

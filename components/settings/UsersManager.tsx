@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useToast } from "@/components/Toast";
 import { useConfirm } from "@/components/Confirm";
+import { dateIN } from "@/lib/format";
 
 type User = {
   id: string;
@@ -389,7 +390,7 @@ export default function UsersManager() {
                     </label>
                   </td>
                   <td className="px-5 py-3.5 text-muted text-xs whitespace-nowrap">
-                    {new Date(user.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                    {dateIN(user.created_at, { day: "numeric", month: "short", year: "numeric" })}
                   </td>
                   <td className="px-5 py-3.5">
                     {editingProfile === user.id ? (

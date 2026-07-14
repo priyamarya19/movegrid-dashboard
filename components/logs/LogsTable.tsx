@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import ExportButton from "@/components/ExportButton";
 import Pagination from "@/components/Pagination";
 import { fetchList } from "@/lib/listFetch";
-import { timeAgo } from "@/lib/format";
+import { timeAgo, dateTimeIN } from "@/lib/format";
 
 const PAGE_SIZE = 25;
 
@@ -134,7 +134,7 @@ export default function LogsTable() {
                   </td>
                   <td className="px-5 py-3 text-muted text-xs">{log.ip_address ?? "—"}</td>
                   <td className="px-5 py-3 text-muted text-xs">
-                    <span title={new Date(log.created_at).toLocaleString("en-IN")}>{timeAgo(log.created_at)}</span>
+                    <span title={dateTimeIN(log.created_at)}>{timeAgo(log.created_at)}</span>
                   </td>
                 </tr>
               ))}

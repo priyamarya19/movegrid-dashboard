@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { getPortfolioByUser } from "@/lib/portfolio";
 import { vehicleStatusColor, vehicleStatusLabel } from "@/lib/vehicleStatus";
-import { inr } from "@/lib/format";
+import { inr, dateIN } from "@/lib/format";
 
 type Props = { userId: string };
 
@@ -26,11 +26,11 @@ export default async function InvestorHome({ userId }: Props) {
   const { profile, vehicles, totalPaid, roi, impact, payoutsMade, payoutsRemaining, termMonths, nextDueDate } = portfolio;
 
   const sinceMonth = profile.investment_date
-    ? new Date(profile.investment_date).toLocaleDateString("en-IN", { month: "short", year: "numeric" })
+    ? dateIN(profile.investment_date, { month: "short", year: "numeric" })
     : null;
 
   const nextDueLabel = nextDueDate
-    ? new Date(nextDueDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
+    ? dateIN(nextDueDate, { day: "numeric", month: "short", year: "numeric" })
     : "—";
 
   const cards = [

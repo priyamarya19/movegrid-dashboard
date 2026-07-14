@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, Fragment } from "react";
 import PaymentProof, { PaymentProofValue, emptyProof, proofValid } from "@/components/PaymentProof";
 import { useConfirm } from "@/components/Confirm";
+import { dateIN } from "@/lib/format";
 
 type Penalty = {
   id: string; amount: number | null; detail: string | null; status: string;
@@ -65,7 +66,7 @@ export default function RiderPenalties({ riderId }: { riderId: string }) {
   }
 
   const outstanding = rows.filter(r => r.status === "pending").reduce((s, r) => s + (Number(r.amount) || 0), 0);
-  const fmtD = (s: string) => new Date(s).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+  const fmtD = (s: string) => dateIN(s, { day: "numeric", month: "short", year: "numeric" });
   const badge = (s: string) => s === "waived" ? "bg-default text-muted" : s === "paid" ? "bg-accent-success/15 text-accent-success-text" : "bg-accent-warning/15 text-accent-warning-text";
 
   return (

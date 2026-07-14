@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import RentMarkPaid from "./RentMarkPaid";
+import { dateIN } from "@/lib/format";
 
 type OverdueRider = {
   id: string; rider_code: string; name: string; mobile: string; status: string;
@@ -72,7 +73,7 @@ export default function OverdueTable() {
                       {r.vehicle_id ? <Link href={`/vehicles/${r.vehicle_id}`} className="text-accent-purple font-medium hover:underline">{r.vehicle_number}</Link> : <span className="text-muted">—</span>}
                     </td>
                     <td className="px-5 py-3 text-secondary whitespace-nowrap">
-                      {new Date(r.last_due_date).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
+                      {dateIN(r.last_due_date, { day: "numeric", month: "short" })}
                     </td>
                     <td className="px-5 py-3">
                       <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-accent-danger-alt/15 text-accent-danger-alt-text whitespace-nowrap">

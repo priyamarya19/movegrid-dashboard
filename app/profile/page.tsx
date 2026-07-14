@@ -4,10 +4,10 @@ import { getSession } from "@/lib/auth";
 import { getPortfolioByUser } from "@/lib/portfolio";
 import BankDetailsForm from "@/components/investors/BankDetailsForm";
 import AadhaarImageViewer from "@/components/investors/AadhaarImageViewer";
-import { inr } from "@/lib/format";
+import { inr, dateIN } from "@/lib/format";
 
 const fmtDate = (d: string | null) =>
-  d ? new Date(d).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "—";
+  d ? dateIN(d, { day: "numeric", month: "short", year: "numeric" }) : "—";
 
 const maskAadhaar = (a: string | null) =>
   a ? "XXXX XXXX " + a.slice(-4) : "—";

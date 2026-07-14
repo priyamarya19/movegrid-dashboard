@@ -5,6 +5,7 @@ import Link from "next/link";
 import ExportButton from "@/components/ExportButton";
 import Pagination from "@/components/Pagination";
 import { fetchList } from "@/lib/listFetch";
+import { dateIN } from "@/lib/format";
 import RecordPayment from "@/components/riders/RecordPayment";
 
 type Rider = {
@@ -263,7 +264,7 @@ export default function RidersTable({ rentFilter, statusFilter: initialStatus }:
                     <RentToggle rider={r} onToggled={fetchRiders} />
                   </td>
                   <td className="px-5 py-3 text-muted text-xs whitespace-nowrap">
-                    {new Date(r.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "2-digit" })}
+                    {dateIN(r.created_at, { day: "numeric", month: "short", year: "2-digit" })}
                   </td>
                 </tr>
               ))}
