@@ -8,6 +8,7 @@ import { getSession } from "@/lib/auth";
 import VehicleInvestorCard from "@/components/vehicles/VehicleInvestorCard";
 import VehicleStatusControl from "@/components/vehicles/VehicleStatusControl";
 import VehicleRepairsCard from "@/components/vehicles/VehicleRepairsCard";
+import PhotoGallery from "@/components/PhotoGallery";
 import { inr, dateIN } from "@/lib/format";
 
 async function getData(id: string) {
@@ -182,6 +183,12 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
             </div>
           </div>
         </div>
+
+        <PhotoGallery
+          title="Vehicle Photos"
+          accent="var(--accent-teal)"
+          photos={[vehicle.vehicle_photo_url, vehicle.rc_book_url, ...(vehicle.vehicle_photos ?? [])]}
+        />
 
         <div className="bg-surface border border-default rounded-xl overflow-hidden">
           <div className="px-5 py-4 border-b border-default">

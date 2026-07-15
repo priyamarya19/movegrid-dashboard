@@ -8,6 +8,7 @@ import BackButton from "@/components/BackButton";
 import BlacklistButton from "@/components/riders/BlacklistButton";
 import RecordPayment from "@/components/riders/RecordPayment";
 import ChangeRate from "@/components/riders/ChangeRate";
+import PhotoGallery from "@/components/PhotoGallery";
 import { getRiderCycle } from "@/lib/rent";
 import RiderPenalties from "@/components/riders/RiderPenalties";
 import ExportButton from "@/components/ExportButton";
@@ -314,6 +315,8 @@ export default async function RiderDetailPage({ params }: { params: Promise<{ id
             ))}
           </div>
         </div>
+
+        <PhotoGallery title="Additional Photos" accent="var(--accent-purple)" photos={rider.additional_photos} />
 
         {/* Rent cycle — full unbroken weekly ledger (no gaps; stops at return) */}
         <div className="bg-surface border border-default rounded-xl overflow-hidden">
