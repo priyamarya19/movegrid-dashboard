@@ -43,7 +43,7 @@ export default function VehicleReturnForm() {
     penalty_detail: "",
     condition_on_return: [] as string[],
     return_remarks: "",
-    return_photos: ["", "", ""],
+    return_photos: ["", "", "", ""],
     returned_date: istTodayISO(),
     is_issue_swap: false,
     non_functional_days: "",
@@ -199,11 +199,17 @@ export default function VehicleReturnForm() {
         </div>
 
         <Section title="Return Photos" />
-        {["Photo 1", "Photo 2", "Photo 3"].map((label, i) => (
-          <ImageUpload key={i} label={label} folder="returns"
+        {form.return_photos.map((_, i) => (
+          <ImageUpload key={i} label={`Photo ${i + 1}`} folder="returns"
             value={form.return_photos[i]}
             onChange={v => setForm(p => { const ph = [...p.return_photos]; ph[i] = v; return { ...p, return_photos: ph }; })} />
         ))}
+        <button type="button"
+          onClick={() => setForm(p => ({ ...p, return_photos: [...p.return_photos, ""] }))}
+          className="flex flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-strong text-muted hover:text-primary hover:border-accent-warning min-h-[7rem] transition-colors">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+          <span className="text-xs font-medium">Add photo</span>
+        </button>
 
       </div>
 
