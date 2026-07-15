@@ -35,6 +35,7 @@ export default function VehicleForm() {
     oem: "", iot_imei: "", iot_partner: "", battery_number: "", battery_partner: "",
     hub_id: "", purchase_date: "", price: "",
     vehicle_photo_url: "", rc_book_url: "",
+    vehicle_photos: [] as string[],
   });
 
   useEffect(() => { fetch("/api/hubs").then(r => r.json()).then(setHubs); }, []);
@@ -49,7 +50,7 @@ export default function VehicleForm() {
       const res = await fetch("/api/vehicles", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...form, price: form.price ? Number(form.price) : null, hub_id: form.hub_id || null }),
+        body: JSON.stringify({ ...form, price: form.price ? Number(form.price) : null, hub_id: form.hub_id || null, vehicle_photos: form.vehicle_photos.filter(Boolean).length ? form.vehicle_photos.filter(Boolean) : null }),
       });
       const data = await res.json();
       if (!res.ok) { setError(data.error || "Failed to create vehicle"); return; }
@@ -116,6 +117,19 @@ export default function VehicleForm() {
         <Section title="Documents & Photos" />
         <ImageUpload label="Vehicle Photo" folder="vehicles" value={form.vehicle_photo_url} onChange={v => set("vehicle_photo_url", v)} />
         <ImageUpload label="RC Book" folder="vehicles" value={form.rc_book_url} onChange={v => set("rc_book_url", v)} />
+
+        <Section title="Additional Photos" />
+        {form.vehicle_photos.map((_, i) => (
+          <ImageUpload key={i} label={`Photo ${i + 1}`} folder="vehicles"
+            value={form.vehicle_photos[i]}
+            onChange={v => setForm(p => { const ph = [...p.vehicle_photos]; ph[i] = v; return { ...p, vehicle_photos: ph }; })} />
+        ))}
+        <button type="button"
+          onClick={() => setForm(p => ({ ...p, vehicle_photos: [...p.vehicle_photos, ""] }))}
+          className="flex flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-strong text-muted hover:text-primary hover:border-accent-teal min-h-[7rem] transition-colors">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+          <span className="text-xs font-medium">Add photo</span>
+        </button>
 
       </div>
 

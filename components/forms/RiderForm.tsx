@@ -48,6 +48,7 @@ export default function RiderForm() {
     onboarding_fee: "", security_deposit: "",
     assigned_hub_id: "",
     profile_photo_url: "",
+    additional_photos: [] as string[],
   });
 
   useEffect(() => {
@@ -83,6 +84,7 @@ export default function RiderForm() {
           assigned_hub_id: form.assigned_hub_id || null,
           b2b_company: form.business_type === "b2b" ? form.b2b_company : null,
           b2b_location: form.business_type === "b2b" ? form.b2b_location : null,
+          additional_photos: form.additional_photos.filter(Boolean).length ? form.additional_photos.filter(Boolean) : null,
         }),
       });
       const data = await res.json();
@@ -178,6 +180,19 @@ export default function RiderForm() {
 
         <Field label="Onboarding Fee (₹)"><input type="number" className={inp} value={form.onboarding_fee} onChange={e => set("onboarding_fee", e.target.value)} placeholder="0" /></Field>
         <Field label="Security Deposit (₹)"><input type="number" className={inp} value={form.security_deposit} onChange={e => set("security_deposit", e.target.value)} placeholder="0" /></Field>
+
+        <Section title="Additional Photos" />
+        {form.additional_photos.map((_, i) => (
+          <ImageUpload key={i} label={`Photo ${i + 1}`} folder="riders"
+            value={form.additional_photos[i]}
+            onChange={v => setForm(p => { const ph = [...p.additional_photos]; ph[i] = v; return { ...p, additional_photos: ph }; })} />
+        ))}
+        <button type="button"
+          onClick={() => setForm(p => ({ ...p, additional_photos: [...p.additional_photos, ""] }))}
+          className="flex flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-strong text-muted hover:text-primary hover:border-accent-purple min-h-[7rem] transition-colors">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+          <span className="text-xs font-medium">Add photo</span>
+        </button>
 
       </div>
 

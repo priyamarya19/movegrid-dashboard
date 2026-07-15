@@ -58,10 +58,10 @@ export async function POST(req: NextRequest) {
       local_ref_name, local_ref_mobile,
       rental_mode, business_type, b2b_company, b2b_location, employer,
       onboarding_fee, security_deposit,
-      profile_photo_url, assigned_hub_id, status, created_by
+      profile_photo_url, assigned_hub_id, status, created_by, additional_photos
     ) VALUES (
       'MGR' || LPAD(NEXTVAL('${schemas.ops}.rider_code_seq')::TEXT, 6, '0'),
-      $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35
+      $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36
     ) RETURNING id, rider_code, name, mobile, status`,
     [
       b.name, b.nickname ?? null, b.mobile,
@@ -74,7 +74,7 @@ export async function POST(req: NextRequest) {
       b.local_ref_name ?? null, b.local_ref_mobile ?? null,
       rentalMode, b.business_type ?? "rental", b.b2b_company ?? null, b.b2b_location ?? null, b.employer ?? null,
       b.onboarding_fee ?? null, b.security_deposit ?? null,
-      b.profile_photo_url ?? null, b.assigned_hub_id ?? null, "pending", session.name,
+      b.profile_photo_url ?? null, b.assigned_hub_id ?? null, "pending", session.name, b.additional_photos ?? null,
     ]
     );
     await writeAudit({

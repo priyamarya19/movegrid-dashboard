@@ -22,14 +22,14 @@ export async function POST(req: NextRequest) {
       ev_number, chassis_number, motor_number, controller_number,
       iot_imei, iot_partner, battery_number, battery_partner,
       model_id, hub_id, status, purchase_date, price,
-      vehicle_photo_url, rc_book_url
-    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'ready_to_deploy',$11,$12,$13,$14)
+      vehicle_photo_url, rc_book_url, vehicle_photos
+    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'ready_to_deploy',$11,$12,$13,$14,$15)
     RETURNING id, ev_number, status`,
     [
       b.ev_number, b.chassis_number ?? null, b.motor_number ?? null, b.controller_number ?? null,
       b.iot_imei ?? null, b.iot_partner ?? null, b.battery_number ?? null, b.battery_partner ?? null,
       model.rows[0].id, b.hub_id ?? null, b.purchase_date || null, b.price ?? null,
-      b.vehicle_photo_url ?? null, b.rc_book_url ?? null,
+      b.vehicle_photo_url ?? null, b.rc_book_url ?? null, b.vehicle_photos ?? null,
     ]
   );
   return NextResponse.json(result.rows[0], { status: 201 });

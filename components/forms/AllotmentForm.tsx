@@ -204,12 +204,18 @@ export default function AllotmentForm() {
         <ImageUpload label="Signed Undertaking" folder="undertakings" value={form.undertaking_url} onChange={v => set("undertaking_url", v)} />
         <Field label="Allotment Date" required><input type="date" className={inp} value={form.assigned_date} onChange={e => set("assigned_date", e.target.value)} required /></Field>
 
-        <Section title="Allotment Photos (up to 5)" />
-        {["Front", "Left side", "Right side", "Back", "Rider on scooter"].map((label, i) => (
-          <ImageUpload key={i} label={label} folder="allotments"
+        <Section title="Allotment Photos" />
+        {form.allotment_pics.map((_, i) => (
+          <ImageUpload key={i} label={["Front", "Left side", "Right side", "Back", "Rider on scooter"][i] ?? `Photo ${i + 1}`} folder="allotments"
             value={form.allotment_pics[i]}
             onChange={v => setForm(p => { const pics = [...p.allotment_pics]; pics[i] = v; return { ...p, allotment_pics: pics }; })} />
         ))}
+        <button type="button"
+          onClick={() => setForm(p => ({ ...p, allotment_pics: [...p.allotment_pics, ""] }))}
+          className="flex flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-strong text-muted hover:text-primary hover:border-accent-warning min-h-[7rem] transition-colors">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+          <span className="text-xs font-medium">Add photo</span>
+        </button>
 
       </div>
 
