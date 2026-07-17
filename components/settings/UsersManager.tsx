@@ -14,6 +14,7 @@ type User = {
   status: string;
   created_at: string;
   can_approve_rent_waivers: boolean;
+  can_view_allotments: boolean;
 };
 
 const ROLES = ["admin", "ops_manager", "hub_incharge", "investor"];
@@ -176,6 +177,21 @@ export default function UsersManager() {
     }
   }
 
+  async function handleAllotmentsToggle(userId: string, current: boolean) {
+    const res = await fetch(`/api/users/${userId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ can_view_allotments: !current }),
+    });
+    if (res.ok) {
+      setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, can_view_allotments: !current } : u)));
+      toast.show("Permission updated", "success");
+    } else {
+      const msg = await res.json().catch(() => ({}));
+      toast.show(msg.error || "Couldn't update permission", "error");
+    }
+  }
+
   return (
     <div className="space-y-6">
       {/* Page header */}
@@ -300,7 +316,7 @@ export default function UsersManager() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-default">
-                {["Member", "Email", "Mobile", "Role", "Status", "Approve Waivers", "Created", "Actions"].map((h) => (
+                {["Member", "Email", "Mobile", "Role", "Status", "Approve Waivers", "View Allotments", "Created", "Actions"].map((h) => (
                   <th key={h} className="text-left px-5 py-3 text-[11px] text-muted uppercase tracking-wider whitespace-nowrap">{h}</th>
                 ))}
               </tr>
@@ -387,6 +403,17 @@ export default function UsersManager() {
                         className="w-3.5 h-3.5 accent-accent-success"
                       />
                       <span className="text-muted text-xs">{user.can_approve_rent_waivers ? "Yes" : "No"}</span>
+                    </label>
+                  </td>
+                  <td className="px-5 py-3.5">
+                    <label className="inline-flex items-center gap-1.5 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={user.can_view_allotments}
+                        onChange={() => handleAllotmentsToggle(user.id, user.can_view_allotments)}
+                        className="w-3.5 h-3.5 accent-accent-success"
+                      />
+                      <span className="text-muted text-xs">{user.can_view_allotments ? "Yes" : "No"}</span>
                     </label>
                   </td>
                   <td className="px-5 py-3.5 text-muted text-xs whitespace-nowrap">

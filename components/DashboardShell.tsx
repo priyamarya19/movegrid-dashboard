@@ -11,10 +11,11 @@ import { ConfirmProvider } from "@/components/Confirm";
 type Props = {
   role: string;
   name: string;
+  canViewAllotments?: boolean;
   children: React.ReactNode;
 };
 
-export default function DashboardShell({ role, name, children }: Props) {
+export default function DashboardShell({ role, name, canViewAllotments, children }: Props) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
@@ -53,7 +54,7 @@ export default function DashboardShell({ role, name, children }: Props) {
         lg:relative lg:translate-x-0 lg:z-auto
         ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
       `}>
-        <Sidebar role={role} name={name} onClose={() => setSidebarOpen(false)} />
+        <Sidebar role={role} name={name} canViewAllotments={canViewAllotments} onClose={() => setSidebarOpen(false)} />
       </div>
 
       {/* Main area */}

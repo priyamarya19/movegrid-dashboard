@@ -9,6 +9,8 @@ type NavItem = {
   href: string;
   icon: React.ReactNode;
   roles: string[];
+  // Some items are gated by a per-user permission flag instead of role.
+  flag?: "allotments";
 };
 
 const navItems: NavItem[] = [
@@ -35,6 +37,13 @@ const navItems: NavItem[] = [
     href: "/vehicles",
     roles: ["admin", "ops_manager", "hub_incharge"],
     icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 17H3a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v5"/><circle cx="16" cy="17" r="2"/><circle cx="9" cy="17" r="2"/></svg>,
+  },
+  {
+    label: "Allotments",
+    href: "/allotments",
+    roles: [],
+    flag: "allotments",
+    icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>,
   },
   {
     label: "Hubs",
@@ -95,15 +104,18 @@ const navItems: NavItem[] = [
 type Props = {
   role: string;
   name: string;
+  canViewAllotments?: boolean;
   onClose?: () => void;
 };
 
-export default function Sidebar({ role, name, onClose }: Props) {
+export default function Sidebar({ role, name, canViewAllotments, onClose }: Props) {
   const pathname = usePathname();
   const router = useRouter();
   const { theme, toggleTheme } = useTheme();
 
-  const visibleItems = navItems.filter((item) => item.roles.includes(role));
+  const visibleItems = navItems.filter((item) =>
+    item.flag === "allotments" ? !!canViewAllotments : item.roles.includes(role)
+  );
 
   const handleLogout = async () => {
     await fetch("/api/auth/logout", { method: "POST" });

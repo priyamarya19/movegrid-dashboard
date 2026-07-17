@@ -140,3 +140,18 @@ export async function requireSession(
   if (!(await isSessionCurrent(session))) return { response: unauthorizedResponse("expired") };
   return { session };
 }
+
+// Per-user "can view the Allotments list" permission (auth schema, migration 012).
+// Read live from the DB rather than the JWT so an admin ticking/unticking the box
+// takes effect immediately, without re-issuing tokens. Default false.
+export async function userCanViewAllotments(userId: string): Promise<boolean> {
+  try {
+    const res = await pool.query(
+      `SELECT can_view_allotments FROM ${schemas.auth}.users WHERE id = $1`,
+      [userId]
+    );
+    return res.rows[0]?.can_view_allotments === true;
+  } catch {
+    return false;
+  }
+}

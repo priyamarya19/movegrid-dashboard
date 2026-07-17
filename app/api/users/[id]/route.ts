@@ -119,5 +119,18 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     );
   }
 
+  // Per-user permission gating the Allotments list (migration 012).
+  if (body.can_view_allotments !== undefined) {
+    await pool.query(
+      `UPDATE ${schemas.auth}.users SET can_view_allotments = $1 WHERE id = $2`,
+      [body.can_view_allotments === true, id]
+    );
+    await writeAudit({
+      action: "user_permission_changed", entity: "user", entityId: id,
+      actorId: session.userId, actorName: session.name, req,
+      details: { can_view_allotments: body.can_view_allotments === true },
+    });
+  }
+
   return NextResponse.json({ ok: true });
 }
