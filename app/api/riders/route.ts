@@ -195,12 +195,17 @@ export async function GET(req: NextRequest) {
   const params: string[] = [];
   let total: number | null = null;
 
-  if (rent === "overdue" || rent === "due_soon") {
+  if (rent === "overdue" || rent === "due_soon" || rent === "pending_week") {
     // 2-day grace: not chased as Overdue until paid_through_date is > 2 days stale.
     // Due-soon: next week starts within 2 days but not yet past grace (matches
     // getOverdueRiders/getDueSoonRiders in lib/rent.ts exactly).
+    // Pending-week: current week unpaid AND at most one week behind — days_behind in
+    // [1,7] (paid_through in [today-7, today-1]); overlaps overdue by design. Amount
+    // is one week (overdue_weeks = 1 across this range). Matches getPendingThisWeekRiders.
     const overdueWhere = `rd.days_behind > 2`;
     const dueSoonWhere = `rd.days_behind BETWEEN -1 AND 2`;
+    const pendingWeekWhere = `rd.days_behind BETWEEN 1 AND 7`;
+    const rentWhere = rent === "overdue" ? overdueWhere : rent === "due_soon" ? dueSoonWhere : pendingWeekWhere;
 
     const rentSelect = baseSelect.replace(
       `FROM ${schemas.ops}.riders r`,
@@ -209,7 +214,7 @@ export async function GET(req: NextRequest) {
     query = `${rentDueCTE}
     ${rentSelect}
     JOIN rent_due rd ON rd.rider_id = r.id
-    WHERE ${rent === "overdue" ? overdueWhere : dueSoonWhere}
+    WHERE ${rentWhere}
     ORDER BY r.created_at DESC LIMIT ${LIMIT}`;
   } else {
     // Build the shared WHERE (status + hub + free-text q) once, so the page query

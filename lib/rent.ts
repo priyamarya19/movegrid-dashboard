@@ -114,21 +114,34 @@ export const getLedgerSummary = unstable_cache(async function getLedgerSummary()
       SELECT CEIL((${IST} - COALESCE(a.paid_through_date, a.assigned_date - 1)) / 7.0) * a.daily_rent * 7 AS overdue_amount
       FROM ${S}.rider_vehicle_assignments a
       WHERE a.status = 'active' AND COALESCE(a.paid_through_date, a.assigned_date - 1) < ${OVERDUE_CUTOFF}
+    ),
+    -- Riders whose current (ongoing) week is unpaid, at most one week behind. One
+    -- week's rent each. Overlaps with 'live' by design (see getPendingThisWeekRiders).
+    pending_week AS (
+      SELECT a.daily_rent * 7 AS pending_amount
+      FROM ${S}.rider_vehicle_assignments a
+      WHERE a.status = 'active'
+        AND COALESCE(a.paid_through_date, a.assigned_date - 1) <= ${IST} - 1
+        AND COALESCE(a.paid_through_date, a.assigned_date - 1) >= ${IST} - 7
     )
     SELECT
       (SELECT COALESCE(SUM(amount) FILTER (WHERE period_start < ${IST}), 0) FROM hist) AS expected_to_date,
       (SELECT COALESCE(SUM(LEAST(paid, amount)), 0) FROM hist) AS collected,
       (SELECT COALESCE(SUM(overdue_amount), 0) FROM live) AS overdue,
-      (SELECT COUNT(*) FROM live) AS overdue_riders
+      (SELECT COUNT(*) FROM live) AS overdue_riders,
+      (SELECT COALESCE(SUM(pending_amount), 0) FROM pending_week) AS pending_this_week,
+      (SELECT COUNT(*) FROM pending_week) AS pending_this_week_riders
   `);
   const r = res.rows[0];
   const expected = Number(r.expected_to_date), collected = Number(r.collected);
   return {
     expectedToDate: expected, collected, overdue: Number(r.overdue),
     overdueRiders: Number(r.overdue_riders),
+    pendingThisWeek: Number(r.pending_this_week),
+    pendingThisWeekRiders: Number(r.pending_this_week_riders),
     pct: expected > 0 ? Math.round((collected / expected) * 100) : 0,
   };
-}, ["ledger-summary-v2"], { revalidate: 60 });
+}, ["ledger-summary-v3"], { revalidate: 60 });
 
 // Riders currently overdue — computed directly from paid_through_date, no rent_dues
 // dependency (so it can never go stale relative to today). Shared everywhere.
@@ -170,3 +183,31 @@ export const getDueSoonRiders = unstable_cache(async function getDueSoonRiders()
     next_due_date: r.next_due_date,
   }));
 }, ["due-soon-riders-v3"], { revalidate: 60 });
+
+// Riders whose CURRENT (ongoing) week is unpaid — and who are at most one week behind
+// (i.e. that current week is their ONLY unpaid week; no earlier week has fully lapsed).
+// This is the operational "collect this week's rent" worklist, distinct from Overdue.
+//   paid_through <= today - 1  → the current week isn't paid yet
+//   paid_through >= today - 7  → not more than one week behind (no PREVIOUS overdue week)
+// The amount is always exactly one week's rent (daily_rent * 7) — never past weeks.
+// NOTE: this intentionally OVERLAPS with getOverdueRiders (which fires at >2 days past
+// paid_through). A rider 3-7 days past paid_through is inside their current week AND
+// past the overdue grace, so appears in both lists — by design; Overdue is left as-is.
+export const getPendingThisWeekRiders = unstable_cache(async function getPendingThisWeekRiders() {
+  const S = schemas.ops;
+  const res = await pool.query(`
+    SELECT r.id AS rider_id, r.rider_code, r.name, r.mobile,
+      a.daily_rent * 7 AS pending_amount,
+      to_char(COALESCE(a.paid_through_date, a.assigned_date - 1) + 1, 'YYYY-MM-DD') AS week_start,
+      to_char(COALESCE(a.paid_through_date, a.assigned_date - 1) + 7, 'YYYY-MM-DD') AS week_end
+    FROM ${S}.rider_vehicle_assignments a
+    JOIN ${S}.riders r ON r.id = a.rider_id
+    WHERE a.status = 'active'
+      AND COALESCE(a.paid_through_date, a.assigned_date - 1) <= ${IST} - 1
+      AND COALESCE(a.paid_through_date, a.assigned_date - 1) >= ${IST} - 7
+    ORDER BY week_start ASC`);
+  return res.rows.map((r) => ({
+    rider_id: r.rider_id, rider_code: r.rider_code, name: r.name, mobile: r.mobile,
+    pending_amount: Number(r.pending_amount), week_start: r.week_start, week_end: r.week_end,
+  }));
+}, ["pending-this-week-riders-v1"], { revalidate: 60 });

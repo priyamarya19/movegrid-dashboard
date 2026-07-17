@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getLedgerSummary, getOverdueRiders, getDueSoonRiders } from "@/lib/rent";
+import { getLedgerSummary, getOverdueRiders, getDueSoonRiders, getPendingThisWeekRiders } from "@/lib/rent";
 import { getFleetRiderCounts } from "@/lib/fleetStats";
 import { getRecentRiders } from "@/lib/riderStats";
 import { VSTATUS, NOT_AVAILABLE } from "@/lib/vehicleStatus";
@@ -13,11 +13,12 @@ const statusColor: Record<string, string> = {
 };
 
 export default async function OpsManagerHome() {
-  const [fleet, recentRiders, ledger, overdueRiders, dueSoonRiders] = await Promise.all([
-    getFleetRiderCounts(), getRecentRiders(), getLedgerSummary(), getOverdueRiders(), getDueSoonRiders(),
+  const [fleet, recentRiders, ledger, overdueRiders, dueSoonRiders, pendingWeekRiders] = await Promise.all([
+    getFleetRiderCounts(), getRecentRiders(), getLedgerSummary(), getOverdueRiders(), getDueSoonRiders(), getPendingThisWeekRiders(),
   ]);
   const overdueCount = overdueRiders.length;
   const dueSoonCount = dueSoonRiders.length;
+  const pendingWeekCount = pendingWeekRiders.length;
   // Single source: identical to Admin & Investor dashboards.
   const collection = { collected: ledger.collected, expected: ledger.expectedToDate, pending: ledger.overdue, pct: ledger.pct };
   const pctColor = collection.pct >= 80 ? "var(--accent-teal)" : collection.pct >= 50 ? "var(--accent-warning)" : "var(--accent-danger-alt)";
@@ -37,6 +38,7 @@ export default async function OpsManagerHome() {
           { label: "Available Vehicles", value: fleet.availableVehicles, color: "var(--accent-purple-2)", href: `/vehicles?status=${VSTATUS.available}` },
           { label: "Not Available", value: fleet.notAvailableVehicles, color: "var(--accent-warning)", href: `/vehicles?status=${NOT_AVAILABLE}` },
           { label: "Overdue Rent", value: overdueCount, color: "var(--accent-danger-alt)", href: "/riders/overdue" },
+          { label: "Pending This Week", value: pendingWeekCount, color: "var(--accent-teal)", href: "/riders/pending-week" },
           { label: "Due in 2 Days", value: dueSoonCount, color: "var(--accent-warning)", href: "/riders/due-soon" },
         ].map((c) => (
           <Link key={c.label} href={c.href} className="bg-surface border border-default rounded-xl p-5 hover:border-strong transition-colors">
