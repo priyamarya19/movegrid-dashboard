@@ -3,6 +3,7 @@ import { schemas } from "@/lib/schemas";
 import { unstable_cache } from "next/cache";
 import Link from "next/link";
 import { VSTATUS } from "@/lib/vehicleStatus";
+import { getPendingThisWeekRiders } from "@/lib/rent";
 import { greeting, dateIN } from "@/lib/format";
 
 type Props = { name: string };
@@ -53,7 +54,7 @@ const quickActions = [
 ];
 
 export default async function HubInchargeHome({ name }: Props) {
-  const [stats, riders] = await Promise.all([getStats(), getRecentRiders()]);
+  const [stats, riders, pendingWeekRiders] = await Promise.all([getStats(), getRecentRiders(), getPendingThisWeekRiders()]);
   const firstName = name.split(" ")[0];
 
   return (
@@ -71,6 +72,7 @@ export default async function HubInchargeHome({ name }: Props) {
           { label: "Pending KYC", value: stats.pendingRiders, color: "var(--accent-warning)", href: "/riders?status=pending" },
           { label: "Vehicles Deployed", value: stats.assignedVehicles, color: "var(--accent-purple)", href: "/vehicles?status=assigned" },
           { label: "Available Vehicles", value: stats.availableVehicles, color: "var(--accent-purple-2)", href: `/vehicles?status=${VSTATUS.available}` },
+          { label: "Pending This Week", value: pendingWeekRiders.length, color: "var(--accent-teal)", href: "/riders/pending-week" },
         ].map((c) => (
           <Link key={c.label} href={c.href} className="bg-surface border border-default rounded-xl p-5 hover:border-strong transition-colors">
             <p className="text-[11px] text-muted uppercase tracking-wider mb-2">{c.label}</p>

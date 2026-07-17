@@ -223,6 +223,11 @@ export default async function AdminHome({ role, name }: Props) {
                 <p className="text-[11px] text-muted uppercase tracking-wider mb-1">Pending ↗</p>
                 <p className="text-[28px] font-bold text-accent-danger-alt group-hover:underline">{inrCompact(collection.pending)}</p>
               </Link>
+              <Link href="/riders/pending-week" className="group" title="Riders whose current week's rent is unpaid">
+                <p className="text-[11px] text-muted group-hover:text-accent-teal uppercase tracking-wider mb-1">This Week ↗</p>
+                <p className="text-[28px] font-bold text-accent-teal group-hover:underline">{inrCompact(ledger.pendingThisWeek)}</p>
+                <p className="text-[11px] text-muted">{ledger.pendingThisWeekRiders} rider{ledger.pendingThisWeekRiders !== 1 ? "s" : ""}</p>
+              </Link>
               <div className="ml-auto text-right">
                 <p className="text-[11px] text-muted uppercase tracking-wider mb-1">Collection</p>
                 <p className="text-[28px] font-bold" style={{ color: pctColor }}>{collection.pct}%</p>
