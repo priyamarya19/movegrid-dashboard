@@ -10,6 +10,10 @@ import { sendEmail } from "@/lib/email";
 const RECIPIENT = process.env.ERROR_ALERT_EMAIL || "priyam@movegrid.in";
 const ENV = process.env.RDS_ENV === "uat" ? "UAT" : "PROD";
 
+// Only prod errors page the inbox. UAT is noisy (testing, stale-build stragglers)
+// and isn't worth alerting on. Set ERROR_ALERT_UAT=1 to opt UAT alerts back in.
+const ALERTS_ENABLED = ENV === "PROD" || process.env.ERROR_ALERT_UAT === "1";
+
 // In-memory throttle: don't re-send the same error (same env + message + route)
 // more than once per window, so a route that errors on every request can't flood
 // the inbox. Per pm2 process, which is fine — each env is its own process.
@@ -20,6 +24,7 @@ type ReqInfo = { path?: string; method?: string };
 type CtxInfo = { routePath?: string; routeType?: string };
 
 export async function reportServerError(err: unknown, request?: ReqInfo, context?: CtxInfo): Promise<void> {
+  if (!ALERTS_ENABLED) return; // UAT alerts suppressed by default
   try {
     const e = (err ?? {}) as { message?: string; stack?: string; digest?: string };
     const message = e.message || String(err);
