@@ -175,6 +175,10 @@ export async function GET(req: NextRequest) {
            v.id AS vehicle_id, v.ev_number AS vehicle_number,
            rva.daily_rent, rva.allotment_code,
            COALESCE(rva.paid_through_date, rva.assigned_date - 1) >= ${IST} AS rent_paid_this_week,
+           -- outstanding rent (whole-week-rounded) for the active assignment, 0 if paid up
+           CASE WHEN rva.id IS NOT NULL AND COALESCE(rva.paid_through_date, rva.assigned_date - 1) < ${IST}
+                THEN CEIL((${IST} - COALESCE(rva.paid_through_date, rva.assigned_date - 1)) / 7.0) * rva.daily_rent * 7
+                ELSE 0 END AS amount_due,
            EXISTS (
              SELECT 1 FROM ${schemas.ops}.rider_vehicle_assignments rva_a
              WHERE rva_a.rider_id = r.id AND rva_a.status = 'active'

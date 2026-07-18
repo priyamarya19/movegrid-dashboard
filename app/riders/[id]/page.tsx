@@ -434,6 +434,42 @@ export default async function RiderDetailPage({ params }: { params: Promise<{ id
           </div>
         </div>
 
+        {/* Payment History — actual collections received (money ledger), newest first.
+            Distinct from the Rent Cycle above, which is the per-week dues view. */}
+        <div className="bg-surface border border-default rounded-xl overflow-hidden">
+          <div className="px-5 py-4 border-b border-default flex items-center justify-between">
+            <h2 className="text-primary font-semibold">Payment History</h2>
+            <span className="text-[11px] text-muted">{payments.length} payment{payments.length !== 1 ? "s" : ""} · {inr(totalCollected)} collected</span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-default">
+                  {["Date Received", "Amount", "Period Covered", "Vehicle"].map((h) => (
+                    <th key={h} className="text-left px-5 py-3 text-[11px] text-muted uppercase tracking-wider whitespace-nowrap">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {payments.length === 0 ? (
+                  <tr><td colSpan={4} className="px-5 py-8 text-center text-muted">No payments recorded yet</td></tr>
+                ) : payments.map((p: { payment_date: string; amount_collected: number; rental_period_start: string | null; rental_period_end: string | null; ev_number: string | null }, i: number) => (
+                  <tr key={i} className="border-b border-subtle">
+                    <td className="px-5 py-3 text-secondary whitespace-nowrap">{dateIN(p.payment_date, { day: "numeric", month: "short", year: "numeric" })}</td>
+                    <td className="px-5 py-3 text-accent-teal font-semibold whitespace-nowrap">{inr(Math.round(Number(p.amount_collected)))}</td>
+                    <td className="px-5 py-3 text-secondary whitespace-nowrap">
+                      {p.rental_period_start && p.rental_period_end
+                        ? `${dateIN(p.rental_period_start, { day: "numeric", month: "short" })} – ${dateIN(p.rental_period_end, { day: "numeric", month: "short" })}`
+                        : "—"}
+                    </td>
+                    <td className="px-5 py-3 text-secondary">{p.ev_number ?? "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
         {/* Penalties — per-rider, raised at submission or ad-hoc */}
         <RiderPenalties riderId={rider.id} />
 

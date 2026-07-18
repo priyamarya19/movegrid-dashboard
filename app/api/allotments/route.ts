@@ -1,10 +1,40 @@
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { schemas } from "@/lib/schemas";
-import { requireRole } from "@/lib/auth";
+import { requireRole, requireSession, userCanViewAllotments } from "@/lib/auth";
 import { istTodayISO } from "@/lib/date";
+import { IST } from "@/lib/rent";
+import { rangeCondition } from "@/lib/dateRange";
 import { writeAudit } from "@/lib/audit";
 import { beginIdempotency, finishIdempotency, abortIdempotency } from "@/lib/idempotency";
+
+// GET /api/allotments — active allotments for the permissioned Allotments list,
+// optionally filtered by allotment date (?range=today|yesterday|last7|mtd, or
+// ?from=&to=). Gated by the can_view_allotments permission.
+export async function GET(req: NextRequest) {
+  const guard = await requireSession(req);
+  if ("response" in guard) return guard.response;
+  if (!(await userCanViewAllotments(guard.session.userId))) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const { searchParams } = new URL(req.url);
+  const dateWhere = rangeCondition("a.assigned_date", searchParams.get("range"), searchParams.get("from"), searchParams.get("to"));
+  const S = schemas.ops;
+  const res = await pool.query(`
+    SELECT r.id AS rider_id, r.rider_code, v.id AS vehicle_id, v.ev_number,
+      to_char(a.assigned_date, 'YYYY-MM-DD') AS assigned_date,
+      to_char(COALESCE(a.paid_through_date, a.assigned_date - 1) + 1, 'YYYY-MM-DD') AS week_start,
+      to_char(COALESCE(a.paid_through_date, a.assigned_date - 1) + 7, 'YYYY-MM-DD') AS week_end,
+      a.allotted_by,
+      (${IST} - COALESCE(a.paid_through_date, a.assigned_date - 1))::int AS days_behind
+    FROM ${S}.rider_vehicle_assignments a
+    JOIN ${S}.riders r ON r.id = a.rider_id
+    JOIN ${S}.vehicles v ON v.id = a.vehicle_id
+    WHERE a.status = 'active' AND ${dateWhere}
+    ORDER BY a.assigned_date DESC`);
+  return NextResponse.json({ allotments: res.rows });
+}
 
 export async function POST(req: NextRequest) {
   const guard = await requireRole(req);

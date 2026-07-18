@@ -5,7 +5,7 @@ import Link from "next/link";
 import ExportButton from "@/components/ExportButton";
 import Pagination from "@/components/Pagination";
 import { fetchList } from "@/lib/listFetch";
-import { dateIN } from "@/lib/format";
+import { dateIN, inr } from "@/lib/format";
 import RecordPayment from "@/components/riders/RecordPayment";
 
 type Rider = {
@@ -19,6 +19,7 @@ type Rider = {
   aadhaar_verified: boolean; pan_verified: boolean; dl_verified: boolean;
   daily_rent: string | number | null;
   rent_paid_this_week: boolean;
+  amount_due: number;
   allotment_code: string | null;   // active tenancy's allotment ID
   allotment_codes: string | null;  // all allotment IDs ever held, space-joined (for search)
 };
@@ -69,12 +70,20 @@ function RentToggle({ rider, onToggled }: { rider: Rider; onToggled: () => void 
       Paid
     </span>
   ) : (
-    <RecordPayment
-      riderId={rider.id}
-      dailyRent={rider.daily_rent != null ? Number(rider.daily_rent) : null}
-      onRecorded={onToggled}
-      compact
-    />
+    <div className="flex items-center gap-2 whitespace-nowrap">
+      <span
+        title={rider.amount_due > 0 ? `Outstanding dues: ${inr(rider.amount_due)}` : "Rent due"}
+        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-accent-danger-alt/15 text-accent-danger-alt-text cursor-help"
+      >
+        Due{rider.amount_due > 0 ? ` · ${inr(rider.amount_due)}` : ""}
+      </span>
+      <RecordPayment
+        riderId={rider.id}
+        dailyRent={rider.daily_rent != null ? Number(rider.daily_rent) : null}
+        onRecorded={onToggled}
+        compact
+      />
+    </div>
   );
 }
 
