@@ -138,8 +138,12 @@ export async function POST(req: NextRequest) {
 
     let paidThroughDateValue;
     if (carryOver) {
+      // Base is the carried paid-through (the last ALREADY-PAID day), so a full prepaid
+      // week must add 7 to keep paid-through in step with the ₹week payment we record
+      // below. (The fresh branch adds 6 because ITS base is the first day of the period,
+      // not the day before it — +6 there and +7 here both mean "one 7-day week".)
       const base = new Date(carryOver.paid_through_date + "T00:00:00Z");
-      base.setUTCDate(base.getUTCDate() + (week1Paid ? 6 : 0));
+      base.setUTCDate(base.getUTCDate() + (week1Paid ? 7 : 0));
       paidThroughDateValue = base.toISOString().slice(0, 10);
       await client.query(
         `UPDATE ${schemas.ops}.rider_vehicle_assignments SET is_issue_swap = false WHERE id = $1`,
