@@ -52,11 +52,34 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     );
 
     if (action === "approve") {
+      // Waiver days can be fractional (1.5) but paid_through_date only moves in
+      // whole days — the sub-day remainder is kept as an ₹ credit (rent_credit)
+      // on the assignment, which the next recorded payment folds in. An earlier
+      // remainder already sitting in rent_credit is combined first, so two half-
+      // day waivers add up to a full extra day rather than being lost.
+      const asgn = await client.query(
+        `SELECT daily_rent, rent_credit FROM ${schemas.ops}.rider_vehicle_assignments
+         WHERE id = $1 FOR UPDATE`,
+        [req_.rows[0].assignment_id]
+      );
+      const dailyRent = Number(asgn.rows[0]?.daily_rent) || 0;
+      const days = Number(req_.rows[0].non_functional_days);
+      let wholeDays: number, newCredit: number;
+      if (dailyRent > 0) {
+        const total = days * dailyRent + (Number(asgn.rows[0]?.rent_credit) || 0);
+        wholeDays = Math.floor(total / dailyRent + 1e-9);
+        newCredit = Math.max(0, Math.round((total - wholeDays * dailyRent) * 100) / 100);
+      } else {
+        // No daily rate to value a fraction with — credit the whole days only.
+        wholeDays = Math.floor(days);
+        newCredit = Number(asgn.rows[0]?.rent_credit) || 0;
+      }
       await client.query(
         `UPDATE ${schemas.ops}.rider_vehicle_assignments
-         SET paid_through_date = paid_through_date + $1::int
-         WHERE id = $2`,
-        [req_.rows[0].non_functional_days, req_.rows[0].assignment_id]
+         SET paid_through_date = COALESCE(paid_through_date, assigned_date - 1) + $1::int,
+             rent_credit = $2
+         WHERE id = $3`,
+        [wholeDays, newCredit, req_.rows[0].assignment_id]
       );
     }
 

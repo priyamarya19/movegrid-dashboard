@@ -119,14 +119,14 @@ export default function CollectionsView({
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-default">
-                {["Rider", "Allotment", "Days behind", "Outstanding", "Sheet note"].map((h) => (
+                {["Rider", "Allotment", "Next due", "Days behind", "Outstanding", "Sheet note"].map((h) => (
                   <th key={h} className={`px-5 py-3 text-[11px] text-muted uppercase tracking-wider font-medium ${h === "Days behind" || h === "Outstanding" ? "text-right" : "text-left"}`}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {rows.length === 0 ? (
-                <tr><td colSpan={5} className="px-5 py-8 text-center text-muted">No riders in this bucket.</td></tr>
+                <tr><td colSpan={6} className="px-5 py-8 text-center text-muted">No riders in this bucket.</td></tr>
               ) : rows.map((r) => {
                 const b = BUCKETS.find((x) => x.test(r.days_behind)) ?? BUCKETS[0];
                 return (
@@ -136,6 +136,7 @@ export default function CollectionsView({
                       <p className="text-muted text-xs">{r.rider_code}</p>
                     </td>
                     <td className="px-5 py-3 text-secondary text-xs">{r.allotment_code ?? "—"}</td>
+                    <td className="px-5 py-3 text-secondary text-xs whitespace-nowrap">{dateIN(r.next_due_date + "T00:00:00", { day: "numeric", month: "short" })}</td>
                     <td className="px-5 py-3 text-right"><span className={`text-xs font-semibold tabular-nums ${b.cls}`}>{r.days_behind <= 0 ? "on track" : `${r.days_behind}d`}</span></td>
                     <td className="px-5 py-3 text-right text-primary font-semibold tabular-nums">{r.outstanding > 0 ? inr(r.outstanding) : "—"}</td>
                     <td className="px-5 py-3 text-secondary text-xs max-w-[240px] truncate" title={r.sheet_note ?? undefined}>{r.sheet_note ? `📝 ${r.sheet_note}` : <span className="text-faint">—</span>}</td>

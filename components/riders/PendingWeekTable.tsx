@@ -48,16 +48,16 @@ export default function PendingWeekTable() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-default">
-                {["User ID", "Name", "Mobile", "Hub", "Vehicle", "This Week's Rent", "Action"].map(h => (
+                {["User ID", "Name", "Mobile", "Hub", "Vehicle", "Next Due", "This Week's Rent", "Action"].map(h => (
                   <th key={h} className="text-left px-5 py-3 text-[11px] text-muted uppercase tracking-wider font-medium whitespace-nowrap">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={7} className="px-5 py-10 text-center text-muted">Loading…</td></tr>
+                <tr><td colSpan={8} className="px-5 py-10 text-center text-muted">Loading…</td></tr>
               ) : riders.length === 0 ? (
-                <tr><td colSpan={7} className="px-5 py-10 text-center text-muted">No riders with the current week pending</td></tr>
+                <tr><td colSpan={8} className="px-5 py-10 text-center text-muted">No riders with the current week pending</td></tr>
               ) : riders.map((r) => {
                 const weekRent = Math.round(r.period_amount ?? r.amount_due);
                 return (
@@ -74,6 +74,9 @@ export default function PendingWeekTable() {
                     </td>
                     <td className="px-5 py-3">
                       {r.vehicle_id ? <Link href={`/vehicles/${r.vehicle_id}`} className="text-accent-purple font-medium hover:underline">{r.vehicle_number}</Link> : <span className="text-muted">—</span>}
+                    </td>
+                    <td className="px-5 py-3 text-secondary whitespace-nowrap">
+                      {r.next_due_date ? dateIN(r.next_due_date, { day: "numeric", month: "short" }) : "—"}
                     </td>
                     <td className="px-5 py-3 font-semibold text-accent-teal whitespace-nowrap">{inr(weekRent)}</td>
                     <td className="px-5 py-3">

@@ -156,7 +156,12 @@ export async function GET(req: NextRequest) {
         7 AS period_days,
         (rva.daily_rent * 7) AS period_amount,
         (${T} - COALESCE(rva.paid_through_date, rva.assigned_date - 1)) AS days_behind,
-        (COALESCE(rva.paid_through_date, rva.assigned_date - 1) + 1) AS next_due_date,
+        -- Next due = the rider's own weekly cycle boundary (allotment day + 7k − 1).
+        -- It holds through the 2-day grace after a missed due date, then rolls to the
+        -- next boundary: week 1st–7th → due 7th; still unpaid on the 9th → 14th.
+        ((rva.assigned_date - 1) + 7 * GREATEST(1, CEIL((
+          GREATEST(COALESCE(rva.paid_through_date, rva.assigned_date - 1), ${T} - 1) - (rva.assigned_date - 1)
+        ) / 7.0))::int) AS next_due_date,
         (COALESCE(rva.paid_through_date, rva.assigned_date - 1) + 1) AS last_due_date,
         -- Rent is billed weekly — round up to a whole week even if only partway
         -- into an unpaid one (the day-precise paid_through_date stays exact internally).

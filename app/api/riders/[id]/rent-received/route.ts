@@ -44,7 +44,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     await client.query("BEGIN");
 
     const asgn = await client.query(
-      `SELECT id, vehicle_id, daily_rent, to_char(COALESCE(paid_through_date, assigned_date - 1), 'YYYY-MM-DD') AS paid_through_date
+      `SELECT id, vehicle_id, daily_rent, rent_credit, to_char(COALESCE(paid_through_date, assigned_date - 1), 'YYYY-MM-DD') AS paid_through_date
        FROM ${schemas.ops}.rider_vehicle_assignments WHERE rider_id = $1 AND status = 'active' LIMIT 1 FOR UPDATE`,
       [id]
     );
@@ -55,15 +55,22 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       return NextResponse.json({ error: "Rider has no active assignment with a daily rate set" }, { status: 409 });
     }
 
-    const daysToAdd = Math.floor(amountNum / Number(assignment.daily_rent));
+    // Fold in any ₹ credit sitting on the assignment (sub-day remainder from a
+    // fractional waiver, or a previous partial payment) so it isn't lost: the
+    // combined total converts to days, and the new remainder is carried forward.
+    const rate = Number(assignment.daily_rent);
+    const total = amountNum + (Number(assignment.rent_credit) || 0);
+    const daysToAdd = Math.floor(total / rate + 1e-9);
+    const newCredit = Math.max(0, Math.round((total - daysToAdd * rate) * 100) / 100);
     const oldPaidThrough = assignment.paid_through_date;
 
     const updated = await client.query(
       `UPDATE ${schemas.ops}.rider_vehicle_assignments
-       SET paid_through_date = COALESCE(paid_through_date, assigned_date - 1) + $1::int
-       WHERE id = $2
+       SET paid_through_date = COALESCE(paid_through_date, assigned_date - 1) + $1::int,
+           rent_credit = $2
+       WHERE id = $3
        RETURNING to_char(paid_through_date, 'YYYY-MM-DD') AS new_paid_through_date`,
-      [daysToAdd, assignment.id]
+      [daysToAdd, newCredit, assignment.id]
     );
     const newPaidThrough = updated.rows[0].new_paid_through_date;
 

@@ -8,6 +8,7 @@ import BackButton from "@/components/BackButton";
 import BlacklistButton from "@/components/riders/BlacklistButton";
 import RecordPayment from "@/components/riders/RecordPayment";
 import ChangeRate from "@/components/riders/ChangeRate";
+import ApplyWaiver from "@/components/riders/ApplyWaiver";
 import PhotoGallery from "@/components/PhotoGallery";
 import { getRiderCycle } from "@/lib/rent";
 import RiderPenalties from "@/components/riders/RiderPenalties";
@@ -339,6 +340,7 @@ export default async function RiderDetailPage({ params }: { params: Promise<{ id
               {activeAssignment && (
                 <>
                   <ChangeRate assignmentId={activeAssignment.assignment_id} currentRate={activeAssignment.daily_rent ? Number(activeAssignment.daily_rent) : null} />
+                  <ApplyWaiver riderId={rider.id} dailyRent={activeAssignment.daily_rent ? Number(activeAssignment.daily_rent) : null} />
                   <RecordPayment riderId={rider.id} dailyRent={activeAssignment.daily_rent ? Number(activeAssignment.daily_rent) : null} />
                 </>
               )}

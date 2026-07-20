@@ -9,6 +9,7 @@ import { dateIN } from "@/lib/format";
 type WaiverRequest = {
   id: string;
   non_functional_days: number;
+  reason: string | null;
   requested_by: string | null;
   requested_at: string;
   rider_id: string;
@@ -80,7 +81,7 @@ export default function RentWaiverReview() {
       <div>
         <h1 className="text-primary text-2xl font-bold">Rent Waiver Requests</h1>
         <p className="text-muted text-sm mt-1">
-          Non-functional-day credits from issue-based vehicle swaps — full rent shows owed until you approve.
+          Waivers applied by the team and non-functional-day credits from issue-based swaps — full rent shows owed until you approve.
         </p>
       </div>
 
@@ -89,16 +90,16 @@ export default function RentWaiverReview() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-default">
-                {["Rider", "Vehicle", "Days Requested", "Requested By", "Requested At", "Action"].map((h) => (
+                {["Rider", "Vehicle", "Days Requested", "Reason", "Requested By", "Requested At", "Action"].map((h) => (
                   <th key={h} className="text-left px-5 py-3 text-[11px] text-muted uppercase tracking-wider whitespace-nowrap">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {rows === null ? (
-                <tr><td colSpan={6} className="px-5 py-10 text-center text-muted">Loading...</td></tr>
+                <tr><td colSpan={7} className="px-5 py-10 text-center text-muted">Loading...</td></tr>
               ) : rows.length === 0 ? (
-                <tr><td colSpan={6} className="px-5 py-10 text-center text-muted">No pending requests</td></tr>
+                <tr><td colSpan={7} className="px-5 py-10 text-center text-muted">No pending requests</td></tr>
               ) : rows.map((r) => (
                 <tr key={r.id} className="border-b border-subtle hover:bg-overlay-hover">
                   <td className="px-5 py-3.5">
@@ -107,6 +108,9 @@ export default function RentWaiverReview() {
                   </td>
                   <td className="px-5 py-3.5 text-secondary">{r.ev_number}</td>
                   <td className="px-5 py-3.5 text-primary font-semibold">{r.non_functional_days} day{r.non_functional_days !== 1 ? "s" : ""}</td>
+                  <td className="px-5 py-3.5 text-secondary text-xs max-w-[220px] truncate" title={r.reason ?? undefined}>
+                    {r.reason ?? <span className="text-faint">Issue-swap credit</span>}
+                  </td>
                   <td className="px-5 py-3.5 text-secondary text-xs">{r.requested_by ?? "—"}</td>
                   <td className="px-5 py-3.5 text-muted text-xs whitespace-nowrap">
                     {dateIN(r.requested_at, { day: "numeric", month: "short", year: "numeric" })}

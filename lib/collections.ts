@@ -104,22 +104,32 @@ export const getWeeklyCollections = unstable_cache(async function getWeeklyColle
 
 // Live chase list: every active rider with an outstanding balance, how many days
 // behind they are (from paid_through_date), and the ops sheet note if any.
+// next_due_date is the rider's own weekly cycle boundary (allotment day + 7·k − 1):
+// it stays put through the 2-day grace after a missed due date, then rolls to the
+// next week boundary — e.g. week 1st–7th, due the 7th; unpaid past the 9th → 14th.
 export type ChaseRow = {
   rider_id: string; rider_code: string | null; name: string;
-  allotment_code: string | null; days_behind: number; outstanding: number; sheet_note: string | null;
+  allotment_code: string | null; days_behind: number; outstanding: number;
+  next_due_date: string; sheet_note: string | null;
 };
 export const getChaseList = unstable_cache(async function getChaseList(): Promise<ChaseRow[]> {
   const S = schemas.ops;
   const res = await pool.query(`
     SELECT r.id AS rider_id, r.rider_code, r.name, a.allotment_code, a.sheet_note,
       GREATEST(0, ${IST} - COALESCE(a.paid_through_date, a.assigned_date - 1)) AS days_behind,
-      GREATEST(0, ${IST} - COALESCE(a.paid_through_date, a.assigned_date - 1)) * a.daily_rent AS outstanding
+      GREATEST(0, ${IST} - COALESCE(a.paid_through_date, a.assigned_date - 1)) * a.daily_rent AS outstanding,
+      to_char(
+        (a.assigned_date - 1) + 7 * GREATEST(1, CEIL((
+          GREATEST(COALESCE(a.paid_through_date, a.assigned_date - 1), ${IST} - 1) - (a.assigned_date - 1)
+        ) / 7.0))::int,
+        'YYYY-MM-DD') AS next_due_date
     FROM ${S}.rider_vehicle_assignments a
     JOIN ${S}.riders r ON r.id = a.rider_id
     WHERE a.status = 'active'
     ORDER BY outstanding DESC`);
   return res.rows.map((r) => ({
     rider_id: r.rider_id, rider_code: r.rider_code, name: r.name, allotment_code: r.allotment_code,
-    days_behind: Number(r.days_behind), outstanding: Number(r.outstanding), sheet_note: r.sheet_note,
+    days_behind: Number(r.days_behind), outstanding: Number(r.outstanding),
+    next_due_date: r.next_due_date, sheet_note: r.sheet_note,
   }));
-}, ["chase-list-v1"], { revalidate: 60 });
+}, ["chase-list-v2"], { revalidate: 60 });

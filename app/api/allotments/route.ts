@@ -197,11 +197,13 @@ export async function POST(req: NextRequest) {
     );
 
     // Record the week-1 prepaid advance so it shows up in the rider's payment history
-    // (same convention as every past onboarding — one week's rent, not the raw cash figure).
+    // (one week's rent, not the raw cash figure). payment_date is the day the money
+    // was actually received — today — not the period end, which put future dates in
+    // the Payments Received list for freshly onboarded riders.
     if (week1Paid) {
       await client.query(
         `INSERT INTO ${schemas.ops}.rider_payments (rider_id, vehicle_id, amount_collected, payment_date, rental_period_start, rental_period_end)
-         VALUES ($1, $2, $3, $4::date + 6, $4, $4::date + 6)`,
+         VALUES ($1, $2, $3, (now() AT TIME ZONE 'Asia/Kolkata')::date, $4, $4::date + 6)`,
         [b.rider_id, b.vehicle_id, dailyRent * 7, assignedDate]
       );
     }
