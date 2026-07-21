@@ -81,7 +81,10 @@ export async function getRiderCycle(riderId: string): Promise<CycleWeek[]> {
       SELECT w.week_no,
         to_char(w.period_start,'YYYY-MM-DD') AS period_start,
         to_char(w.period_end,'YYYY-MM-DD') AS period_end,
-        to_char(w.due_date,'YYYY-MM-DD') AS due_date,
+        -- Week 1 is paid on the allotment day itself — clamp the pay-in-advance
+        -- "day before" so a fresh tenancy never shows a due date preceding it
+        -- (covers old rent_dues rows and synthesized rows alike).
+        to_char(CASE WHEN w.week_no = 1 THEN GREATEST(w.due_date, w.period_start) ELSE w.due_date END,'YYYY-MM-DD') AS due_date,
         w.period_start AS ps_dt, a.vehicle_id, a.status AS asgn_status,
         w.amount, a.sheet_note,
         GREATEST(0, LEAST(COALESCE(a.paid_through_date, a.assigned_date - 1), w.period_end) - w.period_start + 1) * a.daily_rent AS paid,

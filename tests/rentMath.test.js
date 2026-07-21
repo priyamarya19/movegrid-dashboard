@@ -19,7 +19,8 @@ test("generateWeeks: a fresh assignment bills weekly from the assigned date", ()
   // Active rider: cutoff is exclusive (tomorrow), so a week counts if it STARTS before it.
   const { weeks } = generateWeeks({ startISO: "2026-06-11", cutoffISO: "2026-07-16" });
   assert.equal(weeks.length, 5);
-  assert.deepEqual(weeks[0], { weekNo: 1, periodStart: "2026-06-11", periodEnd: "2026-06-17", dueDate: "2026-06-10" });
+  // Week 1 is due on the allotment day itself — a tenancy has no "day before".
+  assert.deepEqual(weeks[0], { weekNo: 1, periodStart: "2026-06-11", periodEnd: "2026-06-17", dueDate: "2026-06-11" });
   assert.deepEqual(weeks[4], { weekNo: 5, periodStart: "2026-07-09", periodEnd: "2026-07-15", dueDate: "2026-07-08" });
 });
 
