@@ -380,13 +380,13 @@ export default async function RiderDetailPage({ params }: { params: Promise<{ id
                     : w.status === "Overdue" ? "bg-accent-danger-alt/15 text-accent-danger-alt-text"
                     : "bg-accent-warning/15 text-accent-warning-text";
                   const fmtD = (s: string) => dateIN(s, { day: "numeric", month: "short" });
-                  const daysLeft = Math.round((new Date(w.due_date).getTime() - todayIST.getTime()) / 86400000);
+                  const daysLeft = w.due_date ? Math.round((new Date(w.due_date).getTime() - todayIST.getTime()) / 86400000) : 0;
                   const balance = Math.max(Math.round(w.amount - w.paid), 0);
                   return (
                     <tr key={i} className="border-b border-subtle">
                       <td className="px-5 py-3 text-secondary">{w.week_no}</td>
                       <td className="px-5 py-3 text-secondary whitespace-nowrap">{fmtD(w.period_start)} – {fmtD(w.period_end)}</td>
-                      <td className="px-5 py-3 text-secondary whitespace-nowrap">{fmtD(w.due_date)}</td>
+                      <td className="px-5 py-3 text-secondary whitespace-nowrap">{w.due_date ? fmtD(w.due_date) : <span className="text-faint">—</span>}</td>
                       <td className="px-5 py-3">{w.vehicle_id ? <Link href={`/vehicles/${w.vehicle_id}`} className="text-accent-purple hover:underline">{w.ev_number ?? "—"}</Link> : <span className="text-muted">{w.ev_number ?? "—"}</span>}</td>
                       <td className="px-5 py-3 text-primary">₹{Math.round(w.amount).toLocaleString("en-IN")}</td>
                       <td className="px-5 py-3 whitespace-nowrap">

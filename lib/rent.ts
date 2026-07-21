@@ -43,7 +43,9 @@ export const PAID_FROM_BALANCE = `
   GREATEST(0, LEAST(COALESCE(a.paid_through_date, a.assigned_date - 1), d.period_end) - d.period_start + 1) * a.daily_rent`;
 
 export type CycleWeek = {
-  week_no: number; period_start: string; period_end: string; due_date: string;
+  // due_date is null for a collected week 1 — it's paid at handover, there's no
+  // followup date. It only carries the allotment date if week 1 is somehow unpaid.
+  week_no: number; period_start: string; period_end: string; due_date: string | null;
   amount: number; paid: number; status: string; ev_number: string | null; vehicle_id: string | null;
   sheet_note: string | null; // free-text payment note from the ops rent sheet (e.g. "1300 rs Recieved | 730 pending")
 };
@@ -84,7 +86,11 @@ export async function getRiderCycle(riderId: string): Promise<CycleWeek[]> {
       UNION ALL
       SELECT * FROM synthesized
     )
-    SELECT week_no, period_start, period_end, due_date, amount, paid, ev_number, vehicle_id, sheet_note,
+    SELECT week_no, period_start, period_end,
+      -- Week 1 is paid at handover, so a collected week 1 has no followup date to
+      -- show (null → "—"). If it's somehow unpaid, the allotment date stands.
+      CASE WHEN week_no = 1 AND paid >= amount THEN NULL ELSE due_date END AS due_date,
+      amount, paid, ev_number, vehicle_id, sheet_note,
       CASE WHEN paid >= amount THEN 'Collected'
            WHEN paid > 0 THEN 'Partial'
            WHEN asgn_status = 'active' AND ps_dt < ${OVERDUE_CUTOFF} THEN 'Overdue'
