@@ -223,7 +223,7 @@ export async function GET(req: NextRequest) {
 
     const rentSelect = baseSelect.replace(
       `FROM ${schemas.ops}.riders r`,
-      `, rd.next_due_date, rd.last_due_date, rd.period_days, rd.period_amount, rd.amount_due, rd.overdue_weeks, NULL::numeric AS partial_paid\n    FROM ${schemas.ops}.riders r`
+      `, rd.next_due_date, rd.last_due_date, rd.days_behind, rd.period_days, rd.period_amount, rd.amount_due, rd.overdue_weeks, NULL::numeric AS partial_paid\n    FROM ${schemas.ops}.riders r`
     );
     query = `${rentDueCTE}
     ${rentSelect}

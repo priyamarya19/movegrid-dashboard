@@ -10,7 +10,8 @@ type PendingWeekRider = {
   hub_id: string; hub_name: string;
   vehicle_id: string; vehicle_number: string;
   employer: string; rental_mode: string;
-  next_due_date: string; period_amount: number; amount_due: number;
+  next_due_date: string; last_due_date: string; days_behind: number;
+  period_amount: number; amount_due: number;
 };
 
 export default function PendingWeekTable() {
@@ -48,16 +49,16 @@ export default function PendingWeekTable() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-default">
-                {["User ID", "Name", "Mobile", "Hub", "Vehicle", "Next Due", "This Week's Rent", "Action"].map(h => (
+                {["User ID", "Name", "Mobile", "Hub", "Vehicle", "Due Since", "Next Due", "This Week's Rent", "Action"].map(h => (
                   <th key={h} className="text-left px-5 py-3 text-[11px] text-muted uppercase tracking-wider font-medium whitespace-nowrap">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={8} className="px-5 py-10 text-center text-muted">Loading…</td></tr>
+                <tr><td colSpan={9} className="px-5 py-10 text-center text-muted">Loading…</td></tr>
               ) : riders.length === 0 ? (
-                <tr><td colSpan={8} className="px-5 py-10 text-center text-muted">No riders with the current week pending</td></tr>
+                <tr><td colSpan={9} className="px-5 py-10 text-center text-muted">No riders with the current week pending</td></tr>
               ) : riders.map((r) => {
                 const weekRent = Math.round(r.period_amount ?? r.amount_due);
                 return (
@@ -74,6 +75,16 @@ export default function PendingWeekTable() {
                     </td>
                     <td className="px-5 py-3">
                       {r.vehicle_id ? <Link href={`/vehicles/${r.vehicle_id}`} className="text-accent-purple font-medium hover:underline">{r.vehicle_number}</Link> : <span className="text-muted">—</span>}
+                    </td>
+                    <td className="px-5 py-3 whitespace-nowrap">
+                      {r.last_due_date ? (
+                        <>
+                          <span className="text-secondary">{dateIN(r.last_due_date, { day: "numeric", month: "short" })}</span>{" "}
+                          <span className={`text-xs font-semibold ${r.days_behind >= 3 ? "text-accent-danger-alt-text" : r.days_behind >= 1 ? "text-accent-warning-text" : "text-muted"}`}>
+                            ({Math.max(0, r.days_behind)} day{Math.max(0, r.days_behind) !== 1 ? "s" : ""})
+                          </span>
+                        </>
+                      ) : "—"}
                     </td>
                     <td className="px-5 py-3 text-secondary whitespace-nowrap">
                       {r.next_due_date ? dateIN(r.next_due_date, { day: "numeric", month: "short" }) : "—"}
