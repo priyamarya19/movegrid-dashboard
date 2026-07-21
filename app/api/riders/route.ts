@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { schemas } from "@/lib/schemas";
 import { requireRole } from "@/lib/auth";
-import { IST } from "@/lib/rent";
+import { IST, nextDueSql } from "@/lib/rent";
 import { writeAudit } from "@/lib/audit";
 import { beginIdempotency, finishIdempotency, abortIdempotency } from "@/lib/idempotency";
 
@@ -156,19 +156,7 @@ export async function GET(req: NextRequest) {
         7 AS period_days,
         (rva.daily_rent * 7) AS period_amount,
         (${T} - COALESCE(rva.paid_through_date, rva.assigned_date - 1)) AS days_behind,
-        -- Next due = the rider's weekly cycle boundary, anchored on paid_through_date
-        -- (their real payment rhythm — assigned_date goes stale after an issue-swap,
-        -- since the continuation assignment restarts mid-tenancy). A rider paid
-        -- through the 21st is due on the 21st for the week starting the 22nd. The
-        -- date holds through the 2-day grace after a miss, then rolls a week: due
-        -- 7th, still unpaid on the 9th → 14th. Never-paid riders anchor on the
-        -- allotment date (week 1 due = assigned + 6).
-        (CASE WHEN COALESCE(rva.paid_through_date, rva.assigned_date - 1) >= rva.assigned_date
-          THEN rva.paid_through_date
-               + 7 * CEIL(GREATEST(${T} - 1 - rva.paid_through_date, 0) / 7.0)::int
-          ELSE (rva.assigned_date - 1)
-               + 7 * GREATEST(1, CEIL(GREATEST(${T} - rva.assigned_date, 0) / 7.0)::int)
-        END) AS next_due_date,
+        ${nextDueSql("rva")} AS next_due_date,
         (COALESCE(rva.paid_through_date, rva.assigned_date - 1) + 1) AS last_due_date,
         -- Rent is billed weekly — round up to a whole week even if only partway
         -- into an unpaid one (the day-precise paid_through_date stays exact internally).

@@ -16,6 +16,18 @@ export const IST = "(now() AT TIME ZONE 'Asia/Kolkata')::date";
 // A rider only becomes Overdue after a 2-day grace past their paid-through date.
 export const OVERDUE_CUTOFF = `(${IST} - 2)`;
 
+// The rider's next due date, anchored on paid_through_date — their real payment
+// rhythm (assigned_date goes stale after an issue-swap continuation). A rider paid
+// through the 21st is due the 21st for the week starting the 22nd; the date holds
+// through the 2-day grace after a miss, then rolls a week (due 7th, unpaid on the
+// 9th → 14th). Never-paid riders anchor on the allotment date (week 1 due =
+// assigned + 6). `a` is the rider_vehicle_assignments alias in the calling query.
+export const nextDueSql = (a: string) => `
+  (CASE WHEN COALESCE(${a}.paid_through_date, ${a}.assigned_date - 1) >= ${a}.assigned_date
+    THEN ${a}.paid_through_date + 7 * CEIL(GREATEST(${IST} - 1 - ${a}.paid_through_date, 0) / 7.0)::int
+    ELSE (${a}.assigned_date - 1) + 7 * GREATEST(1, CEIL(GREATEST(${IST} - ${a}.assigned_date, 0) / 7.0)::int)
+  END)`;
+
 // Rolling-balance rent model: every rider has one paid_through_date (on their active
 // assignment). A payment of any amount, at any time, just extends it by
 // (amount / daily_rate) days — it doesn't need to be tied to a specific week. This is

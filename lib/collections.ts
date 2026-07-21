@@ -1,6 +1,7 @@
 import pool from "@/lib/db";
 import { schemas } from "@/lib/schemas";
 import { unstable_cache } from "next/cache";
+import { nextDueSql } from "@/lib/rent";
 
 // Month-to-date window, in IST (the business timezone used elsewhere in the app).
 const IST = "(now() AT TIME ZONE 'Asia/Kolkata')::date";
@@ -120,14 +121,7 @@ export const getChaseList = unstable_cache(async function getChaseList(): Promis
     SELECT r.id AS rider_id, r.rider_code, r.name, a.allotment_code, a.sheet_note,
       GREATEST(0, ${IST} - COALESCE(a.paid_through_date, a.assigned_date - 1)) AS days_behind,
       GREATEST(0, ${IST} - COALESCE(a.paid_through_date, a.assigned_date - 1)) * a.daily_rent AS outstanding,
-      to_char(
-        (CASE WHEN COALESCE(a.paid_through_date, a.assigned_date - 1) >= a.assigned_date
-          THEN a.paid_through_date
-               + 7 * CEIL(GREATEST(${IST} - 1 - a.paid_through_date, 0) / 7.0)::int
-          ELSE (a.assigned_date - 1)
-               + 7 * GREATEST(1, CEIL(GREATEST(${IST} - a.assigned_date, 0) / 7.0)::int)
-        END),
-        'YYYY-MM-DD') AS next_due_date
+      to_char(${nextDueSql("a")}, 'YYYY-MM-DD') AS next_due_date
     FROM ${S}.rider_vehicle_assignments a
     JOIN ${S}.riders r ON r.id = a.rider_id
     WHERE a.status = 'active'
