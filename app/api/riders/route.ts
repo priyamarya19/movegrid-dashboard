@@ -208,14 +208,17 @@ export async function GET(req: NextRequest) {
     // 2-day grace: not chased as Overdue until paid_through_date is > 2 days stale.
     // Due-soon: next week starts within 2 days but not yet past grace (matches
     // getOverdueRiders/getDueSoonRiders in lib/rent.ts exactly).
-    // Pending-week: the rider's cycle due date (next_due_date) has arrived — due
-    // today, or missed yesterday and still showing through grace. Mid-cycle riders
-    // (due 1+ days ahead) are hidden until their due day, even if a week is running
-    // unpaid. At most one week behind; overlaps overdue by design. Amount is one
-    // week. Matches getPendingThisWeekRiders.
+    // Pending-week: the rider's CURRENT cycle week (the boundary-aligned week
+    // containing today, boundaries at allotment day + 7k − 1) is not fully paid.
+    // Fully-paid-through-the-boundary riders are hidden even on their pay day;
+    // at most one week behind (deeper is Overdue-only); overlaps overdue by
+    // design. Amount is one week. Matches getPendingThisWeekRiders.
     const overdueWhere = `rd.days_behind > 2`;
     const dueSoonWhere = `rd.days_behind BETWEEN -1 AND 2`;
-    const pendingWeekWhere = `rd.days_behind BETWEEN 0 AND 7 AND rd.next_due_date <= ${T}`;
+    const pendingWeekWhere = `
+      COALESCE(rva.paid_through_date, rva.assigned_date - 1) BETWEEN ${T} - 7 AND ${T}
+      AND COALESCE(rva.paid_through_date, rva.assigned_date - 1)
+          < (rva.assigned_date - 1) + 7 * CEIL((${T} - (rva.assigned_date - 1)) / 7.0)::int`;
     const rentWhere = rent === "overdue" ? overdueWhere : rent === "due_soon" ? dueSoonWhere : pendingWeekWhere;
 
     const rentSelect = baseSelect.replace(

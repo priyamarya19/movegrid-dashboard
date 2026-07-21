@@ -38,7 +38,7 @@ export default function PendingWeekTable() {
             <h1 className="text-primary text-2xl font-bold">Pending This Week</h1>
           </div>
           <p className="text-muted text-sm mt-1">
-            {loading ? "Loading…" : `${riders.length} rider${riders.length !== 1 ? "s" : ""} whose rent is due today or just missed · ${inr(totalPending)} to collect`}
+            {loading ? "Loading…" : `${riders.length} rider${riders.length !== 1 ? "s" : ""} whose current week's rent is unpaid · ${inr(totalPending)} to collect`}
           </p>
         </div>
       </div>

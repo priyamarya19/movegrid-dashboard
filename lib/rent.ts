@@ -115,22 +115,17 @@ export const getLedgerSummary = unstable_cache(async function getLedgerSummary()
       FROM ${S}.rider_vehicle_assignments a
       WHERE a.status = 'active' AND COALESCE(a.paid_through_date, a.assigned_date - 1) < ${OVERDUE_CUTOFF}
     ),
-    -- Riders whose cycle due date has arrived: due today (today falls on their
-    -- weekly boundary, allotment day + 7k − 1) or missed yesterday and still in
-    -- grace. Mid-cycle riders are excluded until their due day. One week's rent
-    -- each; at most one week behind. Overlaps with 'live' by design (see
-    -- getPendingThisWeekRiders).
+    -- Riders whose CURRENT cycle week (boundary-aligned week containing today;
+    -- boundaries at allotment day + 7k − 1) is not fully paid. Paid through the
+    -- boundary → hidden. One week's rent each; at most one week behind. Overlaps
+    -- with 'live' by design (see getPendingThisWeekRiders).
     pending_week AS (
       SELECT a.daily_rent * 7 AS pending_amount
       FROM ${S}.rider_vehicle_assignments a
       WHERE a.status = 'active'
-        AND COALESCE(a.paid_through_date, a.assigned_date - 1) <= ${IST}
-        AND COALESCE(a.paid_through_date, a.assigned_date - 1) >= ${IST} - 7
-        AND (
-          MOD(${IST} - a.assigned_date + 1, 7) = 0
-          OR (MOD(${IST} - a.assigned_date, 7) = 0
-              AND COALESCE(a.paid_through_date, a.assigned_date - 1) <= ${IST} - 1)
-        )
+        AND COALESCE(a.paid_through_date, a.assigned_date - 1) BETWEEN ${IST} - 7 AND ${IST}
+        AND COALESCE(a.paid_through_date, a.assigned_date - 1)
+            < (a.assigned_date - 1) + 7 * CEIL((${IST} - (a.assigned_date - 1)) / 7.0)::int
     )
     SELECT
       (SELECT COALESCE(SUM(amount) FILTER (WHERE period_start < ${IST}), 0) FROM hist) AS expected_to_date,
@@ -149,7 +144,7 @@ export const getLedgerSummary = unstable_cache(async function getLedgerSummary()
     pendingThisWeekRiders: Number(r.pending_this_week_riders),
     pct: expected > 0 ? Math.round((collected / expected) * 100) : 0,
   };
-}, ["ledger-summary-v4"], { revalidate: 60 });
+}, ["ledger-summary-v5"], { revalidate: 60 });
 
 // Riders currently overdue — computed directly from paid_through_date, no rent_dues
 // dependency (so it can never go stale relative to today). Shared everywhere.
@@ -192,13 +187,14 @@ export const getDueSoonRiders = unstable_cache(async function getDueSoonRiders()
   }));
 }, ["due-soon-riders-v3"], { revalidate: 60 });
 
-// The operational "collect today" worklist: riders whose cycle due date has
-// ARRIVED — today falls on their weekly boundary (allotment day + 7k − 1), or
-// yesterday did and they're still unpaid (the 1-day window before the displayed
-// due date rolls to the next boundary). Riders mid-cycle — even with a week
-// running unpaid — stay hidden until their due day comes around.
-//   paid_through <= today      → not paid ahead (a boundary-today rider owes today)
-//   paid_through >= today - 7  → at most one week behind (no PREVIOUS lapsed week)
+// The "collect this week" worklist: riders whose CURRENT cycle week — the
+// boundary-aligned week containing today (boundaries at allotment day + 7k − 1)
+// — is not fully paid. A rider paid through the boundary is hidden, even on
+// their pay day; the moment a new week starts uncovered they appear, however
+// many days it has left to run.
+//   paid_through <  current cycle boundary → the running week isn't covered
+//   paid_through >= today - 7              → at most one week behind (deeper is Overdue-only)
+//   paid_through <= today                  → not listed while coverage still extends ahead
 // The amount is always exactly one week's rent (daily_rent * 7) — never past weeks.
 // NOTE: this intentionally OVERLAPS with getOverdueRiders (which fires at >2 days past
 // paid_through) — by design; Overdue is left as-is.
@@ -212,16 +208,12 @@ export const getPendingThisWeekRiders = unstable_cache(async function getPending
     FROM ${S}.rider_vehicle_assignments a
     JOIN ${S}.riders r ON r.id = a.rider_id
     WHERE a.status = 'active'
-      AND COALESCE(a.paid_through_date, a.assigned_date - 1) <= ${IST}
-      AND COALESCE(a.paid_through_date, a.assigned_date - 1) >= ${IST} - 7
-      AND (
-        MOD(${IST} - a.assigned_date + 1, 7) = 0
-        OR (MOD(${IST} - a.assigned_date, 7) = 0
-            AND COALESCE(a.paid_through_date, a.assigned_date - 1) <= ${IST} - 1)
-      )
+      AND COALESCE(a.paid_through_date, a.assigned_date - 1) BETWEEN ${IST} - 7 AND ${IST}
+      AND COALESCE(a.paid_through_date, a.assigned_date - 1)
+          < (a.assigned_date - 1) + 7 * CEIL((${IST} - (a.assigned_date - 1)) / 7.0)::int
     ORDER BY week_start ASC`);
   return res.rows.map((r) => ({
     rider_id: r.rider_id, rider_code: r.rider_code, name: r.name, mobile: r.mobile,
     pending_amount: Number(r.pending_amount), week_start: r.week_start, week_end: r.week_end,
   }));
-}, ["pending-this-week-riders-v2"], { revalidate: 60 });
+}, ["pending-this-week-riders-v3"], { revalidate: 60 });
