@@ -156,12 +156,19 @@ export async function GET(req: NextRequest) {
         7 AS period_days,
         (rva.daily_rent * 7) AS period_amount,
         (${T} - COALESCE(rva.paid_through_date, rva.assigned_date - 1)) AS days_behind,
-        -- Next due = the rider's own weekly cycle boundary (allotment day + 7k − 1).
-        -- It holds through the 2-day grace after a missed due date, then rolls to the
-        -- next boundary: week 1st–7th → due 7th; still unpaid on the 9th → 14th.
-        ((rva.assigned_date - 1) + 7 * GREATEST(1, CEIL((
-          GREATEST(COALESCE(rva.paid_through_date, rva.assigned_date - 1), ${T} - 1) - (rva.assigned_date - 1)
-        ) / 7.0))::int) AS next_due_date,
+        -- Next due = the rider's weekly cycle boundary, anchored on paid_through_date
+        -- (their real payment rhythm — assigned_date goes stale after an issue-swap,
+        -- since the continuation assignment restarts mid-tenancy). A rider paid
+        -- through the 21st is due on the 21st for the week starting the 22nd. The
+        -- date holds through the 2-day grace after a miss, then rolls a week: due
+        -- 7th, still unpaid on the 9th → 14th. Never-paid riders anchor on the
+        -- allotment date (week 1 due = assigned + 6).
+        (CASE WHEN COALESCE(rva.paid_through_date, rva.assigned_date - 1) >= rva.assigned_date
+          THEN rva.paid_through_date
+               + 7 * CEIL(GREATEST(${T} - 1 - rva.paid_through_date, 0) / 7.0)::int
+          ELSE (rva.assigned_date - 1)
+               + 7 * GREATEST(1, CEIL(GREATEST(${T} - rva.assigned_date, 0) / 7.0)::int)
+        END) AS next_due_date,
         (COALESCE(rva.paid_through_date, rva.assigned_date - 1) + 1) AS last_due_date,
         -- Rent is billed weekly — round up to a whole week even if only partway
         -- into an unpaid one (the day-precise paid_through_date stays exact internally).
@@ -208,17 +215,14 @@ export async function GET(req: NextRequest) {
     // 2-day grace: not chased as Overdue until paid_through_date is > 2 days stale.
     // Due-soon: next week starts within 2 days but not yet past grace (matches
     // getOverdueRiders/getDueSoonRiders in lib/rent.ts exactly).
-    // Pending-week: the rider's CURRENT cycle week (the boundary-aligned week
-    // containing today, boundaries at allotment day + 7k − 1) is not fully paid.
-    // Fully-paid-through-the-boundary riders are hidden even on their pay day;
-    // at most one week behind (deeper is Overdue-only); overlaps overdue by
-    // design. Amount is one week. Matches getPendingThisWeekRiders.
+    // Pending-week: at least one full day past the rider's paid-through date —
+    // their current payment-cycle week is running unpaid. Paid through today or
+    // beyond → hidden until tomorrow. At most one week behind (deeper is
+    // Overdue-only); overlaps overdue by design. Amount is one week. Matches
+    // getPendingThisWeekRiders.
     const overdueWhere = `rd.days_behind > 2`;
     const dueSoonWhere = `rd.days_behind BETWEEN -1 AND 2`;
-    const pendingWeekWhere = `
-      COALESCE(rva.paid_through_date, rva.assigned_date - 1) BETWEEN ${T} - 7 AND ${T}
-      AND COALESCE(rva.paid_through_date, rva.assigned_date - 1)
-          < (rva.assigned_date - 1) + 7 * CEIL((${T} - (rva.assigned_date - 1)) / 7.0)::int`;
+    const pendingWeekWhere = `rd.days_behind BETWEEN 1 AND 7`;
     const rentWhere = rent === "overdue" ? overdueWhere : rent === "due_soon" ? dueSoonWhere : pendingWeekWhere;
 
     const rentSelect = baseSelect.replace(
