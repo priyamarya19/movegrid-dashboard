@@ -10,7 +10,7 @@ import RecordPayment from "@/components/riders/RecordPayment";
 import ChangeRate from "@/components/riders/ChangeRate";
 import ApplyWaiver from "@/components/riders/ApplyWaiver";
 import PhotoGallery from "@/components/PhotoGallery";
-import { getRiderCycle, nextDueSql } from "@/lib/rent";
+import { getRiderCycle } from "@/lib/rent";
 import RiderPenalties from "@/components/riders/RiderPenalties";
 import ExportButton from "@/components/ExportButton";
 import { maskPan, maskAccount, maskDl } from "@/lib/mask";
@@ -48,7 +48,6 @@ async function getData(id: string) {
     pool.query(`
       SELECT rva.id AS assignment_id, rva.assigned_date, rva.status AS assignment_status,
              rva.daily_rent, to_char(rva.paid_through_date, 'YYYY-MM-DD') AS paid_through_date,
-             to_char(${nextDueSql("rva")}, 'YYYY-MM-DD') AS next_due_date,
              rva.allotment_code,
              v.ev_number, v.id AS vehicle_id,
              m.model_name, m.oem
@@ -326,15 +325,8 @@ export default async function RiderDetailPage({ params }: { params: Promise<{ id
             <div>
               <h2 className="text-primary font-semibold">Rent Cycle</h2>
               {activeAssignment?.paid_through_date && (
-                <p className="text-[11px] mt-0.5">
-                  <span className="text-accent-teal">
-                    Paid through {dateIN(activeAssignment.paid_through_date, { day: "numeric", month: "short", year: "numeric" })}
-                  </span>
-                  {activeAssignment.next_due_date && (
-                    <span className="text-accent-warning-text">
-                      {" "}· Next due {dateIN(activeAssignment.next_due_date, { day: "numeric", month: "short", year: "numeric" })}
-                    </span>
-                  )}
+                <p className="text-[11px] text-accent-teal mt-0.5">
+                  Paid through {dateIN(activeAssignment.paid_through_date, { day: "numeric", month: "short", year: "numeric" })}
                 </p>
               )}
             </div>
