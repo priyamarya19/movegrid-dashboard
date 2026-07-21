@@ -84,12 +84,7 @@ export async function getRiderCycle(riderId: string): Promise<CycleWeek[]> {
       UNION ALL
       SELECT * FROM synthesized
     )
-    SELECT week_no, period_start, period_end,
-      -- A Collected week's due date is forward-looking: the next payment lands on
-      -- its period end (pay-day for the following week). Unpaid/partial weeks keep
-      -- their own due date — that's the date being chased.
-      CASE WHEN paid >= amount THEN period_end ELSE due_date END AS due_date,
-      amount, paid, ev_number, vehicle_id, sheet_note,
+    SELECT week_no, period_start, period_end, due_date, amount, paid, ev_number, vehicle_id, sheet_note,
       CASE WHEN paid >= amount THEN 'Collected'
            WHEN paid > 0 THEN 'Partial'
            WHEN asgn_status = 'active' AND ps_dt < ${OVERDUE_CUTOFF} THEN 'Overdue'
