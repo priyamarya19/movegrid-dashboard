@@ -437,33 +437,42 @@ export default function UsersManager() {
                       <span className="text-muted text-xs">{user.can_view_allotments ? "Yes" : "No"}</span>
                     </label>
                   </td>
-                  <td className="px-5 py-3.5 relative">
+                  <td className="px-5 py-3.5">
                     <button
-                      onClick={() => setPagesOpenFor(pagesOpenFor === user.id ? null : user.id)}
+                      onClick={() => setPagesOpenFor(user.id)}
                       className={`px-2.5 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-opacity hover:opacity-75 ${(user.app_pages?.length ?? 0) > 0 ? "bg-accent-purple/13 text-accent-purple" : "bg-muted/20 text-muted"}`}
                     >
                       {(user.app_pages?.length ?? 0) > 0 ? `${user.app_pages!.length} enabled` : "None"}
                     </button>
+                    {/* Rendered as a fixed overlay so the table's scroll container can't clip it. */}
                     {pagesOpenFor === user.id && (
-                      <div className="absolute right-0 top-full mt-1 z-50 w-52 bg-surface border border-strong rounded-xl shadow-xl p-3">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-[11px] text-muted uppercase tracking-wider">App menu pages</span>
-                          <button onClick={() => setPagesOpenFor(null)} className="text-muted hover:text-secondary text-xs">✕</button>
+                      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 cursor-default" onClick={() => setPagesOpenFor(null)}>
+                        <div className="w-80 max-w-[90vw] bg-surface border border-strong rounded-2xl shadow-2xl p-5" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex items-center justify-between mb-1">
+                            <h3 className="text-primary font-semibold text-sm">App pages — {user.name}</h3>
+                            <button onClick={() => setPagesOpenFor(null)} className="text-muted hover:text-secondary text-sm">✕</button>
+                          </div>
+                          <p className="text-[11px] text-muted mb-3">Sections shown in the mobile app&apos;s ☰ menu. None enabled → no menu at all.</p>
+                          <div className="grid grid-cols-2 gap-x-4 gap-y-2 max-h-72 overflow-y-auto">
+                            {APP_PAGES.map((p) => (
+                              <label key={p.key} className="flex items-center gap-2 cursor-pointer py-0.5">
+                                <input
+                                  type="checkbox"
+                                  checked={(user.app_pages ?? []).includes(p.key)}
+                                  onChange={() => handleAppPageToggle(user, p.key)}
+                                  className="w-3.5 h-3.5 accent-accent-purple"
+                                />
+                                <span className="text-secondary text-xs">{p.label}</span>
+                              </label>
+                            ))}
+                          </div>
+                          <button
+                            onClick={() => setPagesOpenFor(null)}
+                            className="mt-4 w-full px-3 py-2 rounded-lg text-xs font-semibold bg-accent-purple text-on-dark hover:opacity-90 transition-opacity"
+                          >
+                            Done
+                          </button>
                         </div>
-                        <div className="space-y-1.5 max-h-64 overflow-y-auto">
-                          {APP_PAGES.map((p) => (
-                            <label key={p.key} className="flex items-center gap-2 cursor-pointer py-0.5">
-                              <input
-                                type="checkbox"
-                                checked={(user.app_pages ?? []).includes(p.key)}
-                                onChange={() => handleAppPageToggle(user, p.key)}
-                                className="w-3.5 h-3.5 accent-accent-purple"
-                              />
-                              <span className="text-secondary text-xs">{p.label}</span>
-                            </label>
-                          ))}
-                        </div>
-                        <p className="text-[10px] text-faint mt-2">Shown in the app&apos;s ☰ menu. None enabled → no menu.</p>
                       </div>
                     )}
                   </td>
