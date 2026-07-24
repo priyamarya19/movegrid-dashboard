@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useToast } from "@/components/Toast";
 import { useConfirm } from "@/components/Confirm";
 import { dateIN } from "@/lib/format";
+import { APP_PAGES } from "@/lib/appPages";
 
 type User = {
   id: string;
@@ -15,6 +16,7 @@ type User = {
   created_at: string;
   can_approve_rent_waivers: boolean;
   can_view_allotments: boolean;
+  app_pages: string[] | null;
 };
 
 const ROLES = ["admin", "ops_manager", "hub_incharge", "investor"];
@@ -55,6 +57,7 @@ export default function UsersManager() {
   const [editingProfile, setEditingProfile] = useState<string | null>(null);
   const [editForm, setEditForm] = useState({ name: "", email: "", mobile: "" });
   const [savingProfile, setSavingProfile] = useState(false);
+  const [pagesOpenFor, setPagesOpenFor] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/users")
@@ -174,6 +177,24 @@ export default function UsersManager() {
     } else {
       const msg = await res.json().catch(() => ({}));
       toast.show(msg.error || "Couldn't update permission", "error");
+    }
+  }
+
+  // Toggle one app page for a user — sends the full resulting array, so the
+  // server stays the single source of truth for what's enabled.
+  async function handleAppPageToggle(user: User, key: string) {
+    const current = user.app_pages ?? [];
+    const next = current.includes(key) ? current.filter((k) => k !== key) : [...current, key];
+    const res = await fetch(`/api/users/${user.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ app_pages: next }),
+    });
+    if (res.ok) {
+      setUsers((prev) => prev.map((u) => (u.id === user.id ? { ...u, app_pages: next } : u)));
+    } else {
+      const msg = await res.json().catch(() => ({}));
+      toast.show(msg.error || "Couldn't update app pages", "error");
     }
   }
 
@@ -316,16 +337,16 @@ export default function UsersManager() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-default">
-                {["Member", "Email", "Mobile", "Role", "Status", "Approve Waivers", "View Allotments", "Created", "Actions"].map((h) => (
+                {["Member", "Email", "Mobile", "Role", "Status", "Approve Waivers", "View Allotments", "App Pages", "Created", "Actions"].map((h) => (
                   <th key={h} className="text-left px-5 py-3 text-[11px] text-muted uppercase tracking-wider whitespace-nowrap">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={8} className="px-5 py-10 text-center text-muted">Loading...</td></tr>
+                <tr><td colSpan={10} className="px-5 py-10 text-center text-muted">Loading...</td></tr>
               ) : users.length === 0 ? (
-                <tr><td colSpan={8} className="px-5 py-10 text-center text-muted">No users found</td></tr>
+                <tr><td colSpan={10} className="px-5 py-10 text-center text-muted">No users found</td></tr>
               ) : users.map((user) => (
                 <tr key={user.id} className="border-b border-subtle hover:bg-overlay-hover">
                   <td className="px-5 py-3.5">
@@ -415,6 +436,36 @@ export default function UsersManager() {
                       />
                       <span className="text-muted text-xs">{user.can_view_allotments ? "Yes" : "No"}</span>
                     </label>
+                  </td>
+                  <td className="px-5 py-3.5 relative">
+                    <button
+                      onClick={() => setPagesOpenFor(pagesOpenFor === user.id ? null : user.id)}
+                      className={`px-2.5 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-opacity hover:opacity-75 ${(user.app_pages?.length ?? 0) > 0 ? "bg-accent-purple/13 text-accent-purple" : "bg-muted/20 text-muted"}`}
+                    >
+                      {(user.app_pages?.length ?? 0) > 0 ? `${user.app_pages!.length} enabled` : "None"}
+                    </button>
+                    {pagesOpenFor === user.id && (
+                      <div className="absolute right-0 top-full mt-1 z-50 w-52 bg-surface border border-strong rounded-xl shadow-xl p-3">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-[11px] text-muted uppercase tracking-wider">App menu pages</span>
+                          <button onClick={() => setPagesOpenFor(null)} className="text-muted hover:text-secondary text-xs">✕</button>
+                        </div>
+                        <div className="space-y-1.5 max-h-64 overflow-y-auto">
+                          {APP_PAGES.map((p) => (
+                            <label key={p.key} className="flex items-center gap-2 cursor-pointer py-0.5">
+                              <input
+                                type="checkbox"
+                                checked={(user.app_pages ?? []).includes(p.key)}
+                                onChange={() => handleAppPageToggle(user, p.key)}
+                                className="w-3.5 h-3.5 accent-accent-purple"
+                              />
+                              <span className="text-secondary text-xs">{p.label}</span>
+                            </label>
+                          ))}
+                        </div>
+                        <p className="text-[10px] text-faint mt-2">Shown in the app&apos;s ☰ menu. None enabled → no menu.</p>
+                      </div>
+                    )}
                   </td>
                   <td className="px-5 py-3.5 text-muted text-xs whitespace-nowrap">
                     {dateIN(user.created_at, { day: "numeric", month: "short", year: "numeric" })}

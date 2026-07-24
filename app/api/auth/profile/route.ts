@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
   const session = guard.session;
 
   const res = await pool.query(
-    `SELECT u.id, u.name, u.email, u.mobile, u.photo_url, r.name AS role
+    `SELECT u.id, u.name, u.email, u.mobile, u.photo_url, u.app_pages, r.name AS role
      FROM ${schemas.auth}.users u
      LEFT JOIN ${schemas.auth}.roles r ON r.id = u.role_id
      WHERE u.id = $1`,

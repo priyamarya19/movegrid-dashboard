@@ -3,6 +3,7 @@ import pool from "@/lib/db";
 import { schemas } from "@/lib/schemas";
 import { requireRole } from "@/lib/auth";
 import { writeAudit } from "@/lib/audit";
+import { APP_PAGE_KEYS } from "@/lib/appPages";
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const guard = await requireRole(req, ["admin"]);
@@ -117,6 +118,23 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       `UPDATE ${schemas.auth}.users SET can_approve_rent_waivers = $1 WHERE id = $2`,
       [body.can_approve_rent_waivers === true, id]
     );
+  }
+
+  // Which dashboard sections this user can open from the mobile app's hamburger
+  // menu (migration 014). Whitelisted against the canonical key list.
+  if (body.app_pages !== undefined) {
+    if (!Array.isArray(body.app_pages) || body.app_pages.some((p: unknown) => !APP_PAGE_KEYS.includes(p as string))) {
+      return NextResponse.json({ error: "Invalid app_pages value" }, { status: 400 });
+    }
+    await pool.query(
+      `UPDATE ${schemas.auth}.users SET app_pages = $1 WHERE id = $2`,
+      [body.app_pages, id]
+    );
+    await writeAudit({
+      action: "user_permission_changed", entity: "user", entityId: id,
+      actorId: session.userId, actorName: session.name, req,
+      details: { app_pages: body.app_pages },
+    });
   }
 
   // Per-user permission gating the Allotments list (migration 012).

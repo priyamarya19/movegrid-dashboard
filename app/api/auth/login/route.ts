@@ -26,7 +26,7 @@ export async function POST(req: Request) {
 
   try {
     const result = await pool.query(
-      `SELECT u.id, u.name, u.email, u.password_hash, u.status, u.token_version, r.name AS role
+      `SELECT u.id, u.name, u.email, u.password_hash, u.status, u.token_version, u.app_pages, r.name AS role
        FROM ${schemas.auth}.users u
        LEFT JOIN ${schemas.auth}.roles r ON r.id = u.role_id
        WHERE u.email = $1`,
@@ -53,7 +53,12 @@ export async function POST(req: Request) {
     });
 
     rateLimitReset(rlKey); // good login — clear the failure counter
-    const res = NextResponse.json({ success: true, role: user.role, name: user.name, ...(isMobile ? { token } : {}) });
+    const res = NextResponse.json({
+      success: true, role: user.role, name: user.name,
+      // Which dashboard sections the mobile app's hamburger menu shows this user.
+      app_pages: user.app_pages ?? [],
+      ...(isMobile ? { token } : {}),
+    });
     res.cookies.set("mg_token", token, {
       httpOnly: true,
       // Secure by default; only an explicit COOKIE_SECURE=false (local http dev)
