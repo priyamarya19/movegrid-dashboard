@@ -28,6 +28,18 @@ export const nextDueSql = (a: string) => `
     ELSE (${a}.assigned_date - 1) + 7 * GREATEST(1, CEIL(GREATEST(${IST} - ${a}.assigned_date, 0) / 7.0)::int)
   END)`;
 
+// Outstanding balance, "complete the started weeks" definition (option 2, chosen
+// 25 Jul 26): once a rider is even one day past paid_through, they owe the WHOLE
+// running cycle week (and any earlier lapsed ones) — weeks-behind (rounded up)
+// × weekly rent — minus any banked ₹ credit from partial payments/waivers.
+// Paid through today or beyond → 0. `a` is the assignments alias.
+export const outstandingSql = (a: string) => `
+  GREATEST(0,
+    CEIL(GREATEST(${IST} - COALESCE(${a}.paid_through_date, ${a}.assigned_date - 1), 0) / 7.0)::int
+      * ${a}.daily_rent * 7
+    - COALESCE(${a}.rent_credit, 0)
+  )`;
+
 // Rolling-balance rent model: every rider has one paid_through_date (on their active
 // assignment). A payment of any amount, at any time, just extends it by
 // (amount / daily_rate) days — it doesn't need to be tied to a specific week. This is

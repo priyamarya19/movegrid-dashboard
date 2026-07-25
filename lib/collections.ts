@@ -1,7 +1,7 @@
 import pool from "@/lib/db";
 import { schemas } from "@/lib/schemas";
 import { unstable_cache } from "next/cache";
-import { nextDueSql } from "@/lib/rent";
+import { nextDueSql, outstandingSql } from "@/lib/rent";
 
 // Month-to-date window, in IST (the business timezone used elsewhere in the app).
 const IST = "(now() AT TIME ZONE 'Asia/Kolkata')::date";
@@ -120,7 +120,9 @@ export const getChaseList = unstable_cache(async function getChaseList(): Promis
   const res = await pool.query(`
     SELECT r.id AS rider_id, r.rider_code, r.name, a.allotment_code, a.sheet_note,
       GREATEST(0, ${IST} - COALESCE(a.paid_through_date, a.assigned_date - 1)) AS days_behind,
-      GREATEST(0, ${IST} - COALESCE(a.paid_through_date, a.assigned_date - 1)) * a.daily_rent AS outstanding,
+      -- "Complete the started weeks" balance (option 2) — same formula as the
+      -- rider page and app, so every screen shows one number.
+      ${outstandingSql("a")} AS outstanding,
       to_char(${nextDueSql("a")}, 'YYYY-MM-DD') AS next_due_date
     FROM ${S}.rider_vehicle_assignments a
     JOIN ${S}.riders r ON r.id = a.rider_id
@@ -131,4 +133,4 @@ export const getChaseList = unstable_cache(async function getChaseList(): Promis
     days_behind: Number(r.days_behind), outstanding: Number(r.outstanding),
     next_due_date: r.next_due_date, sheet_note: r.sheet_note,
   }));
-}, ["chase-list-v3"], { revalidate: 60 });
+}, ["chase-list-v4"], { revalidate: 60 });
