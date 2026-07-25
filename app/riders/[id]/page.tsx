@@ -49,7 +49,12 @@ async function getData(id: string) {
       SELECT rva.id AS assignment_id, rva.assigned_date, rva.status AS assignment_status,
              rva.daily_rent, to_char(rva.paid_through_date, 'YYYY-MM-DD') AS paid_through_date,
              to_char(${nextDueSql("rva")}, 'YYYY-MM-DD') AS next_due_date,
-             rva.allotment_code,
+             rva.allotment_code, COALESCE(rva.rent_credit, 0) AS rent_credit,
+             -- Exact outstanding: unpaid elapsed days × rate, minus banked ₹ credit.
+             GREATEST(0,
+               GREATEST(0, (now() AT TIME ZONE 'Asia/Kolkata')::date - COALESCE(rva.paid_through_date, rva.assigned_date - 1)) * rva.daily_rent
+               - COALESCE(rva.rent_credit, 0)
+             ) AS outstanding_now,
              v.ev_number, v.id AS vehicle_id,
              m.model_name, m.oem
       FROM ${schemas.ops}.rider_vehicle_assignments rva
@@ -137,9 +142,15 @@ export default async function RiderDetailPage({ params }: { params: Promise<{ id
           role={session?.role ?? ""}
         />
 
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
           {[
             { label: "Total Collected", value: inr(totalCollected), color: "var(--accent-teal)" },
+            // Live balance on the active assignment: unpaid elapsed days × rate − banked credit.
+            {
+              label: "Outstanding Now",
+              value: inr(activeAssignment ? Math.round(Number(activeAssignment.outstanding_now)) : 0),
+              color: activeAssignment && Number(activeAssignment.outstanding_now) > 0 ? "var(--accent-danger-alt)" : "var(--accent-teal)",
+            },
             { label: "Onboarding Fee", value: inr(rider.onboarding_fee || 0), color: "var(--accent-purple)" },
             { label: "Security Deposit", value: inr(rider.security_deposit || 0), color: "var(--accent-warning)" },
             { label: "Payments Made", value: payments.length.toString(), color: "var(--accent-purple-2)" },

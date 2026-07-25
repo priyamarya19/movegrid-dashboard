@@ -15,7 +15,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     getRiderCycle(id),
     pool.query(
       `SELECT a.daily_rent, to_char(COALESCE(a.paid_through_date, a.assigned_date - 1), 'YYYY-MM-DD') AS paid_through_date,
-         to_char(${nextDueSql("a")}, 'YYYY-MM-DD') AS next_due_date
+         to_char(${nextDueSql("a")}, 'YYYY-MM-DD') AS next_due_date,
+         GREATEST(0,
+           GREATEST(0, (now() AT TIME ZONE 'Asia/Kolkata')::date - COALESCE(a.paid_through_date, a.assigned_date - 1)) * a.daily_rent
+           - COALESCE(a.rent_credit, 0)
+         ) AS outstanding_now
        FROM ${schemas.ops}.rider_vehicle_assignments a WHERE a.rider_id = $1 AND a.status = 'active' LIMIT 1`,
       [id]
     ),
@@ -26,5 +30,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     paid_through_date: a?.paid_through_date ?? null,
     next_due_date: a?.next_due_date ?? null,
     daily_rent: a?.daily_rent != null ? Number(a.daily_rent) : null,
+    // Exact live balance (unpaid elapsed days × rate − banked credit), 0 if paid up.
+    outstanding_now: a ? Math.round(Number(a.outstanding_now)) : null,
   });
 }
