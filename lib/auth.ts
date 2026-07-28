@@ -141,6 +141,20 @@ export async function requireSession(
   return { session };
 }
 
+// Per-user mobile-app page access (auth schema, migration 014). Read live so an
+// admin toggle in Settings → Users applies immediately, like the flags below.
+export async function userHasAppPage(userId: string, page: string): Promise<boolean> {
+  try {
+    const res = await pool.query(
+      `SELECT app_pages @> ARRAY[$2]::text[] AS has FROM ${schemas.auth}.users WHERE id = $1`,
+      [userId, page]
+    );
+    return res.rows[0]?.has === true;
+  } catch {
+    return false;
+  }
+}
+
 // Per-user "can view the Allotments list" permission (auth schema, migration 012).
 // Read live from the DB rather than the JWT so an admin ticking/unticking the box
 // takes effect immediately, without re-issuing tokens. Default false.

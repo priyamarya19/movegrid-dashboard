@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { schemas } from "@/lib/schemas";
-import { requireSession, userCanViewAllotments } from "@/lib/auth";
+import { requireSession, userCanViewAllotments, userHasAppPage } from "@/lib/auth";
 import { rangeCondition } from "@/lib/dateRange";
 
 // GET /api/collections/payments — every rent collection received (independent of
@@ -11,7 +11,11 @@ import { rangeCondition } from "@/lib/dateRange";
 export async function GET(req: NextRequest) {
   const guard = await requireSession(req);
   if ("response" in guard) return guard.response;
-  if (!(await userCanViewAllotments(guard.session.userId))) {
+  // The mobile Collections page permission also unlocks this list (its Payments tab).
+  if (
+    !(await userCanViewAllotments(guard.session.userId)) &&
+    !(await userHasAppPage(guard.session.userId, "collections"))
+  ) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
