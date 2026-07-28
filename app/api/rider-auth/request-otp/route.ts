@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { schemas } from "@/lib/schemas";
-import { generateOtp, hashOtp, mobileCore, sendOtp } from "@/lib/riderAuth";
+import { generateOtp, hashOtp, mobileCore, sendOtp, TEST_MOBILE, testLoginEnabled } from "@/lib/riderAuth";
 import { rateLimit, clientIp } from "@/lib/rate-limit";
 
 // POST /api/rider-auth/request-otp { mobile } — start a rider login. Always
@@ -12,6 +12,13 @@ export async function POST(req: NextRequest) {
   const core = mobileCore(mobile ?? "");
   if (core.length !== 10) {
     return NextResponse.json({ error: "Enter a valid 10-digit mobile number" }, { status: 400 });
+  }
+
+  // UAT tester number: no challenge stored, the app goes straight to the OTP
+  // screen and the fixed test code is checked in /verify. Prod: falls through
+  // to the normal (unknown-number) path.
+  if (core === TEST_MOBILE && testLoginEnabled()) {
+    return NextResponse.json({ ok: true, channel: "test" });
   }
 
   const rl = rateLimit(`rider-otp:${core}:${clientIp(req)}`);

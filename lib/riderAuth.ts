@@ -55,6 +55,42 @@ export async function requireRider(
   }
 }
 
+// ---- UAT tester mode ----
+//
+// A fixed test login (9999999999 / OTP 0000) that opens a rider picker, so the
+// team can browse the app as any rider during testing. Gated on the SCHEMA the
+// backend is connected to — not an env flag someone could set in production by
+// accident. A prod backend (mg_data) structurally has no test login.
+export const TEST_MOBILE = "9999999999";
+export const TEST_OTP = "0000";
+
+export function testLoginEnabled(): boolean {
+  return schemas.ops === "mg_data_uat";
+}
+
+export async function signTesterToken() {
+  return await new SignJWT({ kind: "rider-tester" })
+    .setProtectedHeader({ alg: "HS256" })
+    .setIssuedAt()
+    .setExpirationTime("1d")
+    .sign(secret);
+}
+
+export async function requireTester(
+  req: NextRequest
+): Promise<{ ok: true } | { response: NextResponse }> {
+  const header = req.headers.get("Authorization") ?? "";
+  const token = header.startsWith("Bearer ") ? header.slice(7) : null;
+  if (!token) return { response: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
+  try {
+    const { payload } = await jwtVerify(token, secret);
+    if (payload.kind !== "rider-tester") throw new Error("wrong kind");
+    return { ok: true };
+  } catch {
+    return { response: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
+  }
+}
+
 // ---- OTP challenge helpers ----
 
 export function generateOtp(): string {

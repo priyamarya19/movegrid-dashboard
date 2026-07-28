@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { schemas } from "@/lib/schemas";
-import { hashOtp, mobileCore, signRiderToken } from "@/lib/riderAuth";
+import { hashOtp, mobileCore, signRiderToken, signTesterToken, TEST_MOBILE, TEST_OTP, testLoginEnabled } from "@/lib/riderAuth";
 import { rateLimit, clientIp } from "@/lib/rate-limit";
 
 // POST /api/rider-auth/verify { mobile, otp } — complete a rider login.
@@ -11,6 +11,15 @@ export async function POST(req: NextRequest) {
   const core = mobileCore(mobile ?? "");
   if (core.length !== 10 || !otp) {
     return NextResponse.json({ error: "Mobile and OTP are required" }, { status: 400 });
+  }
+
+  // UAT tester login → short-lived tester token; the app then shows the rider
+  // picker (/test-riders → /test-login). Schema-gated, impossible in prod.
+  if (core === TEST_MOBILE && testLoginEnabled()) {
+    if (String(otp).trim() !== TEST_OTP) {
+      return NextResponse.json({ error: "Incorrect code, try again", code: "otp_wrong" }, { status: 400 });
+    }
+    return NextResponse.json({ ok: true, tester: true, token: await signTesterToken(), name: "Tester" });
   }
 
   const rl = rateLimit(`rider-verify:${core}:${clientIp(req)}`);
