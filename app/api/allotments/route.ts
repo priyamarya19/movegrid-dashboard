@@ -6,6 +6,7 @@ import { istTodayISO } from "@/lib/date";
 import { IST } from "@/lib/rent";
 import { rangeCondition } from "@/lib/dateRange";
 import { writeAudit } from "@/lib/audit";
+import { highSpeedDocsMissing } from "@/lib/highSpeedGate";
 import { beginIdempotency, finishIdempotency, abortIdempotency } from "@/lib/idempotency";
 
 // GET /api/allotments — active allotments for the permissioned Allotments list,
@@ -78,6 +79,15 @@ export async function POST(req: NextRequest) {
       await client.query("ROLLBACK");
       if (idem.mode === "claimed") await abortIdempotency(idem);
       return NextResponse.json({ error: "Vehicle must be 'Ready to Deploy' before it can be allotted. Set its status first." }, { status: 409 });
+    }
+
+    // High-speed vehicles demand DL + PAN on file — enforced here at the moment
+    // of truth, whatever the rider picked (or skipped) at KYC time.
+    const docsGate = await highSpeedDocsMissing(client, b.vehicle_id, b.rider_id);
+    if (docsGate) {
+      await client.query("ROLLBACK");
+      if (idem.mode === "claimed") await abortIdempotency(idem);
+      return NextResponse.json({ error: docsGate }, { status: 409 });
     }
 
     // Close any existing active assignment for this rider, and free its vehicle so it

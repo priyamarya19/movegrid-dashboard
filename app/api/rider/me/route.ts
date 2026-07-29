@@ -12,6 +12,8 @@ export async function GET(req: NextRequest) {
   const res = await pool.query(
     `SELECT r.id, r.name, r.rider_code, r.mobile, r.status, r.vehicle_pref,
        r.kyc_submitted_at, r.aadhaar_verified, r.pan_verified, r.dl_verified,
+       (r.pan IS NOT NULL AND r.pan_image_url IS NOT NULL) AS has_pan,
+       (r.dl_number IS NOT NULL AND r.dl_front_url IS NOT NULL) AS has_dl,
        h.hub_name, h.city AS hub_city,
        a.id AS assignment_id, to_char(a.assigned_date,'YYYY-MM-DD') AS assigned_date,
        a.allotment_code, v.ev_number, m.model_name, m.oem
@@ -40,6 +42,10 @@ export async function GET(req: NextRequest) {
       submitted: !!r.kyc_submitted_at,
       docs_verified: docsNeeded.every(Boolean),
       vehicle_pref: r.vehicle_pref ?? null,
+    },
+    documents: {
+      pan: { on_file: r.has_pan === true, verified: r.pan_verified === true },
+      dl: { on_file: r.has_dl === true, verified: r.dl_verified === true },
     },
   });
 }

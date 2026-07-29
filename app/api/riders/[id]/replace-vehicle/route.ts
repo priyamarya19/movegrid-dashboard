@@ -4,6 +4,7 @@ import { schemas } from "@/lib/schemas";
 import { requireRole } from "@/lib/auth";
 import { istTodayISO } from "@/lib/date";
 import { writeAudit } from "@/lib/audit";
+import { highSpeedDocsMissing } from "@/lib/highSpeedGate";
 
 // Old-vehicle destinations a replacement is allowed to set. 'returned' means
 // "awaiting inspection" — the same state a normal return leaves a vehicle in.
@@ -69,6 +70,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     if (veh.rows[0].status !== "ready_to_deploy") {
       await client.query("ROLLBACK");
       return NextResponse.json({ error: `Vehicle ${veh.rows[0].ev_number} is not ready to deploy (${veh.rows[0].status})` }, { status: 409 });
+    }
+
+    // High-speed replacements demand DL + PAN on file, same as fresh allotments.
+    const docsGate = await highSpeedDocsMissing(client, b.new_vehicle_id, riderId);
+    if (docsGate) {
+      await client.query("ROLLBACK");
+      return NextResponse.json({ error: docsGate }, { status: 409 });
     }
 
     const today = istTodayISO();
