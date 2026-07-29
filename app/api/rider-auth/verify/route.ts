@@ -57,17 +57,32 @@ export async function POST(req: NextRequest) {
   await pool.query(`UPDATE ${S}.rider_otps SET consumed_at = now() WHERE id = $1`, [ch.id]);
 
   const rider = await pool.query(
-    `SELECT id, name, mobile, token_version FROM ${S}.riders
-     WHERE RIGHT(REGEXP_REPLACE(mobile, '\\D', '', 'g'), 10) = $1 AND COALESCE(is_blacklisted, false) = false LIMIT 1`,
+    `SELECT id, name, mobile, token_version, COALESCE(is_blacklisted, false) AS blacklisted
+     FROM ${S}.riders WHERE RIGHT(REGEXP_REPLACE(mobile, '\\D', '', 'g'), 10) = $1 LIMIT 1`,
     [core]
   );
-  if (!rider.rows[0]) {
-    return NextResponse.json({ error: "No rider account for this number" }, { status: 404 });
+  if (rider.rows[0]?.blacklisted) {
+    return NextResponse.json({ error: "This number cannot be used. Contact your hub." }, { status: 403 });
   }
-  const r = rider.rows[0];
+
+  let r = rider.rows[0];
+  let newRider = false;
+  if (!r) {
+    // Open registration: a verified unknown mobile becomes a rider account on the
+    // spot — mobile-only signup, KYC follows inside the app. Name placeholder is
+    // replaced by the KYC wizard's first save.
+    const created = await pool.query(
+      `INSERT INTO ${S}.riders (name, mobile, status, rider_code)
+       VALUES ('New Rider', $1, 'pending', 'MGR' || LPAD(NEXTVAL('${S}.rider_code_seq')::TEXT, 6, '0'))
+       RETURNING id, name, token_version`,
+      [core]
+    );
+    r = created.rows[0];
+    newRider = true;
+  }
 
   const token = await signRiderToken({
     kind: "rider", riderId: r.id, mobile: core, name: r.name, tv: Number(r.token_version ?? 0),
   });
-  return NextResponse.json({ ok: true, token, name: r.name });
+  return NextResponse.json({ ok: true, token, name: r.name, new_rider: newRider });
 }

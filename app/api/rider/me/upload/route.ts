@@ -30,12 +30,15 @@ export async function POST(req: NextRequest) {
   const file = formData.get("file") as File | null;
   if (!file) return NextResponse.json({ error: "No file provided" }, { status: 400 });
 
+  // Purpose-scoped prefixes only — a rider upload can never land elsewhere.
+  const purpose = formData.get("purpose") === "kyc" ? "rider-kyc" : "rider-claims";
+
   const contentType = (file.type || "").toLowerCase();
   const ext = ALLOWED_TYPES[contentType];
   if (!ext) return NextResponse.json({ error: "Upload a JPG, PNG, WEBP or HEIC image" }, { status: 415 });
   if (file.size > MAX_BYTES) return NextResponse.json({ error: "File too large. Maximum size is 15 MB." }, { status: 413 });
 
-  const key = `rider-claims/${guard.rider.riderId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+  const key = `${purpose}/${guard.rider.riderId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
   await s3.send(new PutObjectCommand({
     Bucket: process.env.S3_BUCKET!,
     Key: key,

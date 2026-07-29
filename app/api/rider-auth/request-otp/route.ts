@@ -31,22 +31,25 @@ export async function POST(req: NextRequest) {
 
   const S = schemas.ops;
   const rider = await pool.query(
-    `SELECT id FROM ${S}.riders WHERE RIGHT(REGEXP_REPLACE(mobile, '\\D', '', 'g'), 10) = $1 AND COALESCE(is_blacklisted, false) = false LIMIT 1`,
+    `SELECT id, COALESCE(is_blacklisted, false) AS blacklisted
+     FROM ${S}.riders WHERE RIGHT(REGEXP_REPLACE(mobile, '\\D', '', 'g'), 10) = $1 LIMIT 1`,
     [core]
   );
 
-  if (rider.rows[0]) {
-    const otp = generateOtp();
-    // One live challenge per mobile: newer request invalidates older codes.
-    await pool.query(`UPDATE ${S}.rider_otps SET consumed_at = now() WHERE mobile = $1 AND consumed_at IS NULL`, [core]);
-    await pool.query(
-      `INSERT INTO ${S}.rider_otps (mobile, otp_hash, expires_at) VALUES ($1, $2, now() + interval '5 minutes')`,
-      [core, hashOtp(core, otp)]
-    );
-    const delivery = await sendOtp(core, otp);
-    return NextResponse.json({ ok: true, channel: delivery.channel });
+  // Blacklisted numbers can't log in OR re-register: same silent shape as before.
+  if (rider.rows[0]?.blacklisted) {
+    return NextResponse.json({ ok: true, channel: "none", exists: false });
   }
 
-  // Unknown number: same success shape (no enumeration), nothing stored.
-  return NextResponse.json({ ok: true, channel: "none" });
+  // Open registration: an unknown number gets an OTP too — verifying it creates
+  // the rider account (mobile-only signup; KYC follows inside the app).
+  const otp = generateOtp();
+  // One live challenge per mobile: newer request invalidates older codes.
+  await pool.query(`UPDATE ${S}.rider_otps SET consumed_at = now() WHERE mobile = $1 AND consumed_at IS NULL`, [core]);
+  await pool.query(
+    `INSERT INTO ${S}.rider_otps (mobile, otp_hash, expires_at) VALUES ($1, $2, now() + interval '5 minutes')`,
+    [core, hashOtp(core, otp)]
+  );
+  const delivery = await sendOtp(core, otp);
+  return NextResponse.json({ ok: true, channel: delivery.channel, exists: !!rider.rows[0] });
 }

@@ -10,7 +10,9 @@ export async function GET(req: NextRequest) {
   const S = schemas.ops;
 
   const res = await pool.query(
-    `SELECT r.id, r.name, r.rider_code, r.mobile, h.hub_name, h.city AS hub_city,
+    `SELECT r.id, r.name, r.rider_code, r.mobile, r.status, r.vehicle_pref,
+       r.kyc_submitted_at, r.aadhaar_verified, r.pan_verified, r.dl_verified,
+       h.hub_name, h.city AS hub_city,
        a.id AS assignment_id, to_char(a.assigned_date,'YYYY-MM-DD') AS assigned_date,
        a.allotment_code, v.ev_number, m.model_name, m.oem
      FROM ${S}.riders r
@@ -23,11 +25,21 @@ export async function GET(req: NextRequest) {
   );
   if (!res.rows[0]) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const r = res.rows[0];
+  // For low-speed riders PAN/DL are optional, so "documents verified" only
+  // requires what their vehicle class actually demands.
+  const docsNeeded = r.vehicle_pref === "high_speed"
+    ? [r.aadhaar_verified, r.pan_verified, r.dl_verified]
+    : [r.aadhaar_verified];
   return NextResponse.json({
-    name: r.name, rider_code: r.rider_code, mobile: r.mobile,
+    name: r.name, rider_code: r.rider_code, mobile: r.mobile, status: r.status,
     hub: r.hub_name ? { name: r.hub_name, city: r.hub_city } : null,
     vehicle: r.ev_number
       ? { ev_number: r.ev_number, model: [r.oem, r.model_name].filter(Boolean).join(" ") || null, assigned_date: r.assigned_date, allotment_code: r.allotment_code }
       : null,
+    kyc: {
+      submitted: !!r.kyc_submitted_at,
+      docs_verified: docsNeeded.every(Boolean),
+      vehicle_pref: r.vehicle_pref ?? null,
+    },
   });
 }
