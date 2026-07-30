@@ -3,6 +3,7 @@ import pool from "@/lib/db";
 import { schemas } from "@/lib/schemas";
 import { requireRole } from "@/lib/auth";
 import { IST, nextDueSql } from "@/lib/rent";
+import { riderIdentityConflict, uniqueViolationMessage } from "@/lib/riderUnique";
 import { writeAudit } from "@/lib/audit";
 import { beginIdempotency, finishIdempotency, abortIdempotency } from "@/lib/idempotency";
 
@@ -41,10 +42,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Pre-check duplicate mobile (fast, friendly path). The DB UNIQUE
-    // constraints below are the real guard against races.
-    const dup = await pool.query(`SELECT id FROM ${schemas.ops}.riders WHERE mobile = $1`, [b.mobile]);
-    if (dup.rows[0]) { if (idem.mode === "claimed") await abortIdempotency(idem); return NextResponse.json({ error: "A rider with this mobile number already exists", field: "mobile" }, { status: 409 }); }
+    // One identity, one rider: mobile / Aadhaar / PAN / bank account must not
+    // already belong to someone (DB unique indexes are the race-proof backstop).
+    const conflict = await riderIdentityConflict({
+      mobile: b.mobile, aadhaar: b.aadhaar ?? undefined, pan: b.pan ?? undefined, accountNumber: b.account_number ?? undefined,
+    });
+    if (conflict) { if (idem.mode === "claimed") await abortIdempotency(idem); return NextResponse.json({ error: conflict }, { status: 409 }); }
 
     const result = await pool.query(`
     INSERT INTO ${schemas.ops}.riders (
@@ -89,6 +92,8 @@ export async function POST(req: NextRequest) {
     const e = err as { code?: string; constraint?: string };
     // 23505 unique_violation — name the duplicated field.
     if (e.code === "23505") {
+      const identityMsg = uniqueViolationMessage(err);
+      if (identityMsg) return NextResponse.json({ error: identityMsg }, { status: 409 });
       const field = e.constraint === "riders_aadhaar_key" ? "aadhaar" : "mobile";
       const label = field === "aadhaar" ? "Aadhaar number" : "mobile number";
       return NextResponse.json(

@@ -71,14 +71,22 @@ export async function POST(req: NextRequest) {
     // Open registration: a verified unknown mobile becomes a rider account on the
     // spot — mobile-only signup, KYC follows inside the app. Name placeholder is
     // replaced by the KYC wizard's first save.
-    const created = await pool.query(
-      `INSERT INTO ${S}.riders (name, mobile, status, rider_code)
-       VALUES ('New Rider', $1, 'pending', 'MGR' || LPAD(NEXTVAL('${S}.rider_code_seq')::TEXT, 6, '0'))
-       RETURNING id, name, token_version`,
-      [core]
-    );
-    r = created.rows[0];
-    newRider = true;
+    try {
+      const created = await pool.query(
+        `INSERT INTO ${S}.riders (name, mobile, status, rider_code)
+         VALUES ('New Rider', $1, 'pending', 'MGR' || LPAD(NEXTVAL('${S}.rider_code_seq')::TEXT, 6, '0'))
+         RETURNING id, name, token_version`,
+        [core]
+      );
+      r = created.rows[0];
+      newRider = true;
+    } catch (e) {
+      // Race: two verifies for the same new number — the unique index caught it.
+      if ((e as { code?: string }).code === "23505") {
+        return NextResponse.json({ error: "Account ban chuka hai — dobara login karein" }, { status: 409 });
+      }
+      throw e;
+    }
   }
 
   const token = await signRiderToken({

@@ -3,6 +3,7 @@ import pool from "@/lib/db";
 import { schemas } from "@/lib/schemas";
 import { requireRider } from "@/lib/riderAuth";
 import { writeAudit } from "@/lib/audit";
+import { riderIdentityConflict, uniqueViolationMessage } from "@/lib/riderUnique";
 
 // PATCH /api/rider/me/documents — add or replace PAN / DL after KYC (e.g. a
 // low-speed rider upgrading toward a high-speed vehicle). Each document needs
@@ -32,6 +33,12 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: "DL needs the licence number AND a front photo together" }, { status: 400 });
   }
 
+  // A PAN can only ever belong to one rider (mirrors the KYC-time check).
+  if (wantsPan) {
+    const conflict = await riderIdentityConflict({ excludeRiderId: riderId, pan });
+    if (conflict) return NextResponse.json({ error: conflict }, { status: 409 });
+  }
+
   const sets: string[] = [];
   const vals: (string | null)[] = [];
   const push = (sql: string, v: string | null) => { vals.push(v); sets.push(sql.replace("?", `$${vals.length}`)); };
@@ -49,7 +56,13 @@ export async function PATCH(req: NextRequest) {
   }
 
   vals.push(riderId);
-  await pool.query(`UPDATE ${schemas.ops}.riders SET ${sets.join(", ")} WHERE id = $${vals.length}`, vals);
+  try {
+    await pool.query(`UPDATE ${schemas.ops}.riders SET ${sets.join(", ")} WHERE id = $${vals.length}`, vals);
+  } catch (e) {
+    const msg = uniqueViolationMessage(e);
+    if (msg) return NextResponse.json({ error: msg }, { status: 409 });
+    throw e;
+  }
 
   await writeAudit({
     action: "rider_documents_updated", entity: "rider", entityId: riderId,

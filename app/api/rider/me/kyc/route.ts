@@ -3,6 +3,7 @@ import pool from "@/lib/db";
 import { schemas } from "@/lib/schemas";
 import { requireRider } from "@/lib/riderAuth";
 import { writeAudit } from "@/lib/audit";
+import { riderIdentityConflict, uniqueViolationMessage } from "@/lib/riderUnique";
 
 // PATCH /api/rider/me/kyc — the in-app KYC wizard's save. Validation mirrors the
 // hub rule set: Aadhaar (number + both photos), bank details and a family
@@ -55,6 +56,14 @@ export async function PATCH(req: NextRequest) {
 
   if (errors.length) return NextResponse.json({ error: errors[0], errors }, { status: 400 });
 
+  // One identity, one rider: Aadhaar / PAN / bank account must not belong to
+  // anyone else (DB unique indexes are the race-proof backstop).
+  const conflict = await riderIdentityConflict({
+    excludeRiderId: riderId, aadhaar, pan: pan || undefined, accountNumber: account,
+  });
+  if (conflict) return NextResponse.json({ error: conflict }, { status: 409 });
+
+  try {
   await pool.query(
     `UPDATE ${schemas.ops}.riders SET
        name = $1, current_address = $2, permanent_address = $3, employer = $4,
@@ -81,6 +90,11 @@ export async function PATCH(req: NextRequest) {
       riderId,
     ]
   );
+  } catch (e) {
+    const msg = uniqueViolationMessage(e);
+    if (msg) return NextResponse.json({ error: msg }, { status: 409 });
+    throw e;
+  }
 
   await writeAudit({
     action: "rider_kyc_submitted", entity: "rider", entityId: riderId,
