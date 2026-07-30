@@ -43,7 +43,9 @@ export async function POST(req: NextRequest) {
 
   // Open registration: an unknown number gets an OTP too — verifying it creates
   // the rider account (mobile-only signup; KYC follows inside the app).
-  const otp = generateOtp();
+  // UAT convenience: the OTP is the mobile's LAST 4 DIGITS (schema-gated like
+  // tester mode — a production backend always generates random codes).
+  const otp = testLoginEnabled() ? core.slice(-4) : generateOtp();
   // One live challenge per mobile: newer request invalidates older codes.
   await pool.query(`UPDATE ${S}.rider_otps SET consumed_at = now() WHERE mobile = $1 AND consumed_at IS NULL`, [core]);
   await pool.query(
