@@ -10,6 +10,7 @@ import RecordPayment from "@/components/riders/RecordPayment";
 import ChangeRate from "@/components/riders/ChangeRate";
 import ApplyWaiver from "@/components/riders/ApplyWaiver";
 import ReplaceVehicle from "@/components/riders/ReplaceVehicle";
+import RecoverVehicle from "@/components/riders/RecoverVehicle";
 import PhotoGallery from "@/components/PhotoGallery";
 import { getRiderCycle, nextDueSql, outstandingSql } from "@/lib/rent";
 import RiderPenalties from "@/components/riders/RiderPenalties";
@@ -17,6 +18,12 @@ import ExportButton from "@/components/ExportButton";
 import { maskPan, maskAccount, maskDl } from "@/lib/mask";
 import { getSession } from "@/lib/auth";
 import { inr, dateIN } from "@/lib/format";
+
+// Stored document values are S3 keys (e.g. "kyc/1784...jpg") — always serve
+// them through the /api/file proxy. Legacy full URLs pass through untouched.
+function docHref(v: string): string {
+  return v.startsWith("http") ? v : `/api/file?key=${encodeURIComponent(v)}`;
+}
 
 function toISTMidnight(d: Date): Date {
   // Returns a Date whose y/m/d components (in local time) match the IST date of d
@@ -290,7 +297,7 @@ export default async function RiderDetailPage({ params }: { params: Promise<{ id
                 )}
                 <div className="flex flex-col gap-1 mb-1">
                   {d.frontUrl ? (
-                    <a href={d.frontUrl} target="_blank" rel="noopener noreferrer"
+                    <a href={docHref(d.frontUrl)} target="_blank" rel="noopener noreferrer"
                       className="inline-flex items-center gap-1.5 text-xs text-accent-purple hover:underline">
                       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                       View Front
@@ -302,7 +309,7 @@ export default async function RiderDetailPage({ params }: { params: Promise<{ id
                     </span>
                   )}
                   {d.backUrl !== undefined && (d.backUrl ? (
-                    <a href={d.backUrl} target="_blank" rel="noopener noreferrer"
+                    <a href={docHref(d.backUrl)} target="_blank" rel="noopener noreferrer"
                       className="inline-flex items-center gap-1.5 text-xs text-accent-purple hover:underline">
                       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                       View Back
@@ -357,6 +364,7 @@ export default async function RiderDetailPage({ params }: { params: Promise<{ id
                 <>
                   <ChangeRate assignmentId={activeAssignment.assignment_id} currentRate={activeAssignment.daily_rent ? Number(activeAssignment.daily_rent) : null} />
                   <ReplaceVehicle riderId={rider.id} currentEv={activeAssignment.ev_number} dailyRent={activeAssignment.daily_rent ? Number(activeAssignment.daily_rent) : null} />
+                  <RecoverVehicle riderId={rider.id} riderName={rider.name} currentEv={activeAssignment.ev_number} />
                   <ApplyWaiver riderId={rider.id} dailyRent={activeAssignment.daily_rent ? Number(activeAssignment.daily_rent) : null} />
                   <RecordPayment riderId={rider.id} dailyRent={activeAssignment.daily_rent ? Number(activeAssignment.daily_rent) : null} />
                 </>
