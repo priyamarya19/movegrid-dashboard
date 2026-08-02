@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import ImageUpload from "@/components/ImageUpload";
+import { useToast } from "@/components/Toast";
 
 type VehicleOption = { id: string; ev_number: string };
 
@@ -20,6 +21,7 @@ function thisMonth() {
 
 export default function RecordPayoutModal({ investorId, vehicles }: Props) {
   const router = useRouter();
+  const toast = useToast();
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -51,11 +53,22 @@ export default function RecordPayoutModal({ investorId, vehicles }: Props) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ investor_id: investorId, ...form, amount: Number(form.amount), vehicle_id: form.vehicle_id || null }),
       });
-      const data = await res.json();
-      if (!res.ok) { setError(data.error || "Failed to record payout"); return; }
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error || "Failed to record payout");
+        toast.show(data.error || "Couldn't record the payout", "error");
+        return;
+      }
+      const amt = Number(form.amount).toLocaleString("en-IN");
       setOpen(false);
       reset();
+      // Confirm loudly, THEN re-render the server page so Payout History updates
+      // without a manual reload.
+      toast.show(`Payout of ₹${amt} recorded ✓`, "success");
       router.refresh();
+    } catch {
+      setError("Network error — check your connection and retry");
+      toast.show("Network error — payout may not be saved", "error");
     } finally { setSaving(false); }
   }
 
