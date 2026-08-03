@@ -199,7 +199,7 @@ export async function GET(req: NextRequest) {
     LEFT JOIN ${schemas.ops}.vehicles v ON v.id = rva.vehicle_id
   `;
 
-  const LIMIT = 200;
+  const LIMIT = 1000;
   let query: string;
   const params: string[] = [];
   let total: number | null = null;
@@ -250,11 +250,16 @@ export async function GET(req: NextRequest) {
     );
     total = countRes.rows[0]?.n ?? null;
 
-    query = `${baseSelect} ${where} ORDER BY ${sortCol} ${sortDir} NULLS LAST`;
     if (paginated) {
+      query = `${baseSelect} ${where} ORDER BY ${sortCol} ${sortDir} NULLS LAST`;
       query += ` LIMIT ${pageSize} OFFSET ${(page - 1) * pageSize}`;
     } else {
-      query += ` LIMIT ${LIMIT}`;
+      // Mobile default list: actives first, then pending, then inactive (newest
+      // within each group) — so if the cap is ever hit again, it's the oldest
+      // inactive riders that fall off, never active paying ones.
+      query = `${baseSelect} ${where} ORDER BY
+        CASE r.status WHEN 'active' THEN 0 WHEN 'pending' THEN 1 ELSE 2 END,
+        r.created_at DESC LIMIT ${LIMIT}`;
     }
   }
 
