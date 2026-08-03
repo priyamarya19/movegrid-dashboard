@@ -33,7 +33,7 @@ export default async function OpsManagerHome() {
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
         {[
-          { label: "Available Riders", value: fleet.pendingRiders, color: "var(--accent-warning)", href: "/riders?status=pending" },
+          { label: "Available Riders", value: fleet.availableRiders, color: "var(--accent-warning)", href: "/riders?status=pending" },
           { label: "Vehicles Deployed", value: fleet.assignedVehicles, color: "var(--accent-purple)", href: `/vehicles?status=${VSTATUS.assigned}` },
           { label: "Available Vehicles", value: fleet.availableVehicles, color: "var(--accent-purple-2)", href: `/vehicles?status=${VSTATUS.available}` },
           { label: "Not Available", value: fleet.notAvailableVehicles, color: "var(--accent-warning)", href: `/vehicles?status=${NOT_AVAILABLE}` },

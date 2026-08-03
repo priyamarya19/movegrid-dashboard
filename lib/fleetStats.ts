@@ -9,9 +9,18 @@ import { VSTATUS } from "@/lib/vehicleStatus";
 // re-queries or re-derives the counts itself.
 export const getFleetRiderCounts = unstable_cache(async function getFleetRiderCounts() {
   const S = schemas.ops;
-  const [vehicles, riders] = await Promise.all([
+  const [vehicles, riders, availableRiders] = await Promise.all([
     pool.query(`SELECT status, COUNT(*) FROM ${S}.vehicles GROUP BY status`),
     pool.query(`SELECT status, COUNT(*) FROM ${S}.riders GROUP BY status`),
+    // "Available" = pending AND KYC done. KYC done = Aadhaar + PAN captured
+    // (photo or number) — DL is deliberately excluded (only mandatory for
+    // high-speed vehicles, enforced at allotment by the high-speed gate).
+    // Document presence, not the verified checkboxes: verification flags are
+    // newer than most riders and unset on legitimately-onboarded ones.
+    pool.query(`SELECT COUNT(*)::int AS n FROM ${S}.riders r2
+      WHERE r2.status = 'pending'
+        AND (r2.aadhaar_front_url IS NOT NULL OR COALESCE(r2.aadhaar,'') <> '')
+        AND (r2.pan_image_url IS NOT NULL OR COALESCE(r2.pan,'') <> '')`),
   ]);
 
   const vMap: Record<string, number> = {};
@@ -34,5 +43,7 @@ export const getFleetRiderCounts = unstable_cache(async function getFleetRiderCo
     activeRiders: rMap["active"] ?? 0,
     inactiveRiders: rMap["inactive"] ?? 0,
     pendingRiders: rMap["pending"] ?? 0,
+    // KYC-done pending riders — the ones genuinely ready for an allotment.
+    availableRiders: Number(availableRiders.rows[0]?.n ?? 0),
   };
-}, ["fleet-rider-counts-v1"], { revalidate: 60 });
+}, ["fleet-rider-counts-v2"], { revalidate: 60 });

@@ -174,7 +174,7 @@ export default async function AdminHome({ role, name }: Props) {
               { label: "Deployed", value: stats.assignedVehicles, sub: `of ${stats.totalVehicles} total`, accent: "var(--accent-teal)", href: "/vehicles?status=assigned" },
               { label: "Available", value: stats.availableVehicles, sub: "ready to deploy", accent: "var(--accent-purple-2)", href: `/vehicles?status=${VSTATUS.available}` },
               { label: "Not Available", value: stats.notAvailableVehicles, sub: "maintenance, returned, etc.", accent: "var(--accent-warning)", href: `/vehicles?status=${NOT_AVAILABLE}` },
-              { label: "Available Riders", value: stats.pendingRiders, sub: "not yet allotted a vehicle", accent: "var(--accent-purple)", href: "/riders?status=pending" },
+              { label: "Available Riders", value: stats.availableRiders, sub: "KYC done, not yet allotted", accent: "var(--accent-purple)", href: "/riders?status=pending" },
             ].map((c) => (
               <Link key={c.label} href={c.href} className="bg-surface border border-default rounded-xl p-5 relative overflow-hidden hover:border-strong hover:bg-surface-hover transition-colors block">
                 <div className="absolute top-0 left-0 right-0 h-[3px]" style={{ background: c.accent }} />

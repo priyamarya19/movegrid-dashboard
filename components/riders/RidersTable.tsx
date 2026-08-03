@@ -183,7 +183,7 @@ export default function RidersTable({ rentFilter, statusFilter: initialStatus }:
             Riders{rentFilter === "overdue" ? " — Overdue Rent" : rentFilter === "due_soon" ? " — Due in 2 Days" : ""}
           </h1>
           <p className="text-muted text-sm mt-1">
-            {total ?? riders.length} riders • {counts["active"] || 0} active · {counts["inactive"] || 0} inactive
+            {total ?? riders.length} riders • {counts["active"] || 0} active · {counts["inactive"] || 0} inactive{counts["kyc_pending"] != null ? ` · ${counts["kyc_pending"]} KYC pending` : ""}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">

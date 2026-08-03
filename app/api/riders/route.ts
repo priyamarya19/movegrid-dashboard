@@ -277,6 +277,16 @@ export async function GET(req: NextRequest) {
     );
     const counts: Record<string, number> = {};
     for (const row of sc.rows) counts[row.status] = row.n;
+    // KYC pending = Aadhaar + PAN not both captured (photo or number; DL
+    // intentionally excluded — only high-speed allotments require it). Shown in
+    // the riders page header. Presence, not the verified checkboxes — those are
+    // newer than most riders.
+    const kp = await pool.query(
+      `SELECT count(*)::int AS n FROM ${schemas.ops}.riders r2
+       WHERE NOT ((r2.aadhaar_front_url IS NOT NULL OR COALESCE(r2.aadhaar,'') <> '')
+              AND (r2.pan_image_url IS NOT NULL OR COALESCE(r2.pan,'') <> ''))`
+    );
+    counts["kyc_pending"] = kp.rows[0]?.n ?? 0;
     headers["X-Status-Counts"] = JSON.stringify(counts);
   }
   return NextResponse.json(result.rows, { headers });
