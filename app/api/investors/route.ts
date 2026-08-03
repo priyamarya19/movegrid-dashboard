@@ -8,19 +8,20 @@ export async function GET(req: NextRequest) {
   const guard = await requireRole(req, ["admin"]);
   if ("response" in guard) return guard.response;
 
+  // Vehicles and payouts are aggregated in separate subqueries — joining both
+  // onto the profile row multiplies them (42 vehicles × 1 payout inflated
+  // total_paid 42×, and a 2nd payout would have doubled the vehicle count).
   const result = await pool.query(`
     SELECT ip.id, u.name, u.email, u.mobile,
            ip.total_invested, ip.investment_date, ip.status,
            ip.bank, ip.account_number, ip.ifsc, ip.bank_status,
-           COUNT(v.id) AS vehicle_count,
-           COALESCE(SUM(CASE WHEN pay.status = 'paid' THEN pay.amount END), 0) AS total_paid,
-           COALESCE(SUM(CASE WHEN pay.status = 'pending' THEN pay.amount END), 0) AS pending_amount
+           (SELECT COUNT(*) FROM ${schemas.ops}.vehicles v WHERE v.investor_id = ip.id) AS vehicle_count,
+           COALESCE((SELECT SUM(pay.amount) FROM ${schemas.ops}.investor_payouts pay
+                     WHERE pay.investor_id = ip.id AND pay.status = 'paid'), 0) AS total_paid,
+           COALESCE((SELECT SUM(pay.amount) FROM ${schemas.ops}.investor_payouts pay
+                     WHERE pay.investor_id = ip.id AND pay.status = 'pending'), 0) AS pending_amount
     FROM ${schemas.ops}.investor_profiles ip
     JOIN ${schemas.auth}.users u ON u.id = ip.user_id
-    LEFT JOIN ${schemas.ops}.vehicles v ON v.investor_id = ip.id
-    LEFT JOIN ${schemas.ops}.investor_payouts pay ON pay.investor_id = ip.id
-    GROUP BY ip.id, u.name, u.email, u.mobile, ip.total_invested, ip.investment_date, ip.status,
-             ip.bank, ip.account_number, ip.ifsc, ip.bank_status
     ORDER BY ip.total_invested DESC
   `);
 
