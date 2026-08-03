@@ -36,6 +36,7 @@ export default function InvestorForm() {
     name: "", mobile: "", email: "", password: "",
     aadhaar: "", pan: "", aadhaar_url: "",
     total_invested: "", investment_date: "",
+    payout_start_date: "", payout_term_months: "24", roi_percent: "", scooter_price: "",
     bank: "", account_number: "", confirm_account_number: "", ifsc: "",
   });
 
@@ -59,6 +60,10 @@ export default function InvestorForm() {
           ...form,
           total_invested: form.total_invested ? Number(form.total_invested) : null,
           investment_date: form.investment_date || null,
+          payout_start_date: form.payout_start_date || null,
+          payout_term_months: form.payout_term_months ? Number(form.payout_term_months) : 24,
+          roi_percent: form.roi_percent ? Number(form.roi_percent) : null,
+          scooter_price: form.scooter_price ? Number(form.scooter_price) : null,
         }),
       });
       const data = await res.json();
@@ -84,6 +89,10 @@ export default function InvestorForm() {
         <Section title="Investment" />
         <Field label="Investment Amount (₹)" required><input type="number" min="0" className={inp} value={form.total_invested} onChange={e => set("total_invested", e.target.value)} placeholder="250000" required /></Field>
         <Field label="Investment Date"><input type="date" className={inp} value={form.investment_date} onChange={e => set("investment_date", e.target.value)} /></Field>
+        <Field label="Earning Start Date"><input type="date" className={inp} value={form.payout_start_date} onChange={e => set("payout_start_date", e.target.value)} /><p className="text-[11px] text-faint mt-1">1st of the month after deployment — the instalment clock starts here</p></Field>
+        <Field label="Instalments (term)" required><input type="number" min="1" max="120" className={inp} value={form.payout_term_months} onChange={e => set("payout_term_months", e.target.value)} required /></Field>
+        <Field label="ROI %"><input type="number" step="0.1" min="0" className={inp} value={form.roi_percent} onChange={e => set("roi_percent", e.target.value)} placeholder="27" /></Field>
+        <Field label="Scooter Price (₹ per scooter)"><input type="number" min="0" className={inp} value={form.scooter_price} onChange={e => set("scooter_price", e.target.value)} placeholder="25000" /></Field>
 
         <Section title="Bank Account" />
         <Field label="Bank Name" required><input className={inp} value={form.bank} onChange={e => set("bank", e.target.value)} placeholder="HDFC Bank" required /></Field>

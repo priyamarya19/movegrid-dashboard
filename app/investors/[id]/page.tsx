@@ -7,6 +7,7 @@ import BackButton from "@/components/BackButton";
 import { getSession } from "@/lib/auth";
 import MapVehiclesPanel from "@/components/investors/MapVehiclesPanel";
 import RecordPayoutModal from "@/components/investors/RecordPayoutModal";
+import EditInvestorTerms from "@/components/investors/EditInvestorTerms";
 import { vehicleStatusColor, vehicleStatusLabel } from "@/lib/vehicleStatus";
 import { inr, dateIN } from "@/lib/format";
 
@@ -67,6 +68,24 @@ export default async function InvestorDetailPage({ params }: { params: Promise<{
 
   const { investor, vehicles, payouts, totalPaid, totalPending } = data;
   const roi = investor.total_invested > 0 ? ((totalPaid / investor.total_invested) * 100).toFixed(1) : "0";
+  // Instalments = distinct months with a paid payout; schedule off the start date.
+  const paidMonths = new Set<string>();
+  for (const p of payouts as { status: string; period_month: string | null; due_date: string | null }[]) {
+    if (p.status !== "paid") continue;
+    const d = p.period_month ?? p.due_date;
+    if (d) paidMonths.add(new Date(d).toISOString().slice(0, 7));
+  }
+  const term = Number(investor.payout_term_months ?? 24);
+  const instPaid = paidMonths.size;
+  const expectedMonthly = investor.roi_percent != null && investor.total_invested > 0 && term > 0
+    ? Math.round((Number(investor.total_invested) * (1 + Number(investor.roi_percent) / 100)) / term)
+    : null;
+  let nextInstalment: string | null = null;
+  if (investor.payout_start_date && instPaid < term) {
+    const sd = new Date(investor.payout_start_date);
+    const due = new Date(sd.getFullYear(), sd.getMonth() + instPaid + 1, 1);
+    nextInstalment = due.toISOString().slice(0, 10);
+  }
   const isAdmin = session?.role === "admin";
 
   return (
@@ -84,14 +103,17 @@ export default async function InvestorDetailPage({ params }: { params: Promise<{
             <h1 className="text-primary text-2xl font-bold">{investor.name}</h1>
             <p className="text-muted text-sm mt-1">{investor.mobile} · {investor.email}</p>
           </div>
-          <span className={`px-3 py-1 rounded-full text-sm font-medium capitalize ${investor.status === "active" ? "bg-accent-success/20 text-accent-success-text" : "bg-muted/20 text-muted"}`}>{investor.status}</span>
+          <div className="flex items-center gap-3">
+            {isAdmin && <EditInvestorTerms investorId={investor.id} current={{ payout_start_date: investor.payout_start_date, payout_term_months: term, roi_percent: investor.roi_percent != null ? Number(investor.roi_percent) : null, scooter_price: investor.scooter_price != null ? Number(investor.scooter_price) : null }} />}
+            <span className={`px-3 py-1 rounded-full text-sm font-medium capitalize ${investor.status === "active" ? "bg-accent-success/20 text-accent-success-text" : "bg-muted/20 text-muted"}`}>{investor.status}</span>
+          </div>
         </div>
 
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[
             { label: "Total Invested", value: inr(investor.total_invested), color: "var(--accent-purple)" },
             { label: "Total Paid Out", value: inr(totalPaid), color: "var(--accent-teal)" },
-            { label: "Pending Payouts", value: inr(totalPending), color: "var(--accent-danger)" },
+            { label: "Instalments", value: `${instPaid}/${term} · ${Math.max(0, term - instPaid)} left`, color: "var(--accent-danger)" },
             { label: "ROI So Far", value: roi + "%", color: "var(--accent-warning)" },
           ].map((c) => (
             <div key={c.label} className="bg-surface border border-default rounded-xl p-5">
@@ -112,6 +134,11 @@ export default async function InvestorDetailPage({ params }: { params: Promise<{
               { label: "Aadhaar", value: investor.aadhaar ? "XXXX XXXX " + investor.aadhaar.slice(-4) : "—" },
               { label: "Bank", value: investor.bank ?? "—" },
               { label: "Investment Date", value: investor.investment_date ? dateIN(investor.investment_date, { day: "numeric", month: "short", year: "numeric" }) : "—" },
+              { label: "Earning Start Date", value: investor.payout_start_date ? dateIN(investor.payout_start_date, { day: "numeric", month: "short", year: "numeric" }) : "not set" },
+              { label: "Next Instalment Due", value: nextInstalment ? dateIN(nextInstalment, { day: "numeric", month: "short", year: "numeric" }) : "—" },
+              { label: "ROI", value: investor.roi_percent != null ? `${Number(investor.roi_percent)}%` : "not set" },
+              { label: "Scooter Price", value: investor.scooter_price != null ? inr(Number(investor.scooter_price)) : "not set" },
+              { label: "Expected Monthly Instalment", value: expectedMonthly != null ? inr(expectedMonthly) : "—" },
             ].map((row) => (
               <div key={row.label} className="flex justify-between py-2 border-b border-default last:border-0">
                 <span className="text-muted text-sm">{row.label}</span>

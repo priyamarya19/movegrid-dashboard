@@ -52,7 +52,7 @@ function PortfolioView({
     : null;
 
   const cards = [
-    { label: "Total Invested", value: inr(profile.total_invested), color: "var(--accent-purple)", sub: sinceMonth ? "Since " + sinceMonth : undefined },
+    { label: "Total Invested", value: inr(profile.total_invested), color: "var(--accent-purple)", sub: [sinceMonth ? "Since " + sinceMonth : null, profile.scooter_price != null ? `${vehicles.length} scooters @ ${inr(Number(profile.scooter_price))} each` : null].filter(Boolean).join(" · ") || undefined },
     { label: "Earned So Far", value: inr(totalPaid), color: "var(--accent-teal)", sub: `${payoutsMade} of ${termMonths} payouts received` },
     { label: "Payouts Remaining", value: String(payoutsRemaining), color: "var(--accent-danger)", sub: `of ${termMonths} months` },
     { label: "ROI So Far", value: roi.toFixed(1) + "%", color: "var(--accent-warning)", sub: undefined },

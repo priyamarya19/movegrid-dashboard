@@ -8,6 +8,7 @@ import { getSession } from "@/lib/auth";
 import VehicleInvestorCard from "@/components/vehicles/VehicleInvestorCard";
 import VehicleStatusControl from "@/components/vehicles/VehicleStatusControl";
 import VehicleRepairsCard from "@/components/vehicles/VehicleRepairsCard";
+import VehicleHistory from "@/components/vehicles/VehicleHistory";
 import PhotoGallery from "@/components/PhotoGallery";
 import { inr, dateIN } from "@/lib/format";
 
@@ -250,6 +251,9 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
             </tbody>
           </table></div>
         </div>
+
+        {/* Full life story: deployments, returns, recoveries, state changes with reasons */}
+        <VehicleHistory vehicleId={vehicle.id} />
 
       </div>
     </DashboardLayout>

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { schemas } from "@/lib/schemas";
 import { requireRole } from "@/lib/auth";
+import { convertRiderLeadByMobile } from "@/lib/leadConvert";
 
 const validDocs = ["aadhaar", "pan", "dl"] as const;
 type Doc = typeof validDocs[number];
@@ -23,14 +24,19 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const verifiedAtCol = `${document}_verified_at`;
   const verifiedCol = `${document}_verified`;
 
-  await pool.query(
+  const upd = await pool.query(
     `UPDATE ${schemas.ops}.riders
      SET ${verifiedCol} = $1,
          ${verifiedByCol} = $2,
          ${verifiedAtCol} = $3
-     WHERE id = $4`,
+     WHERE id = $4
+     RETURNING mobile`,
     [verified, verified ? session.name : null, verified ? new Date() : null, id]
   );
+
+  // Team verifying documents also counts as "KYC completed" → convert any
+  // matching rider lead.
+  if (verified && upd.rows[0]?.mobile) await convertRiderLeadByMobile(upd.rows[0].mobile);
 
   return NextResponse.json({ ok: true, verified, verified_by: verified ? session.name : null });
 }

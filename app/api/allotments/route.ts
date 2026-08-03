@@ -7,6 +7,7 @@ import { IST } from "@/lib/rent";
 import { rangeCondition } from "@/lib/dateRange";
 import { writeAudit } from "@/lib/audit";
 import { highSpeedDocsMissing } from "@/lib/highSpeedGate";
+import { logVehicleStatus } from "@/lib/vehicleStatusLog";
 import { beginIdempotency, finishIdempotency, abortIdempotency } from "@/lib/idempotency";
 
 // GET /api/allotments — active allotments for the permissioned Allotments list,
@@ -242,6 +243,10 @@ export async function POST(req: NextRequest) {
       `UPDATE ${schemas.ops}.vehicles SET status = 'assigned', hub_id = COALESCE($1, hub_id) WHERE id = $2`,
       [b.hub_id ?? null, b.vehicle_id]
     );
+    await logVehicleStatus(client, {
+      vehicleId: b.vehicle_id, from: "ready_to_deploy", to: "assigned",
+      reason: `Allotted (${allotmentCode})`, source: "allotment", actor: session.name,
+    });
 
     await client.query("COMMIT");
     await writeAudit({

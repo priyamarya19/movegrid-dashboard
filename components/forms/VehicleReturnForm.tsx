@@ -47,6 +47,7 @@ export default function VehicleReturnForm() {
     returned_date: istTodayISO(),
     is_issue_swap: false,
     non_functional_days: "",
+    amount_collected: "",
   });
 
   const [settle, setSettle] = useState<PaymentProofValue>(emptyProof);
@@ -88,6 +89,9 @@ export default function VehicleReturnForm() {
     if (form.rent_cleared === "true" && !proofValid(settle)) {
       setError("Rent was cleared — select a payment mode and upload the proof image"); return;
     }
+    if (form.rent_cleared === "false" && Number(form.amount_collected) > 0 && !proofValid(settle)) {
+      setError("Money collected at return — select a payment mode and upload the proof image"); return;
+    }
     setSubmitting(true); setError("");
     try {
       const photos = form.return_photos.filter(Boolean);
@@ -102,9 +106,10 @@ export default function VehicleReturnForm() {
           condition_on_return: form.condition_on_return.length ? form.condition_on_return : null,
           return_photos: photos.length ? photos : null,
           return_remarks: form.return_remarks || null,
-          rent_settlement_mode: form.rent_cleared === "true" ? settle.mode : null,
-          rent_settlement_utr: form.rent_cleared === "true" ? (settle.utr || null) : null,
-          rent_settlement_proof_url: form.rent_cleared === "true" ? settle.proof : null,
+          amount_collected: form.rent_cleared === "false" && form.amount_collected !== "" ? Number(form.amount_collected) : 0,
+          rent_settlement_mode: form.rent_cleared === "true" || Number(form.amount_collected) > 0 ? settle.mode : null,
+          rent_settlement_utr: form.rent_cleared === "true" || Number(form.amount_collected) > 0 ? (settle.utr || null) : null,
+          rent_settlement_proof_url: form.rent_cleared === "true" || Number(form.amount_collected) > 0 ? settle.proof : null,
           is_issue_swap: form.is_issue_swap,
           non_functional_days: form.is_issue_swap && form.non_functional_days ? Number(form.non_functional_days) : 0,
         }),
@@ -158,6 +163,21 @@ export default function VehicleReturnForm() {
               <PaymentProof value={settle} onChange={setSettle} folder="rent-settlement" />
             </div>
           </div>
+        )}
+        {form.rent_cleared === "false" && (
+          <>
+            <Field label="Amount Collected Now (₹)" hint="₹0 allowed — whatever remains outstanding becomes bad debt">
+              <input type="number" min="0" className={inp} value={form.amount_collected} onChange={e => set("amount_collected", e.target.value)} placeholder="0" />
+            </Field>
+            {Number(form.amount_collected) > 0 && (
+              <div className="col-span-full">
+                <div className="max-w-xs">
+                  <p className="text-xs text-accent-danger font-semibold uppercase tracking-wider mb-2">Collection Proof</p>
+                  <PaymentProof value={settle} onChange={setSettle} folder="rent-settlement" />
+                </div>
+              </div>
+            )}
+          </>
         )}
         <Field label="Penalty Amount (₹)"><input type="number" className={inp} value={form.penalty_amount} onChange={e => set("penalty_amount", e.target.value)} placeholder="0" /></Field>
         <Field label="Penalty Details" hint="Damaged parts / reason — saved to the rider's penalties"><input className={inp} value={form.penalty_detail} onChange={e => set("penalty_detail", e.target.value)} placeholder="e.g. Front fender, handle T band" /></Field>

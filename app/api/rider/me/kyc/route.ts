@@ -4,6 +4,7 @@ import { schemas } from "@/lib/schemas";
 import { requireRider } from "@/lib/riderAuth";
 import { writeAudit } from "@/lib/audit";
 import { riderIdentityConflict, uniqueViolationMessage } from "@/lib/riderUnique";
+import { convertRiderLeadByMobile } from "@/lib/leadConvert";
 
 // PATCH /api/rider/me/kyc — the in-app KYC wizard's save. Validation mirrors the
 // hub rule set: Aadhaar (number + both photos), bank details and a family
@@ -95,6 +96,9 @@ export async function PATCH(req: NextRequest) {
     if (msg) return NextResponse.json({ error: msg }, { status: 409 });
     throw e;
   }
+
+  // KYC complete → any matching rider lead flips to 'converted'.
+  await convertRiderLeadByMobile(guard.rider.mobile);
 
   await writeAudit({
     action: "rider_kyc_submitted", entity: "rider", entityId: riderId,

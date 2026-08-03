@@ -4,7 +4,9 @@ import { schemas } from "@/lib/schemas";
 import { requireRole } from "@/lib/auth";
 import { istTodayISO } from "@/lib/date";
 import { writeAudit } from "@/lib/audit";
-import { outstandingSql } from "@/lib/rent";
+import { outstandingSql, PAYMENT_MODES } from "@/lib/rent";
+import { recordRentPayment } from "@/lib/recordRentPayment";
+import { logVehicleStatus } from "@/lib/vehicleStatusLog";
 
 const REASONS = ["non_payment", "absconded", "unreachable", "other"] as const;
 
@@ -31,6 +33,17 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const recoveredDate = b.recovered_date || istTodayISO();
   const S = schemas.ops;
 
+  // "Amount collected now" (₹0 allowed): goes through the normal rent ledger;
+  // only the REMAINDER becomes bad debt. A non-zero amount needs mode + proof,
+  // same discipline as every payment.
+  const collectedNow = b.amount_collected != null && b.amount_collected !== "" ? Number(b.amount_collected) : 0;
+  if (Number.isNaN(collectedNow) || collectedNow < 0) {
+    return NextResponse.json({ error: "amount_collected must be 0 or more" }, { status: 400 });
+  }
+  if (collectedNow > 0 && (!PAYMENT_MODES.includes(b.payment_mode) || !b.payment_proof_url)) {
+    return NextResponse.json({ error: "Payment mode and proof are required when collecting money at recovery" }, { status: 400 });
+  }
+
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
@@ -46,7 +59,20 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       await client.query("ROLLBACK");
       return NextResponse.json({ error: "Rider has no active vehicle assignment" }, { status: 409 });
     }
-    const outstanding = Math.round(Number(a.outstanding) || 0);
+
+    // Collect first (assignment must still be active for the ledger), THEN
+    // freeze whatever remains as the recovery dues / bad debt.
+    if (collectedNow > 0) {
+      await recordRentPayment(client, {
+        riderId, amount: collectedNow, paymentMode: b.payment_mode,
+        paymentUtr: b.payment_utr ?? null, screenshotUrl: b.payment_proof_url,
+      });
+    }
+    const fresh = await client.query(
+      `SELECT ${outstandingSql("a")} AS outstanding FROM ${S}.rider_vehicle_assignments a WHERE a.id = $1`,
+      [a.id]
+    );
+    const outstanding = Math.round(Number(fresh.rows[0]?.outstanding) || 0);
 
     await client.query(
       `UPDATE ${S}.rider_vehicle_assignments SET
@@ -57,6 +83,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     );
 
     await client.query(`UPDATE ${S}.vehicles SET status = 'returned' WHERE id = $1`, [a.vehicle_id]);
+    await logVehicleStatus(client, {
+      vehicleId: a.vehicle_id, from: "assigned", to: "returned",
+      reason: `RECOVERED — ${b.reason}${b.notes ? `: ${String(b.notes).trim()}` : ""}`,
+      source: "recovery", actor: session.name,
+    });
 
     // Rider goes inactive; blacklisting also bumps token_version so any live
     // rider-app session dies immediately.
@@ -85,6 +116,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         outstanding, blacklist, session.name,
       ]
     );
+
+    // The remainder is the bad debt (Finance → Bad Debt tab).
+    if (outstanding > 0) {
+      await client.query(
+        `INSERT INTO ${S}.bad_debts (rider_id, vehicle_id, assignment_id, source, original_outstanding, collected_at_close, created_by)
+         VALUES ($1, $2, $3, 'recovery', $4, $5, $6)`,
+        [riderId, a.vehicle_id, a.id, outstanding, collectedNow, session.name]
+      );
+    }
 
     await client.query("COMMIT");
     await writeAudit({

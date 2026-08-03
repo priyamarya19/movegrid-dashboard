@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { schemas } from "@/lib/schemas";
 import { requireRole, requireSession, forbiddenResponse } from "@/lib/auth";
+import { logVehicleStatus } from "@/lib/vehicleStatusLog";
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const guard = await requireRole(req);
@@ -68,12 +69,25 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (!OPS_STATUSES.includes(body.status)) {
       return NextResponse.json({ error: "Invalid status" }, { status: 400 });
     }
+    // The reason IS the record: mandatory when flagging a problem or declaring
+    // it fixed; optional for Ready to Deploy.
+    const reason = typeof body.reason === "string" ? body.reason.trim() : "";
+    if ((body.status === "under_maintenance" || body.status === "mechanically_ok") && !reason) {
+      return NextResponse.json(
+        { error: body.status === "under_maintenance" ? "What's the issue? A reason is required for Under Maintenance." : "What was checked/fixed? A reason is required for Mechanically OK." },
+        { status: 400 }
+      );
+    }
     const cur = await pool.query(`SELECT status FROM ${schemas.ops}.vehicles WHERE id = $1`, [id]);
     if (!cur.rows[0]) return NextResponse.json({ error: "Vehicle not found" }, { status: 404 });
     if (cur.rows[0].status === "assigned") {
       return NextResponse.json({ error: "Can't change status while the vehicle is assigned to a rider. Process the return first." }, { status: 409 });
     }
     await pool.query(`UPDATE ${schemas.ops}.vehicles SET status = $1 WHERE id = $2`, [body.status, id]);
+    await logVehicleStatus(pool, {
+      vehicleId: id, from: cur.rows[0].status, to: body.status,
+      reason: reason || null, source: "manual", actor: session.name,
+    });
     return NextResponse.json({ success: true, status: body.status });
   }
 

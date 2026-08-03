@@ -5,6 +5,7 @@ import { requireRole } from "@/lib/auth";
 import { istTodayISO } from "@/lib/date";
 import { writeAudit } from "@/lib/audit";
 import { highSpeedDocsMissing } from "@/lib/highSpeedGate";
+import { logVehicleStatus } from "@/lib/vehicleStatusLog";
 
 // Old-vehicle destinations a replacement is allowed to set. 'returned' means
 // "awaiting inspection" — the same state a normal return leaves a vehicle in.
@@ -106,6 +107,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     await client.query(`UPDATE ${schemas.ops}.vehicles SET status = $1 WHERE id = $2`, [oldStatus, old.vehicle_id]);
     await client.query(`UPDATE ${schemas.ops}.vehicles SET status = 'assigned' WHERE id = $1`, [b.new_vehicle_id]);
+    await logVehicleStatus(client, {
+      vehicleId: old.vehicle_id, from: "assigned", to: oldStatus,
+      reason: `Replaced out — ${String(b.reason).trim()}`, source: "replacement", actor: session.name,
+    });
+    await logVehicleStatus(client, {
+      vehicleId: b.new_vehicle_id, from: "ready_to_deploy", to: "assigned",
+      reason: `Replacement for ${veh.rows[0].ev_number ? "previous vehicle" : "swap"} (${old.allotment_code ?? "swap"})`, source: "replacement", actor: session.name,
+    });
 
     // Downtime credit waits for approval, same as the classic issue-swap flow.
     if (nfd > 0) {

@@ -51,6 +51,8 @@ export type Portfolio = {
     ifsc: string | null;
     account_number: string | null;
     bank_status: string;
+    roi_percent: number | null;
+    scooter_price: number | null;
   };
   vehicles: PortfolioVehicle[];
   payouts: PortfolioPayout[];
@@ -74,7 +76,9 @@ export type Portfolio = {
 export async function getPortfolioByUser(userId: string): Promise<Portfolio | null> {
   const profileResult = await pool.query(
     `SELECT id, total_invested, investment_date, status, pan, aadhaar, aadhaar_url,
-            bank, ifsc, account_number, bank_status
+            bank, ifsc, account_number, bank_status,
+            to_char(payout_start_date, 'YYYY-MM-DD') AS payout_start_date,
+            payout_term_months, roi_percent, scooter_price
      FROM ${schemas.ops}.investor_profiles
      WHERE user_id = $1`,
     [userId]
@@ -142,19 +146,32 @@ export async function getPortfolioByUser(userId: string): Promise<Portfolio | nu
     paidMonths.add(new Date(d).toISOString().slice(0, 7)); // YYYY-MM
   }
   const payoutsMade = paidMonths.size;
-  const payoutsRemaining = Math.max(0, PAYOUT_TERM_MONTHS - payoutsMade);
+  // Per-investor term (migration 020); the old global 24 is only the fallback.
+  const termMonths = Number(profile.payout_term_months ?? PAYOUT_TERM_MONTHS);
+  const payoutsRemaining = Math.max(0, termMonths - payoutsMade);
 
-  const invDate = profile.investment_date ? new Date(profile.investment_date) : null;
+  // Tenure counts from the earning start date when set (the 1st of the month
+  // after deployment — the deal clock), else from the investment date.
+  const clockStart = profile.payout_start_date ?? profile.investment_date;
+  const invDate = clockStart ? new Date(clockStart) : null;
   const now = new Date();
   const tenureMonths = invDate
     ? Math.max(0, (now.getFullYear() - invDate.getFullYear()) * 12 + (now.getMonth() - invDate.getMonth()))
     : 0;
 
-  // Next payout is due on the 10th of next month (while payouts remain).
+  // Instalment n falls on the 1st, n months after the start date: start 1 Sep,
+  // 0 paid → next due 1 Oct. Without a start date, the legacy "10th of next
+  // month" placeholder applies until admin sets one.
   let nextDueDate: string | null = null;
   if (payoutsRemaining > 0) {
-    const due = new Date(now.getFullYear(), now.getMonth() + 1, 10);
-    nextDueDate = `${due.getFullYear()}-${String(due.getMonth() + 1).padStart(2, "0")}-10`;
+    if (profile.payout_start_date) {
+      const s = new Date(profile.payout_start_date);
+      const due = new Date(s.getFullYear(), s.getMonth() + payoutsMade + 1, 1);
+      nextDueDate = `${due.getFullYear()}-${String(due.getMonth() + 1).padStart(2, "0")}-01`;
+    } else {
+      const due = new Date(now.getFullYear(), now.getMonth() + 1, 10);
+      nextDueDate = `${due.getFullYear()}-${String(due.getMonth() + 1).padStart(2, "0")}-10`;
+    }
   }
 
   return {
@@ -168,7 +185,7 @@ export async function getPortfolioByUser(userId: string): Promise<Portfolio | nu
     tenureMonths,
     payoutsMade,
     payoutsRemaining,
-    termMonths: PAYOUT_TERM_MONTHS,
+    termMonths,
     nextDueDate,
   };
 }

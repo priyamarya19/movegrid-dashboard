@@ -19,6 +19,7 @@ const env = fs.readFileSync(path.join(__dirname, "..", ".env.local"), "utf8").sp
 const isUAT = (process.env.RDS_ENV || env.RDS_ENV) === "uat";
 const S = isUAT ? "mg_data_uat" : "mg_data";   // ops schema
 const A = isUAT ? "uat_auth" : "auth";          // auth schema
+const L = isUAT ? "uat_leads" : "leads";        // leads schema
 const STATUS_ONLY = process.argv.includes("--status");
 
 const client = new Client({ host: env.RDS_HOST, port: +env.RDS_PORT, user: env.RDS_USER, password: env.RDS_PASSWORD, database: env.RDS_DATABASE, ssl: { rejectUnauthorized: false } });
@@ -50,7 +51,7 @@ const client = new Client({ host: env.RDS_HOST, port: +env.RDS_PORT, user: env.R
     process.stdout.write(`→ ${f} ... `);
     await client.query("BEGIN");
     try {
-      await migration.up({ client, S, A });
+      await migration.up({ client, S, A, L });
       await client.query(`INSERT INTO ${S}.schema_migrations (id) VALUES ($1)`, [f]);
       await client.query("COMMIT");
       console.log("done");

@@ -1,10 +1,10 @@
 import DashboardLayout from "@/components/DashboardLayout";
-import FinanceSummary from "@/components/finance/FinanceSummary";
+import FinanceTabs from "@/components/finance/FinanceTabs";
 
 export default function FinancePage() {
   return (
     <DashboardLayout allowedRoles={["admin"]}>
-      <FinanceSummary />
+      <FinanceTabs />
     </DashboardLayout>
   );
 }

@@ -3,7 +3,7 @@ import ExcelJS from "exceljs";
 import pool from "@/lib/db";
 import { schemas } from "@/lib/schemas";
 import { sendEmail } from "@/lib/email";
-import { getFleetRentStatusReport } from "@/lib/reports";
+import { getFleetRentStatusReport, getWowBlock, writeDailySnapshot } from "@/lib/reports";
 
 // POST /api/reports/fleet-status/send — cron-triggered (6:30 PM IST). Builds the
 // fleet & rider rent status Excel and emails it to enabled recipients.
@@ -20,6 +20,9 @@ export async function POST(req: NextRequest) {
   if (!recipients.length) return NextResponse.json({ sent: false, reason: "no recipients" });
 
   const rows = await getFleetRentStatusReport();
+  const wow = await getWowBlock();
+  // Snapshot BEFORE emailing — after a week of these, the WoW numbers are exact.
+  await writeDailySnapshot();
 
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet("Fleet & Rider Rent Status");
@@ -86,10 +89,27 @@ export async function POST(req: NextRequest) {
       <td style="padding:6px 10px;border-bottom:1px solid #eee;text-align:right;color:#e17055;">${inr(h.overdue)}</td>
     </tr>`).join("");
 
+  const wkArrow = wow.collectedThisWeek >= wow.collectedLastWeek ? "▲" : "▼";
+  const wkColor = wow.collectedThisWeek >= wow.collectedLastWeek ? "#00b894" : "#e17055";
+  const netLeak = wow.newDefaulters - wow.cured;
   const html = `
     <div style="font-family:Arial,sans-serif;color:#222;">
       <h2 style="margin:0 0 4px;">Fleet & Rider Rent Status — ${stamp}</h2>
       <p style="color:#555;margin:0 0 16px;">${rows.length} active assignment(s). Full detail in the attached Excel.</p>
+
+      <div style="background:#f8f8fb;border:1px solid #ececf2;border-radius:8px;padding:12px 16px;margin-bottom:16px;">
+        <div style="font-size:11px;color:#888;letter-spacing:1px;font-weight:700;margin-bottom:6px;">THIS WEEK vs LAST WEEK</div>
+        <div style="font-size:13px;line-height:1.9;">
+          Collected: <b style="color:${wkColor};">${inr(wow.collectedThisWeek)} ${wkArrow}</b>
+          <span style="color:#888;">(last week ${inr(wow.collectedLastWeek)})</span>
+          &nbsp;·&nbsp; Expected ${inr(wow.expectedThisWeek)} → collection rate <b>${wow.ratePct}%</b><br/>
+          Riders owing: <b>${wow.ridersOwingNow}</b> today vs ${wow.ridersOwingWeekAgo ?? "—"} a week ago${wow.weekAgoExact ? "" : " (approx.)"}
+          &nbsp;·&nbsp; new defaulters <b style="color:#e17055;">+${wow.newDefaulters}</b>
+          &nbsp;·&nbsp; cured <b style="color:#00b894;">−${wow.cured}</b>
+          &nbsp;·&nbsp; net leakage <b style="color:${netLeak > 0 ? "#e17055" : "#00b894"};">${netLeak > 0 ? "+" : ""}${netLeak}</b><br/>
+          Bad debt: ${inr(wow.badDebtAddedThisWeek)} added this week · <b>${inr(wow.badDebtOutstanding)}</b> total outstanding
+        </div>
+      </div>
       <table style="border-collapse:separate;border-spacing:8px 0;margin-bottom:8px;"><tbody><tr>
         ${tile("Active", String(rows.length), "vehicles on rent")}
         ${tile("Collected till date", inr(totals.collected))}

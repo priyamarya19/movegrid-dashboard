@@ -2,9 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { schemas } from "@/lib/schemas";
 import { requireRole } from "@/lib/auth";
-import { PAYMENT_MODES } from "@/lib/rent";
+import { PAYMENT_MODES, outstandingSql } from "@/lib/rent";
+import { recordRentPayment } from "@/lib/recordRentPayment";
 import { istTodayISO } from "@/lib/date";
 import { writeAudit } from "@/lib/audit";
+import { logVehicleStatus } from "@/lib/vehicleStatusLog";
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const guard = await requireRole(req);
@@ -45,6 +47,30 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       return NextResponse.json({ ok: true, already_returned: true });
     }
     const { vehicle_id, rider_id } = asgn.rows[0];
+
+    // "Amount collected now" at handback (₹0 allowed): recorded through the
+    // normal rent ledger while the assignment is still active; whatever remains
+    // outstanding afterwards becomes a bad-debt entry.
+    const collectedNow = b.amount_collected != null && b.amount_collected !== "" ? Number(b.amount_collected) : 0;
+    if (Number.isNaN(collectedNow) || collectedNow < 0) {
+      await client.query("ROLLBACK");
+      return NextResponse.json({ error: "amount_collected must be 0 or more" }, { status: 400 });
+    }
+    if (collectedNow > 0 && (!PAYMENT_MODES.includes(b.rent_settlement_mode) || !b.rent_settlement_proof_url)) {
+      await client.query("ROLLBACK");
+      return NextResponse.json({ error: "Settlement mode and proof are required when collecting money at return" }, { status: 400 });
+    }
+    if (collectedNow > 0) {
+      await recordRentPayment(client, {
+        riderId: rider_id, amount: collectedNow, paymentMode: b.rent_settlement_mode,
+        paymentUtr: b.rent_settlement_utr ?? null, screenshotUrl: b.rent_settlement_proof_url,
+      });
+    }
+    const freshOut = await client.query(
+      `SELECT ${outstandingSql("a")} AS outstanding FROM ${schemas.ops}.rider_vehicle_assignments a WHERE a.id = $1`,
+      [id]
+    );
+    const remainingOutstanding = Math.round(Number(freshOut.rows[0]?.outstanding) || 0);
 
     // Update assignment
     await client.query(`
@@ -88,11 +114,26 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     await client.query(
       `UPDATE ${schemas.ops}.vehicles SET status = 'returned' WHERE id = $1`, [vehicle_id]
     );
+    await logVehicleStatus(client, {
+      vehicleId: vehicle_id, from: "assigned", to: "returned",
+      reason: [Array.isArray(b.condition_on_return) && b.condition_on_return.length ? `Condition: ${b.condition_on_return.join(", ")}` : null, b.return_remarks || null]
+        .filter(Boolean).join(" — ") || null,
+      source: "return", actor: session.name,
+    });
 
     // Update rider → inactive
     await client.query(
       `UPDATE ${schemas.ops}.riders SET status = 'inactive' WHERE id = $1`, [rider_id]
     );
+
+    // Rent left unpaid at handback → bad-debt register (Finance → Bad Debt).
+    if (remainingOutstanding > 0) {
+      await client.query(
+        `INSERT INTO ${schemas.ops}.bad_debts (rider_id, vehicle_id, assignment_id, source, original_outstanding, collected_at_close, created_by)
+         VALUES ($1, $2, $3, 'return', $4, $5, $6)`,
+        [rider_id, vehicle_id, id, remainingOutstanding, collectedNow, session.name]
+      );
+    }
 
     await client.query("COMMIT");
     await writeAudit({

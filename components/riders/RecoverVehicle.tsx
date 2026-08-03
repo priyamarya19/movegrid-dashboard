@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/Toast";
 import { useConfirm } from "@/components/Confirm";
+import PaymentProof, { PaymentProofValue, emptyProof, proofValid } from "@/components/PaymentProof";
 
 const REASONS = [
   { key: "non_payment", label: "Non-payment" },
@@ -24,14 +25,19 @@ export default function RecoverVehicle({ riderId, riderName, currentEv }: { ride
   const [location, setLocation] = useState("");
   const [notes, setNotes] = useState("");
   const [blacklist, setBlacklist] = useState(true);
+  const [amountCollected, setAmountCollected] = useState("");
+  const [proof, setProof] = useState<PaymentProofValue>(emptyProof);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   async function submit() {
     if (reason === "other" && !notes.trim()) { setError("Notes are required for 'other'"); return; }
+    const collected = amountCollected === "" ? 0 : Number(amountCollected);
+    if (Number.isNaN(collected) || collected < 0) { setError("Amount collected must be 0 or more"); return; }
+    if (collected > 0 && !proofValid(proof)) { setError("Money collected — select a payment mode and upload proof"); return; }
     const ok = await confirm({
       title: `Recover ${currentEv} from ${riderName}?`,
-      message: `The tenancy closes as a RECOVERY, their outstanding is frozen as recovery dues${blacklist ? ", and the rider is blacklisted" : ""}. This is not a normal return.`,
+      message: `The tenancy closes as a RECOVERY${collected > 0 ? `, \u20b9${collected.toLocaleString("en-IN")} is recorded as collected now` : ""}, the remaining outstanding is frozen as bad debt${blacklist ? ", and the rider is blacklisted" : ""}. This is not a normal return.`,
       confirmLabel: "Record recovery",
       danger: true,
     });
@@ -40,7 +46,13 @@ export default function RecoverVehicle({ riderId, riderName, currentEv }: { ride
     const res = await fetch(`/api/riders/${riderId}/recover-vehicle`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ reason, location: location.trim() || null, notes: notes.trim() || null, blacklist }),
+      body: JSON.stringify({
+        reason, location: location.trim() || null, notes: notes.trim() || null, blacklist,
+        amount_collected: collected,
+        payment_mode: collected > 0 ? proof.mode : null,
+        payment_utr: collected > 0 ? (proof.utr || null) : null,
+        payment_proof_url: collected > 0 ? proof.proof : null,
+      }),
     });
     setLoading(false);
     if (!res.ok) { setError((await res.json().catch(() => ({}))).error || "Failed"); return; }
@@ -85,6 +97,12 @@ export default function RecoverVehicle({ riderId, riderName, currentEv }: { ride
           <label className="block text-[11px] text-muted uppercase tracking-wider mb-1">Notes{reason === "other" ? " *" : " (optional)"}</label>
           <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} placeholder="What happened?" className={`${inp} resize-none`} />
         </div>
+        <div>
+          <label className="block text-[11px] text-muted uppercase tracking-wider mb-1">Amount collected now (₹)</label>
+          <input type="number" min="0" value={amountCollected} onChange={(e) => setAmountCollected(e.target.value)} placeholder="0" className={inp} />
+          <p className="text-[10px] text-faint mt-1">₹0 allowed — the rest is frozen as bad debt</p>
+        </div>
+        {Number(amountCollected) > 0 && <PaymentProof value={proof} onChange={setProof} folder="recovery-payments" />}
         <label className="flex items-center gap-2 cursor-pointer">
           <input type="checkbox" checked={blacklist} onChange={() => setBlacklist((v) => !v)} className="w-3.5 h-3.5 accent-accent-danger-alt" />
           <span className="text-secondary text-xs">Blacklist this rider (blocks login &amp; re-registration)</span>

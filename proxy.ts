@@ -19,6 +19,12 @@ const PUBLIC_PATHS = [
 export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
+  // CORS preflights carry no credentials and can't be authenticated — let them
+  // through; the actual request that follows is still guarded below.
+  if (req.method === "OPTIONS") {
+    return NextResponse.next();
+  }
+
   if (PUBLIC_PATHS.some((p) => pathname.startsWith(p))) {
     return NextResponse.next();
   }

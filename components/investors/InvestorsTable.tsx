@@ -8,7 +8,8 @@ import { dateIN } from "@/lib/format";
 type Investor = {
   id: string; name: string; email: string; mobile: string;
   total_invested: number; investment_date: string; status: string;
-  vehicle_count: number; total_paid: number; pending_amount: number;
+  vehicle_count: number; total_paid: number;
+  payout_start_date: string | null; payout_term_months: number; instalments_paid: number;
   bank: string | null; account_number: string | null; ifsc: string | null; bank_status: string;
 };
 
@@ -20,7 +21,8 @@ const cols: { label: string; key: string }[] = [
   { label: "Invested", key: "total_invested" },
   { label: "Vehicles", key: "vehicle_count" },
   { label: "Total Paid", key: "total_paid" },
-  { label: "Pending", key: "pending_amount" },
+  { label: "Instalments", key: "instalments_paid" },
+  { label: "Start Date", key: "payout_start_date" },
   { label: "Inv. Date", key: "investment_date" },
   { label: "Status", key: "status" },
 ];
@@ -62,7 +64,7 @@ export default function InvestorsTable() {
 
   const sorted = sortData(investors, sort);
   const totalInvested = investors.reduce((a, i) => a + Number(i.total_invested), 0);
-  const totalPending = investors.reduce((a, i) => a + Number(i.pending_amount), 0);
+  const totalInstalmentsLeft = investors.reduce((a, i) => a + Math.max(0, Number(i.payout_term_months) - Number(i.instalments_paid)), 0);
   const pendingBank = investors.filter((i) => i.bank_status === "pending");
 
   return (
@@ -70,7 +72,7 @@ export default function InvestorsTable() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-primary text-2xl font-bold">Investors</h1>
-          <p className="text-muted text-sm mt-1">{investors.length} investors · ₹{(totalInvested / 100000).toFixed(1)}L total invested · ₹{(totalPending / 100000).toFixed(1)}L pending payouts</p>
+          <p className="text-muted text-sm mt-1">{investors.length} investors · ₹{(totalInvested / 100000).toFixed(1)}L total invested · {totalInstalmentsLeft} instalments remaining across deals</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <ExportButton filename="investors" columns={cols} rows={sorted} />
@@ -113,7 +115,7 @@ export default function InvestorsTable() {
         {[
           { label: "Total Investors", value: investors.length.toString(), color: "var(--accent-purple)" },
           { label: "Total Invested", value: "₹" + (totalInvested / 100000).toFixed(1) + "L", color: "var(--accent-teal)" },
-          { label: "Pending Payouts", value: "₹" + (totalPending / 100000).toFixed(1) + "L", color: "var(--accent-danger)" },
+          { label: "Instalments Remaining", value: String(totalInstalmentsLeft), color: "var(--accent-danger)" },
         ].map((c) => (
           <div key={c.label} className="bg-surface border border-default rounded-xl p-5">
             <p className="text-[11px] text-muted uppercase tracking-wider mb-2">{c.label}</p>
@@ -153,7 +155,11 @@ export default function InvestorsTable() {
                   <td className="px-5 py-3 text-accent-teal font-semibold">₹{Number(inv.total_invested).toLocaleString()}</td>
                   <td className="px-5 py-3 text-accent-purple font-semibold">{inv.vehicle_count}</td>
                   <td className="px-5 py-3 text-accent-success-text">₹{Number(inv.total_paid).toLocaleString()}</td>
-                  <td className="px-5 py-3 text-accent-danger">₹{Number(inv.pending_amount).toLocaleString()}</td>
+                  <td className="px-5 py-3 whitespace-nowrap">
+                    <span className="text-primary font-semibold">{inv.instalments_paid}/{inv.payout_term_months} paid</span>
+                    <span className="text-muted text-xs"> · {Math.max(0, inv.payout_term_months - inv.instalments_paid)} left</span>
+                  </td>
+                  <td className="px-5 py-3 text-muted text-xs whitespace-nowrap">{inv.payout_start_date ? dateIN(inv.payout_start_date, { day: "numeric", month: "short", year: "numeric" }) : "not set"}</td>
                   <td className="px-5 py-3 text-muted text-xs">{inv.investment_date ? dateIN(inv.investment_date, { day: "numeric", month: "short", year: "numeric" }) : "—"}</td>
                   <td className="px-5 py-3">
                     <span className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize ${inv.status === "active" ? "bg-accent-success/20 text-accent-success-text" : "bg-muted/20 text-muted"}`}>{inv.status}</span>
