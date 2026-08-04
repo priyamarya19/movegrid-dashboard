@@ -44,13 +44,18 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Invalid credentials", code: "invalid_credentials" }, { status: 400 });
     }
 
-    const token = await signToken({
-      userId: user.id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      tv: Number(user.token_version ?? 0),
-    });
+    const token = await signToken(
+      {
+        userId: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        tv: Number(user.token_version ?? 0),
+      },
+      // Mobile: stay signed in on the device until sign-out (revocable via
+      // token_version). Web keeps the short session.
+      isMobile ? "365d" : "8h"
+    );
 
     rateLimitReset(rlKey); // good login — clear the failure counter
     const res = NextResponse.json({

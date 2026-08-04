@@ -27,11 +27,15 @@ export type AuthResult = {
 
 export const DATA_ROLES = ["admin", "ops_manager", "hub_incharge"] as const;
 
-export async function signToken(payload: JWTPayload) {
+// Web sessions stay short (8h). Mobile staff sessions are long-lived so field
+// phones stay signed in until an explicit sign-out — safe because requireRole
+// re-checks status + token_version against the DB on every request, so
+// deactivating a user or bumping token_version still revokes a phone instantly.
+export async function signToken(payload: JWTPayload, expiresIn: string = "8h") {
   return await new SignJWT({ ...payload })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
-    .setExpirationTime("8h")
+    .setExpirationTime(expiresIn)
     .sign(secret);
 }
 
