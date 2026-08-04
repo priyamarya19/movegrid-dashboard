@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { schemas } from "@/lib/schemas";
 import { requireRole } from "@/lib/auth";
+import { getHubScope, hubScopeSql } from "@/lib/hubScope";
 import { IST, nextDueSql } from "@/lib/rent";
 import { riderIdentityConflict, uniqueViolationMessage } from "@/lib/riderUnique";
 import { writeAudit } from "@/lib/audit";
@@ -127,6 +128,9 @@ export async function POST(req: NextRequest) {
 export async function GET(req: NextRequest) {
   const guard = await requireRole(req);
   if ("response" in guard) return guard.response;
+  // Ops staff only see riders at the hubs they are assigned to.
+  const scope = await getHubScope(guard.session.userId, guard.session.role);
+  const hubWhere = hubScopeSql(scope, "r.assigned_hub_id");
 
   const { searchParams } = new URL(req.url);
   const status = searchParams.get("status");
@@ -225,12 +229,12 @@ export async function GET(req: NextRequest) {
     query = `${rentDueCTE}
     ${rentSelect}
     JOIN rent_due rd ON rd.rider_id = r.id
-    WHERE ${rentWhere}
+    WHERE ${rentWhere}${hubWhere}
     ORDER BY r.created_at DESC LIMIT ${LIMIT}`;
   } else {
     // Build the shared WHERE (status + hub + free-text q) once, so the page query
     // and the count query stay in sync.
-    let where = "WHERE 1=1";
+    let where = `WHERE 1=1${hubWhere}`;
     if (status) { params.push(status); where += ` AND r.status = $${params.length}`; }
     if (hub) { params.push(hub); where += ` AND h.hub_name = $${params.length}`; }
     if (q) {
@@ -273,7 +277,7 @@ export async function GET(req: NextRequest) {
   // dashboard; skip the extra query for the mobile/unpaginated path.
   if (paginated) {
     const sc = await pool.query(
-      `SELECT status, count(*)::int AS n FROM ${schemas.ops}.riders GROUP BY status`
+      `SELECT status, count(*)::int AS n FROM ${schemas.ops}.riders r WHERE true${hubWhere} GROUP BY status`
     );
     const counts: Record<string, number> = {};
     for (const row of sc.rows) counts[row.status] = row.n;
@@ -284,7 +288,8 @@ export async function GET(req: NextRequest) {
     const kp = await pool.query(
       `SELECT count(*)::int AS n FROM ${schemas.ops}.riders r2
        WHERE NOT ((r2.aadhaar_front_url IS NOT NULL OR COALESCE(r2.aadhaar,'') <> '')
-              AND (r2.pan_image_url IS NOT NULL OR COALESCE(r2.pan,'') <> ''))`
+              AND (r2.pan_image_url IS NOT NULL OR COALESCE(r2.pan,'') <> ''))
+         ${hubScopeSql(scope, "r2.assigned_hub_id")}`
     );
     counts["kyc_pending"] = kp.rows[0]?.n ?? 0;
     headers["X-Status-Counts"] = JSON.stringify(counts);

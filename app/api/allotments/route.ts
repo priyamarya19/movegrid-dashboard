@@ -7,6 +7,7 @@ import { IST } from "@/lib/rent";
 import { rangeCondition } from "@/lib/dateRange";
 import { writeAudit } from "@/lib/audit";
 import { highSpeedDocsMissing } from "@/lib/highSpeedGate";
+import { getHubScope, hubScopeSql, scopeAllowsHub } from "@/lib/hubScope";
 import { logVehicleStatus } from "@/lib/vehicleStatusLog";
 import { beginIdempotency, finishIdempotency, abortIdempotency } from "@/lib/idempotency";
 
@@ -63,12 +64,33 @@ export async function POST(req: NextRequest) {
     // partial unique index (scripts/add-active-assignment-guard.js) is the DB-level
     // backstop if this check is ever bypassed.
     const vCheck = await client.query(
-      `SELECT id, status FROM ${schemas.ops}.vehicles WHERE id = $1 FOR UPDATE`, [b.vehicle_id]
+      `SELECT id, status, hub_id FROM ${schemas.ops}.vehicles WHERE id = $1 FOR UPDATE`, [b.vehicle_id]
     );
     if (!vCheck.rows[0]) {
       await client.query("ROLLBACK");
       if (idem.mode === "claimed") await abortIdempotency(idem);
       return NextResponse.json({ error: "Vehicle not found" }, { status: 404 });
+    }
+    // A vehicle belongs to a hub. Allotting one from a hub you don't cover used
+    // to silently move it (the UPDATE below COALESCEs a new hub_id in), leaving
+    // no record that it changed location — so refuse instead. Moving a vehicle
+    // between hubs must be a deliberate, audited transfer.
+    const scope = await getHubScope(session.userId, session.role);
+    if (!scopeAllowsHub(scope, vCheck.rows[0].hub_id)) {
+      await client.query("ROLLBACK");
+      if (idem.mode === "claimed") await abortIdempotency(idem);
+      return NextResponse.json(
+        { error: "This vehicle belongs to another hub. Transfer it to your hub before allotting it." },
+        { status: 403 }
+      );
+    }
+    if (b.hub_id && vCheck.rows[0].hub_id && b.hub_id !== vCheck.rows[0].hub_id) {
+      await client.query("ROLLBACK");
+      if (idem.mode === "claimed") await abortIdempotency(idem);
+      return NextResponse.json(
+        { error: "The vehicle is not at the selected hub. Transfer it first." },
+        { status: 400 }
+      );
     }
     if (vCheck.rows[0].status === "assigned") {
       await client.query("ROLLBACK");
@@ -240,7 +262,9 @@ export async function POST(req: NextRequest) {
 
     // Update vehicle status → assigned
     await client.query(
-      `UPDATE ${schemas.ops}.vehicles SET status = 'assigned', hub_id = COALESCE($1, hub_id) WHERE id = $2`,
+      // hub_id only fills a blank (fresh stock); it never overwrites an existing
+      // hub — see the cross-hub guard above.
+      `UPDATE ${schemas.ops}.vehicles SET status = 'assigned', hub_id = COALESCE(hub_id, $1) WHERE id = $2`,
       [b.hub_id ?? null, b.vehicle_id]
     );
     await logVehicleStatus(client, {

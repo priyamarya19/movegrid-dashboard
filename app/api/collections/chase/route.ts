@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireRole, userCanViewAllotments, userHasAppPage } from "@/lib/auth";
+import { requireRole } from "@/lib/auth";
+import { getHubScope } from "@/lib/hubScope";
 import { getChaseList } from "@/lib/collections";
 import { getLedgerSummary } from "@/lib/rent";
 
@@ -8,16 +9,13 @@ import { getLedgerSummary } from "@/lib/rent";
 // from lib/collections). Accessible to admins, users with the Collections app
 // page enabled, or the older can_view_allotments permission.
 export async function GET(req: NextRequest) {
+  // Role gate only. Chasing rent is the core job of every ops role, so this list
+  // is not behind the per-user Collections page toggle — a hub incharge who is
+  // trusted to collect rent has to be able to see who owes it.
   const guard = await requireRole(req);
   if ("response" in guard) return guard.response;
-  const { userId, role } = guard.session;
+  const scope = await getHubScope(guard.session.userId, guard.session.role);
 
-  const allowed =
-    role === "admin" ||
-    (await userHasAppPage(userId, "collections")) ||
-    (await userCanViewAllotments(userId));
-  if (!allowed) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-
-  const [summary, chase] = await Promise.all([getLedgerSummary(), getChaseList()]);
+  const [summary, chase] = await Promise.all([getLedgerSummary(scope), getChaseList(scope)]);
   return NextResponse.json({ summary, chase });
 }

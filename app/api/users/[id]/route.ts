@@ -137,6 +137,38 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     });
   }
 
+  // Which hubs this user's data is limited to (migration 025). Admins are
+  // unscoped regardless of what is stored here. Replaces the whole set so the
+  // UI can send the final list.
+  if (body.hub_ids !== undefined) {
+    if (!Array.isArray(body.hub_ids) || body.hub_ids.some((h: unknown) => typeof h !== "string")) {
+      return NextResponse.json({ error: "Invalid hub_ids value" }, { status: 400 });
+    }
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query(`DELETE FROM ${schemas.ops}.user_hub_access WHERE user_id = $1`, [id]);
+      for (const hubId of body.hub_ids as string[]) {
+        await client.query(
+          `INSERT INTO ${schemas.ops}.user_hub_access (user_id, hub_id, created_by)
+           VALUES ($1, $2, $3) ON CONFLICT (user_id, hub_id) DO NOTHING`,
+          [id, hubId, session.name]
+        );
+      }
+      await client.query("COMMIT");
+    } catch (e) {
+      await client.query("ROLLBACK");
+      throw e;
+    } finally {
+      client.release();
+    }
+    await writeAudit({
+      action: "user_permission_changed", entity: "user", entityId: id,
+      actorId: session.userId, actorName: session.name, req,
+      details: { hub_ids: body.hub_ids },
+    });
+  }
+
   // Per-user permission gating the Allotments list (migration 012).
   if (body.can_view_allotments !== undefined) {
     await pool.query(

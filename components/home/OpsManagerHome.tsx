@@ -4,6 +4,8 @@ import { getFleetRiderCounts } from "@/lib/fleetStats";
 import { getRecentRiders } from "@/lib/riderStats";
 import { VSTATUS, NOT_AVAILABLE } from "@/lib/vehicleStatus";
 import { inrCompact, dateIN } from "@/lib/format";
+import { getSession } from "@/lib/auth";
+import { getHubScope } from "@/lib/hubScope";
 
 const statusColor: Record<string, string> = {
   active: "bg-accent-success/20 text-accent-success-text",
@@ -13,8 +15,12 @@ const statusColor: Record<string, string> = {
 };
 
 export default async function OpsManagerHome() {
+  // Ops staff see only the hubs they are assigned to (admins are unscoped).
+  const session = await getSession();
+  const scope = session ? await getHubScope(session.userId, session.role) : [];
   const [fleet, recentRiders, ledger, overdueRiders, dueSoonRiders, pendingWeekRiders] = await Promise.all([
-    getFleetRiderCounts(), getRecentRiders(), getLedgerSummary(), getOverdueRiders(), getDueSoonRiders(), getPendingThisWeekRiders(),
+    getFleetRiderCounts(scope), getRecentRiders(), getLedgerSummary(scope),
+    getOverdueRiders(scope), getDueSoonRiders(scope), getPendingThisWeekRiders(scope),
   ]);
   const overdueCount = overdueRiders.length;
   const dueSoonCount = dueSoonRiders.length;

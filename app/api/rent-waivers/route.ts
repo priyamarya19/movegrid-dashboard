@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { schemas } from "@/lib/schemas";
 import { requireRole, requireSession } from "@/lib/auth";
+import { getHubScope, hubScopeSql } from "@/lib/hubScope";
 import { writeAudit } from "@/lib/audit";
 
 // can_approve_rent_waivers is a per-user permission independent of role, so it can't
@@ -24,6 +25,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Forbidden", code: "forbidden" }, { status: 403 });
   }
 
+  const scope = await getHubScope(guard.session.userId, guard.session.role);
   const res = await pool.query(`
     SELECT w.id, w.non_functional_days, w.reason, w.requested_by, w.requested_at,
       r.id AS rider_id, r.name AS rider_name, r.rider_code, v.ev_number
@@ -31,7 +33,7 @@ export async function GET(req: NextRequest) {
     JOIN ${schemas.ops}.riders r ON r.id = w.rider_id
     JOIN ${schemas.ops}.rider_vehicle_assignments a ON a.id = w.assignment_id
     JOIN ${schemas.ops}.vehicles v ON v.id = a.vehicle_id
-    WHERE w.status = 'pending'
+    WHERE w.status = 'pending'${hubScopeSql(scope, "a.hub_id")}
     ORDER BY w.requested_at ASC
   `);
   // non_functional_days is numeric since migration 013 — pg returns it as a

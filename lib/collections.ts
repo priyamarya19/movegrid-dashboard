@@ -1,5 +1,6 @@
 import pool from "@/lib/db";
 import { schemas } from "@/lib/schemas";
+import { hubScopeSql, type HubScope } from "@/lib/hubScope";
 import { unstable_cache } from "next/cache";
 import { nextDueSql, outstandingSql } from "@/lib/rent";
 
@@ -115,7 +116,7 @@ export type ChaseRow = {
   allotment_code: string | null; days_behind: number; outstanding: number;
   next_due_date: string; sheet_note: string | null;
 };
-export const getChaseList = unstable_cache(async function getChaseList(): Promise<ChaseRow[]> {
+export const getChaseList = unstable_cache(async function getChaseList(scope: HubScope = null): Promise<ChaseRow[]> {
   const S = schemas.ops;
   const res = await pool.query(`
     SELECT r.id AS rider_id, r.rider_code, r.name, a.allotment_code, a.sheet_note,
@@ -127,6 +128,7 @@ export const getChaseList = unstable_cache(async function getChaseList(): Promis
     FROM ${S}.rider_vehicle_assignments a
     JOIN ${S}.riders r ON r.id = a.rider_id
     WHERE a.status = 'active'
+      ${hubScopeSql(scope, 'a.hub_id')}
     ORDER BY outstanding DESC`);
   return res.rows.map((r) => ({
     rider_id: r.rider_id, rider_code: r.rider_code, name: r.name, allotment_code: r.allotment_code,

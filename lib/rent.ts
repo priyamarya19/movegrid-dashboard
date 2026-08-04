@@ -1,5 +1,6 @@
 import pool from "@/lib/db";
 import { schemas } from "@/lib/schemas";
+import { hubScopeSql, type HubScope } from "@/lib/hubScope";
 import { unstable_cache } from "next/cache";
 
 // Single source of truth for rent numbers. Every dashboard (admin/ops/investor), the
@@ -133,13 +134,15 @@ export async function getRiderCycle(riderId: string): Promise<CycleWeek[]> {
 
 // All-time ledger summary — the headline numbers shared by every dashboard.
 // expected/collected are historical (need rent_dues); overdue is live (paid_through_date).
-export const getLedgerSummary = unstable_cache(async function getLedgerSummary() {
+export const getLedgerSummary = unstable_cache(async function getLedgerSummary(scope: HubScope = null) {
   const S = schemas.ops;
+  const hubHist = hubScopeSql(scope, 'a.hub_id');
   const res = await pool.query(`
     WITH hist AS (
       SELECT d.amount, d.period_start, ${PAID_FROM_BALANCE} AS paid
       FROM ${S}.rent_dues d
       JOIN ${S}.rider_vehicle_assignments a ON a.id = d.assignment_id
+      WHERE true${hubHist}
     ),
     live AS (
       -- Rent is billed weekly, so a display amount is always a whole week's rent —
@@ -147,6 +150,7 @@ export const getLedgerSummary = unstable_cache(async function getLedgerSummary()
       SELECT CEIL((${IST} - COALESCE(a.paid_through_date, a.assigned_date - 1)) / 7.0) * a.daily_rent * 7 AS overdue_amount
       FROM ${S}.rider_vehicle_assignments a
       WHERE a.status = 'active' AND COALESCE(a.paid_through_date, a.assigned_date - 1) < ${OVERDUE_CUTOFF}
+        ${hubHist}
     ),
     -- Riders at least one full day past their paid-through date — their current
     -- payment-cycle week is running unpaid. Paid through today or beyond →
@@ -156,6 +160,7 @@ export const getLedgerSummary = unstable_cache(async function getLedgerSummary()
       SELECT a.daily_rent * 7 AS pending_amount
       FROM ${S}.rider_vehicle_assignments a
       WHERE a.status = 'active'
+        ${hubHist}
         AND COALESCE(a.paid_through_date, a.assigned_date - 1) BETWEEN ${IST} - 7 AND ${IST} - 1
     )
     SELECT
@@ -164,7 +169,14 @@ export const getLedgerSummary = unstable_cache(async function getLedgerSummary()
       (SELECT COALESCE(SUM(overdue_amount), 0) FROM live) AS overdue,
       (SELECT COUNT(*) FROM live) AS overdue_riders,
       (SELECT COALESCE(SUM(pending_amount), 0) FROM pending_week) AS pending_this_week,
-      (SELECT COUNT(*) FROM pending_week) AS pending_this_week_riders
+      (SELECT COUNT(*) FROM pending_week) AS pending_this_week_riders,
+      -- Cash/UPI actually received today (IST). Headline figure for the app's
+      -- home screen, so it rides on this role-gated summary rather than the
+      -- row-level collections endpoints.
+      (SELECT COALESCE(SUM(p.amount_collected), 0)
+         FROM ${schemas.ops}.rider_payments p
+         LEFT JOIN ${schemas.ops}.vehicles v ON v.id = p.vehicle_id
+        WHERE p.payment_date = ${IST}${hubScopeSql(scope, 'v.hub_id')}) AS collected_today
   `);
   const r = res.rows[0];
   const expected = Number(r.expected_to_date), collected = Number(r.collected);
@@ -173,15 +185,16 @@ export const getLedgerSummary = unstable_cache(async function getLedgerSummary()
     overdueRiders: Number(r.overdue_riders),
     pendingThisWeek: Number(r.pending_this_week),
     pendingThisWeekRiders: Number(r.pending_this_week_riders),
+    collectedToday: Number(r.collected_today),
     pct: expected > 0 ? Math.round((collected / expected) * 100) : 0,
   };
-}, ["ledger-summary-v6"], { revalidate: 60 });
+}, ["ledger-summary-v7"], { revalidate: 60 });
 
 // Riders currently overdue — computed directly from paid_through_date, no rent_dues
 // dependency (so it can never go stale relative to today). Shared everywhere.
 // Displayed amount/weeks are rounded UP to whole weeks (rent is billed weekly) — the
 // day-precise paid_through_date this is derived from stays exact internally.
-export const getOverdueRiders = unstable_cache(async function getOverdueRiders() {
+export const getOverdueRiders = unstable_cache(async function getOverdueRiders(scope: HubScope = null) {
   const S = schemas.ops;
   const res = await pool.query(`
     SELECT r.id AS rider_id, r.rider_code, r.name, r.mobile,
@@ -190,6 +203,7 @@ export const getOverdueRiders = unstable_cache(async function getOverdueRiders()
     FROM ${S}.rider_vehicle_assignments a
     JOIN ${S}.riders r ON r.id = a.rider_id
     WHERE a.status = 'active' AND COALESCE(a.paid_through_date, a.assigned_date - 1) < ${OVERDUE_CUTOFF}
+      ${hubScopeSql(scope, 'a.hub_id')}
     ORDER BY overdue_amount DESC`);
   return res.rows.map((r) => ({
     rider_id: r.rider_id, rider_code: r.rider_code, name: r.name, mobile: r.mobile,
@@ -201,7 +215,7 @@ export const getOverdueRiders = unstable_cache(async function getOverdueRiders()
 // computed directly from paid_through_date. Shared everywhere. Next week's
 // period_start = paid_through_date + 1, so "starts within 2 days" means
 // paid_through_date <= today + 1.
-export const getDueSoonRiders = unstable_cache(async function getDueSoonRiders() {
+export const getDueSoonRiders = unstable_cache(async function getDueSoonRiders(scope: HubScope = null) {
   const S = schemas.ops;
   const res = await pool.query(`
     SELECT r.id AS rider_id, r.rider_code, r.name, r.mobile,
@@ -209,6 +223,7 @@ export const getDueSoonRiders = unstable_cache(async function getDueSoonRiders()
     FROM ${S}.rider_vehicle_assignments a
     JOIN ${S}.riders r ON r.id = a.rider_id
     WHERE a.status = 'active'
+      ${hubScopeSql(scope, 'a.hub_id')}
       AND COALESCE(a.paid_through_date, a.assigned_date - 1) >= ${OVERDUE_CUTOFF}
       AND COALESCE(a.paid_through_date, a.assigned_date - 1) <= ${IST} + 1
     ORDER BY next_due_date ASC`);
@@ -228,7 +243,7 @@ export const getDueSoonRiders = unstable_cache(async function getDueSoonRiders()
 // The amount is always exactly one week's rent (daily_rent * 7) — never past weeks.
 // NOTE: this intentionally OVERLAPS with getOverdueRiders (which fires at >2 days past
 // paid_through) — by design; Overdue is left as-is.
-export const getPendingThisWeekRiders = unstable_cache(async function getPendingThisWeekRiders() {
+export const getPendingThisWeekRiders = unstable_cache(async function getPendingThisWeekRiders(scope: HubScope = null) {
   const S = schemas.ops;
   const res = await pool.query(`
     SELECT r.id AS rider_id, r.rider_code, r.name, r.mobile,
@@ -238,6 +253,7 @@ export const getPendingThisWeekRiders = unstable_cache(async function getPending
     FROM ${S}.rider_vehicle_assignments a
     JOIN ${S}.riders r ON r.id = a.rider_id
     WHERE a.status = 'active'
+      ${hubScopeSql(scope, 'a.hub_id')}
       AND COALESCE(a.paid_through_date, a.assigned_date - 1) BETWEEN ${IST} - 7 AND ${IST} - 1
     ORDER BY week_start ASC`);
   return res.rows.map((r) => ({

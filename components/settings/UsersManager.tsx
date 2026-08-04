@@ -17,6 +17,7 @@ type User = {
   can_approve_rent_waivers: boolean;
   can_view_allotments: boolean;
   app_pages: string[] | null;
+  hub_ids: string[] | null;
 };
 
 const ROLES = ["admin", "ops_manager", "hub_incharge", "investor"];
@@ -58,12 +59,18 @@ export default function UsersManager() {
   const [editForm, setEditForm] = useState({ name: "", email: "", mobile: "" });
   const [savingProfile, setSavingProfile] = useState(false);
   const [pagesOpenFor, setPagesOpenFor] = useState<string | null>(null);
+  const [hubs, setHubs] = useState<{ id: string; hub_name: string }[]>([]);
 
   useEffect(() => {
     fetch("/api/users")
       .then((r) => r.json())
       .then(setUsers)
       .finally(() => setLoading(false));
+    // Hub list for the per-user hub access checkboxes.
+    fetch("/api/hubs")
+      .then((r) => r.json())
+      .then((d) => setHubs(Array.isArray(d) ? d : d.hubs ?? []))
+      .catch(() => setHubs([]));
   }, []);
 
   async function handleAddUser(e: React.FormEvent) {
@@ -195,6 +202,24 @@ export default function UsersManager() {
     } else {
       const msg = await res.json().catch(() => ({}));
       toast.show(msg.error || "Couldn't update app pages", "error");
+    }
+  }
+
+  // Hub access — which hubs a non-admin user's data is limited to. Admins are
+  // unscoped server-side regardless of what is stored here.
+  async function handleHubToggle(user: User, hubId: string) {
+    const current = user.hub_ids ?? [];
+    const next = current.includes(hubId) ? current.filter((h) => h !== hubId) : [...current, hubId];
+    const res = await fetch(`/api/users/${user.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ hub_ids: next }),
+    });
+    if (res.ok) {
+      setUsers((prev) => prev.map((u) => (u.id === user.id ? { ...u, hub_ids: next } : u)));
+    } else {
+      const msg = await res.json().catch(() => ({}));
+      toast.show(msg.error || "Couldn't update hub access", "error");
     }
   }
 
@@ -466,6 +491,28 @@ export default function UsersManager() {
                               </label>
                             ))}
                           </div>
+
+                          <p className="mt-4 text-[11px] text-muted uppercase tracking-wider">Hub access</p>
+                          <p className="text-[10px] text-faint mb-1">
+                            {user.role === "admin"
+                              ? "Admins see every hub."
+                              : "This user only sees riders, vehicles and money for the ticked hubs."}
+                          </p>
+                          <div className="max-h-32 overflow-y-auto">
+                            {hubs.map((h) => (
+                              <label key={h.id} className="flex items-center gap-2 cursor-pointer py-0.5">
+                                <input
+                                  type="checkbox"
+                                  disabled={user.role === "admin"}
+                                  checked={(user.hub_ids ?? []).includes(h.id)}
+                                  onChange={() => handleHubToggle(user, h.id)}
+                                  className="w-3.5 h-3.5 accent-accent-purple disabled:opacity-40"
+                                />
+                                <span className="text-secondary text-xs">{h.hub_name}</span>
+                              </label>
+                            ))}
+                          </div>
+
                           <button
                             onClick={() => setPagesOpenFor(null)}
                             className="mt-4 w-full px-3 py-2 rounded-lg text-xs font-semibold bg-accent-purple text-on-dark hover:opacity-90 transition-opacity"

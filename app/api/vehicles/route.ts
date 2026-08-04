@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { schemas } from "@/lib/schemas";
 import { requireRole } from "@/lib/auth";
+import { getHubScope, hubScopeSql } from "@/lib/hubScope";
 import { VSTATUS, NOT_AVAILABLE } from "@/lib/vehicleStatus";
 
 export async function POST(req: NextRequest) {
@@ -41,6 +42,8 @@ export async function GET(req: NextRequest) {
 
   const { searchParams } = new URL(req.url);
   const status = searchParams.get("status");
+  const scope = await getHubScope(guard.session.userId, guard.session.role);
+  const hubWhere = hubScopeSql(scope, "v.hub_id");
   const unassigned = searchParams.get("unassigned");
   // Opt-in pagination (dashboard sends ?page=); mobile/unpaginated path unchanged.
   const pageParam = searchParams.get("page");
@@ -65,10 +68,10 @@ export async function GET(req: NextRequest) {
     LEFT JOIN ${schemas.auth}.users u ON u.id = ip.user_id
     LEFT JOIN ${schemas.ops}.rider_vehicle_assignments rva ON rva.vehicle_id = v.id AND rva.status = 'active'
     LEFT JOIN ${schemas.ops}.riders r ON r.id = rva.rider_id
-    WHERE 1=1
+    WHERE 1=1${hubWhere}
   `;
   const params: string[] = [];
-  let where = "WHERE 1=1";
+  let where = `WHERE 1=1${hubWhere}`;
   if (status === NOT_AVAILABLE) {
     params.push(VSTATUS.assigned, VSTATUS.available);
     const cond = ` AND v.status NOT IN ($${params.length - 1}, $${params.length})`;
