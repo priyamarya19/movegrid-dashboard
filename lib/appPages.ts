@@ -16,6 +16,7 @@ export const APP_PAGES = [
   { key: "logs", label: "Audit Logs" },
   { key: "users", label: "Users" },
   { key: "support", label: "Support" },
+  { key: "rider_tickets", label: "Rider Tickets" },
 ] as const;
 
 export type AppPageKey = (typeof APP_PAGES)[number]["key"];

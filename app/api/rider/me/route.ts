@@ -11,6 +11,7 @@ export async function GET(req: NextRequest) {
 
   const res = await pool.query(
     `SELECT r.id, r.name, r.rider_code, r.mobile, r.status, r.vehicle_pref,
+       r.preferred_oem, r.assigned_hub_id,
        r.kyc_submitted_at, r.aadhaar_verified, r.pan_verified, r.dl_verified,
        (r.pan IS NOT NULL AND r.pan_image_url IS NOT NULL) AS has_pan,
        (r.dl_number IS NOT NULL AND r.dl_front_url IS NOT NULL) AS has_dl,
@@ -35,6 +36,11 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     name: r.name, rider_code: r.rider_code, mobile: r.mobile, status: r.status,
     hub: r.hub_name ? { name: r.hub_name, city: r.hub_city } : null,
+    // Null until the rider picks a city — the app routes to the city step on it.
+    hub_chosen: !!r.assigned_hub_id,
+    // Brand asked for in the scooter catalog (distinct from kyc.vehicle_pref,
+    // which is the speed class that drives the document rule).
+    preferred_brand: r.preferred_oem ?? null,
     vehicle: r.ev_number
       ? { ev_number: r.ev_number, model: [r.oem, r.model_name].filter(Boolean).join(" ") || null, assigned_date: r.assigned_date, allotment_code: r.allotment_code }
       : null,

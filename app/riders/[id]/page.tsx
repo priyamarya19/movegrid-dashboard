@@ -181,6 +181,15 @@ export default async function RiderDetailPage({ params }: { params: Promise<{ id
               { label: "Account", value: maskAccount(rider.account_number) },
               { label: "Current Address", value: rider.current_address ?? "—" },
               { label: "Permanent Address", value: rider.permanent_address ?? "—" },
+              // Brand the rider asked for in the app's scooter catalog. A stated
+              // preference only — it reserves nothing, but allotment should
+              // honour it where stock allows.
+              {
+                label: "Scooter Requested",
+                value: rider.preferred_oem
+                  ? `${rider.preferred_oem}${rider.preferred_oem_at ? ` · ${dateIN(rider.preferred_oem_at, { day: "numeric", month: "short" })}` : ""}`
+                  : "—",
+              },
             ].map((row) => (
               <div key={row.label} className="flex justify-between py-2 border-b border-default last:border-0">
                 <span className="text-muted text-sm">{row.label}</span>
