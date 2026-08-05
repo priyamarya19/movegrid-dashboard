@@ -51,10 +51,11 @@ export async function POST(req: Request) {
         email: user.email,
         role: user.role,
         tv: Number(user.token_version ?? 0),
+        plat: isMobile ? "mobile" : "web",
       },
       // Mobile: stay signed in on the device until sign-out (revocable via
-      // token_version). Web keeps the short session.
-      isMobile ? "365d" : "8h"
+      // token_version). Web lasts a day and also ends at the nightly cut-off.
+      isMobile ? "365d" : "24h"
     );
 
     rateLimitReset(rlKey); // good login — clear the failure counter

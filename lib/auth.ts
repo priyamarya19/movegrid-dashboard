@@ -11,7 +11,32 @@ export type JWTPayload = {
   email: string;
   role: string;
   tv?: number; // token_version at sign time — see lib/jwt.ts / requireRole freshness check
+  /** Where the session was created. Web sessions get the nightly cut-off; phones don't. */
+  plat?: "web" | "mobile";
+  /** Issued-at (seconds), set by jose. Used for the nightly web sign-out. */
+  iat?: number;
 };
+
+// Every browser session ends at this hour, IST — a shared machine left signed in
+// overnight is signed out by morning. Phones are exempt: field staff stay signed
+// in until they sign out (see signToken).
+export const WEB_SIGNOUT_HOUR_IST = 1;
+
+/**
+ * The most recent nightly cut-off, as epoch seconds. A web token issued before
+ * it is dead regardless of its own expiry — so the sign-out happens on schedule
+ * with no cron job, nothing to drift, and nothing to run at 1am.
+ */
+export function lastWebSignoutEpoch(now: Date = new Date()): number {
+  const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+  const ist = new Date(now.getTime() + IST_OFFSET_MS);
+  const cutoffIst = Date.UTC(
+    ist.getUTCFullYear(), ist.getUTCMonth(), ist.getUTCDate(), WEB_SIGNOUT_HOUR_IST, 0, 0, 0
+  );
+  // Before today's cut-off → the previous day's applies.
+  const cutoff = cutoffIst <= ist.getTime() ? cutoffIst : cutoffIst - 24 * 60 * 60 * 1000;
+  return Math.floor((cutoff - IST_OFFSET_MS) / 1000);
+}
 
 // Why a token failed to resolve to a session:
 //  - "ok":      valid session
@@ -27,11 +52,12 @@ export type AuthResult = {
 
 export const DATA_ROLES = ["admin", "ops_manager", "hub_incharge"] as const;
 
-// Web sessions stay short (8h). Mobile staff sessions are long-lived so field
-// phones stay signed in until an explicit sign-out — safe because requireRole
-// re-checks status + token_version against the DB on every request, so
-// deactivating a user or bumping token_version still revokes a phone instantly.
-export async function signToken(payload: JWTPayload, expiresIn: string = "8h") {
+// Web sessions last a day and also end at the nightly cut-off above. Mobile staff
+// sessions are long-lived so field phones stay signed in until an explicit
+// sign-out — safe because requireRole re-checks status + token_version against
+// the DB on every request, so deactivating a user or bumping token_version still
+// revokes a phone instantly.
+export async function signToken(payload: JWTPayload, expiresIn: string = "24h") {
   return await new SignJWT({ ...payload })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
@@ -43,7 +69,7 @@ export async function signToken(payload: JWTPayload, expiresIn: string = "8h") {
 // active AND their token_version must match what's embedded in the token. Bumping
 // token_version (deactivate, role change, password change) revokes every existing
 // token immediately, instead of letting a suspended employee keep access until the
-// 8h expiry. Tokens signed before this field existed (tv undefined) fail the match
+// token's own expiry. Tokens signed before this field existed (tv undefined) fail the match
 // against the default 0 and are forced to re-login once — acceptable on rollout.
 async function isSessionCurrent(session: JWTPayload): Promise<boolean> {
   try {
@@ -64,7 +90,12 @@ async function isSessionCurrent(session: JWTPayload): Promise<boolean> {
 async function verifyTokenResult(token: string): Promise<AuthResult> {
   try {
     const { payload } = await jwtVerify(token, secret);
-    return { session: payload as unknown as JWTPayload, reason: "ok" };
+    const session = payload as unknown as JWTPayload;
+    // Nightly browser sign-out. Mobile sessions are explicitly exempt.
+    if (session.plat !== "mobile" && typeof session.iat === "number" && session.iat < lastWebSignoutEpoch()) {
+      return { session: null, reason: "expired" };
+    }
+    return { session, reason: "ok" };
   } catch (err) {
     // jose 6.x throws JWTExpired (code 'ERR_JWT_EXPIRED') for an expired token.
     if (err instanceof joseErrors.JWTExpired || (err as { code?: string })?.code === "ERR_JWT_EXPIRED") {
