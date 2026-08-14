@@ -178,6 +178,18 @@ export async function requireSession(
 
 // Per-user mobile-app page access (auth schema, migration 014). Read live so an
 // admin toggle in Settings → Users applies immediately, like the flags below.
+export async function getUserAppPages(userId: string): Promise<string[]> {
+  try {
+    const res = await pool.query(
+      `SELECT COALESCE(app_pages, '{}') AS pages FROM ${schemas.auth}.users WHERE id = $1`,
+      [userId]
+    );
+    return (res.rows[0]?.pages as string[]) ?? [];
+  } catch {
+    return [];
+  }
+}
+
 export async function userHasAppPage(userId: string, page: string): Promise<boolean> {
   try {
     const res = await pool.query(

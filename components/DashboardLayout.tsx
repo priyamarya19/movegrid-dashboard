@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getSession, userCanViewAllotments } from "@/lib/auth";
+import { getSession, getUserAppPages, userCanViewAllotments } from "@/lib/auth";
 import DashboardShell from "@/components/DashboardShell";
 
 type Props = {
@@ -15,10 +15,11 @@ export default async function DashboardLayout({ children, allowedRoles, requireA
   if (allowedRoles && !allowedRoles.includes(session.role)) redirect("/");
 
   const canViewAllotments = await userCanViewAllotments(session.userId);
+  const appPages = await getUserAppPages(session.userId);
   if (requireAllotments && !canViewAllotments) redirect("/");
 
   return (
-    <DashboardShell role={session.role} name={session.name} canViewAllotments={canViewAllotments}>
+    <DashboardShell role={session.role} name={session.name} canViewAllotments={canViewAllotments} appPages={appPages}>
       {children}
     </DashboardShell>
   );
