@@ -8,6 +8,7 @@ import { rangeCondition } from "@/lib/dateRange";
 import { writeAudit } from "@/lib/audit";
 import { highSpeedDocsMissing } from "@/lib/highSpeedGate";
 import { getHubScope, hubScopeSql, scopeAllowsHub } from "@/lib/hubScope";
+import { pushToRiderAsync } from "@/lib/riderPush";
 import { logVehicleStatus } from "@/lib/vehicleStatusLog";
 import { beginIdempotency, finishIdempotency, abortIdempotency } from "@/lib/idempotency";
 
@@ -273,6 +274,10 @@ export async function POST(req: NextRequest) {
     });
 
     await client.query("COMMIT");
+
+    // The scooter is theirs from this moment — tell them.
+    pushToRiderAsync(b.rider_id, "vehicle_ready");
+
     await writeAudit({
       action: "allotment_created", entity: "assignment", entityId: result.rows[0].id,
       actorId: session.userId, actorName: session.name, req,

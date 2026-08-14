@@ -4,6 +4,7 @@ import { schemas } from "@/lib/schemas";
 import { requireRole, userHasAppPage } from "@/lib/auth";
 import { getHubScope, scopeAllowsHub } from "@/lib/hubScope";
 import { writeAudit } from "@/lib/audit";
+import { pushToRiderAsync } from "@/lib/riderPush";
 
 // PATCH /api/rider-tickets/[id] — resolve a ticket (or reopen it).
 //
@@ -66,6 +67,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     req,
     details: { rider_id: existing.rows[0].rider_id },
   });
+
+  if (action === "resolve") pushToRiderAsync(existing.rows[0].rider_id, "ticket_answered");
 
   return NextResponse.json({ ok: true, status: action === "reopen" ? "open" : "resolved" });
 }

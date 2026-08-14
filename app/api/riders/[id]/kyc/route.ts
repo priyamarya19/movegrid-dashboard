@@ -3,6 +3,7 @@ import pool from "@/lib/db";
 import { schemas } from "@/lib/schemas";
 import { requireRole } from "@/lib/auth";
 import { convertRiderLeadByMobile } from "@/lib/leadConvert";
+import { pushToRiderAsync } from "@/lib/riderPush";
 
 const validDocs = ["aadhaar", "pan", "dl"] as const;
 type Doc = typeof validDocs[number];
@@ -37,6 +38,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   // Team verifying documents also counts as "KYC completed" → convert any
   // matching rider lead.
   if (verified && upd.rows[0]?.mobile) await convertRiderLeadByMobile(upd.rows[0].mobile);
+
+  // Tell the rider once their Aadhaar clears — that is the document that lets
+  // them collect a scooter. PAN/DL only matter for high-speed, and firing on
+  // each tick would mean three notifications for one piece of good news.
+  if (verified && document === "aadhaar") pushToRiderAsync(id, "kyc_verified");
 
   return NextResponse.json({ ok: true, verified, verified_by: verified ? session.name : null });
 }
