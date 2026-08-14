@@ -64,19 +64,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Attachment is incomplete", code: "bad_media" }, { status: 400 });
   }
 
-  // One open ticket at a time — stops a frustrated rider filing the same
-  // complaint five times and burying the queue.
-  const open = await pool.query(
-    `SELECT id FROM ${schemas.ops}.rider_tickets WHERE rider_id = $1 AND status = 'open' LIMIT 1`,
-    [riderId]
-  );
-  if ((open.rowCount ?? 0) > 0) {
-    return NextResponse.json(
-      { error: "Your previous request is still open", code: "already_open", ticket_id: open.rows[0].id },
-      { status: 409 }
-    );
-  }
-
   // Denormalise the hub so the ops queue can be hub-scoped like every other list.
   const res = await pool.query(
     `INSERT INTO ${schemas.ops}.rider_tickets (rider_id, hub_id, message, media_url, media_type)
