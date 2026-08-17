@@ -1,7 +1,7 @@
 import pool from "@/lib/db";
 import { schemas } from "@/lib/schemas";
 import { hubScopeSql, type HubScope } from "@/lib/hubScope";
-import { unstable_cache } from "next/cache";
+import { cached } from "@/lib/cache";
 import { nextDueSql, outstandingSql } from "@/lib/rent";
 
 // Month-to-date window, in IST (the business timezone used elsewhere in the app).
@@ -9,7 +9,7 @@ const IST = "(now() AT TIME ZONE 'Asia/Kolkata')::date";
 
 // Rent that *should* have accrued this month vs what was actually collected.
 // Expected = per-vehicle days-on-rent (this month) × that model's daily rate.
-export const getCollectionMTD = unstable_cache(async function getCollectionMTD() {
+export const getCollectionMTD = cached(async function getCollectionMTD() {
   const [collectedRes, expectedRes] = await Promise.all([
     pool.query(`
       SELECT COALESCE(SUM(amount_collected), 0) AS total
@@ -42,7 +42,7 @@ export type PendingRider = {
 };
 
 // Per-rider breakdown of this month's expected vs collected, pending first.
-export const getPendingByRider = unstable_cache(async function getPendingByRider(): Promise<PendingRider[]> {
+export const getPendingByRider = cached(async function getPendingByRider(): Promise<PendingRider[]> {
   const res = await pool.query(`
     WITH win AS (SELECT date_trunc('month', ${IST})::date AS s, ${IST} AS e),
     exp AS (
@@ -91,7 +91,7 @@ export const getPendingByRider = unstable_cache(async function getPendingByRider
 // figure is derived from paid_through_date (same rolling-balance model as the
 // rest of the app), capped at the week's amount.
 export type WeeklyCollection = { week: string; expected: number; collected: number };
-export const getWeeklyCollections = unstable_cache(async function getWeeklyCollections(): Promise<WeeklyCollection[]> {
+export const getWeeklyCollections = cached(async function getWeeklyCollections(): Promise<WeeklyCollection[]> {
   const S = schemas.ops;
   const res = await pool.query(`
     SELECT to_char(date_trunc('week', d.period_start), 'YYYY-MM-DD') AS week,
@@ -116,7 +116,7 @@ export type ChaseRow = {
   allotment_code: string | null; days_behind: number; outstanding: number;
   next_due_date: string; sheet_note: string | null;
 };
-export const getChaseList = unstable_cache(async function getChaseList(scope: HubScope = null): Promise<ChaseRow[]> {
+export const getChaseList = cached(async function getChaseList(scope: HubScope = null): Promise<ChaseRow[]> {
   const S = schemas.ops;
   const res = await pool.query(`
     SELECT r.id AS rider_id, r.rider_code, r.name, a.allotment_code, a.sheet_note,

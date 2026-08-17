@@ -1,6 +1,6 @@
 import pool from "@/lib/db";
 import { schemas } from "@/lib/schemas";
-import { unstable_cache } from "next/cache";
+import { cached } from "@/lib/cache";
 import Link from "next/link";
 import RidersChart from "@/components/charts/RidersChart";
 import VehicleDonut from "@/components/charts/VehicleDonut";
@@ -13,7 +13,7 @@ import { inrCompact, timeAgo, greeting, dateIN } from "@/lib/format";
 
 type Props = { role: string; name: string };
 
-const getMonthlyOnboarding = unstable_cache(async function getMonthlyOnboarding() {
+const getMonthlyOnboarding = cached(async function getMonthlyOnboarding() {
   const res = await pool.query(`
     SELECT TO_CHAR(DATE_TRUNC('month', created_at), 'Mon YY') AS label,
            COUNT(*) AS count
@@ -25,21 +25,21 @@ const getMonthlyOnboarding = unstable_cache(async function getMonthlyOnboarding(
   return res.rows.map((r: { label: string; count: string }) => ({ label: r.label, count: Number(r.count) }));
 }, ["admin-onboarding-v1"], { revalidate: 300 });
 
-const getRecentLeads = unstable_cache(async function getRecentLeads() {
+const getRecentLeads = cached(async function getRecentLeads() {
   const res = await pool.query(
     `SELECT id, type, name, phone, status, created_at FROM ${schemas.leads}.leads ORDER BY created_at DESC LIMIT 5`
   );
   return res.rows;
 }, ["admin-leads"], { revalidate: 30 });
 
-const getAuditLogs = unstable_cache(async function getAuditLogs() {
+const getAuditLogs = cached(async function getAuditLogs() {
   const res = await pool.query(
     `SELECT action, entity, details, created_at FROM ${schemas.logs}.audit_logs ORDER BY created_at DESC LIMIT 6`
   );
   return res.rows;
 }, ["admin-audit-logs"], { revalidate: 30 });
 
-const getPendingPayouts = unstable_cache(async function getPendingPayouts() {
+const getPendingPayouts = cached(async function getPendingPayouts() {
   const res = await pool.query(`
     SELECT pay.id, u.name AS investor_name, pay.amount, pay.due_date, v.ev_number
     FROM ${schemas.ops}.investor_payouts pay
@@ -53,7 +53,7 @@ const getPendingPayouts = unstable_cache(async function getPendingPayouts() {
   return res.rows;
 }, ["admin-pending-payouts"], { revalidate: 30 });
 
-const getRevenueSummary = unstable_cache(async function getRevenueSummary() {
+const getRevenueSummary = cached(async function getRevenueSummary() {
   const res = await pool.query(`
     WITH rent AS (
       SELECT DATE_TRUNC('month', payment_date) AS m, COALESCE(SUM(amount_collected),0) AS rent

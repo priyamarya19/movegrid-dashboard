@@ -1,7 +1,7 @@
 import pool from "@/lib/db";
 import { schemas } from "@/lib/schemas";
 import { hubScopeSql, type HubScope } from "@/lib/hubScope";
-import { unstable_cache } from "next/cache";
+import { cached } from "@/lib/cache";
 
 // Single source of truth for rent numbers. Every dashboard (admin/ops/investor), the
 // rider page, the email reports, and the mobile app all read from these functions —
@@ -134,7 +134,7 @@ export async function getRiderCycle(riderId: string): Promise<CycleWeek[]> {
 
 // All-time ledger summary — the headline numbers shared by every dashboard.
 // expected/collected are historical (need rent_dues); overdue is live (paid_through_date).
-export const getLedgerSummary = unstable_cache(async function getLedgerSummary(scope: HubScope = null) {
+export const getLedgerSummary = cached(async function getLedgerSummary(scope: HubScope = null) {
   const S = schemas.ops;
   const hubHist = hubScopeSql(scope, 'a.hub_id');
   const res = await pool.query(`
@@ -194,7 +194,7 @@ export const getLedgerSummary = unstable_cache(async function getLedgerSummary(s
 // dependency (so it can never go stale relative to today). Shared everywhere.
 // Displayed amount/weeks are rounded UP to whole weeks (rent is billed weekly) — the
 // day-precise paid_through_date this is derived from stays exact internally.
-export const getOverdueRiders = unstable_cache(async function getOverdueRiders(scope: HubScope = null) {
+export const getOverdueRiders = cached(async function getOverdueRiders(scope: HubScope = null) {
   const S = schemas.ops;
   const res = await pool.query(`
     SELECT r.id AS rider_id, r.rider_code, r.name, r.mobile,
@@ -215,7 +215,7 @@ export const getOverdueRiders = unstable_cache(async function getOverdueRiders(s
 // computed directly from paid_through_date. Shared everywhere. Next week's
 // period_start = paid_through_date + 1, so "starts within 2 days" means
 // paid_through_date <= today + 1.
-export const getDueSoonRiders = unstable_cache(async function getDueSoonRiders(scope: HubScope = null) {
+export const getDueSoonRiders = cached(async function getDueSoonRiders(scope: HubScope = null) {
   const S = schemas.ops;
   const res = await pool.query(`
     SELECT r.id AS rider_id, r.rider_code, r.name, r.mobile,
@@ -243,7 +243,7 @@ export const getDueSoonRiders = unstable_cache(async function getDueSoonRiders(s
 // The amount is always exactly one week's rent (daily_rent * 7) — never past weeks.
 // NOTE: this intentionally OVERLAPS with getOverdueRiders (which fires at >2 days past
 // paid_through) — by design; Overdue is left as-is.
-export const getPendingThisWeekRiders = unstable_cache(async function getPendingThisWeekRiders(scope: HubScope = null) {
+export const getPendingThisWeekRiders = cached(async function getPendingThisWeekRiders(scope: HubScope = null) {
   const S = schemas.ops;
   const res = await pool.query(`
     SELECT r.id AS rider_id, r.rider_code, r.name, r.mobile,

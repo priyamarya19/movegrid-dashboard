@@ -1,6 +1,6 @@
 import pool from "@/lib/db";
 import { schemas } from "@/lib/schemas";
-import { unstable_cache } from "next/cache";
+import { cached } from "@/lib/cache";
 import { VSTATUS } from "@/lib/vehicleStatus";
 import { hubScopeSql, type HubScope } from "@/lib/hubScope";
 
@@ -8,7 +8,7 @@ import { hubScopeSql, type HubScope } from "@/lib/hubScope";
 // (Admin/Ops/Investor/any future role) calls this same function. A dashboard only
 // decides which of these fields to show and how (cards, donut, bar); it never
 // re-queries or re-derives the counts itself.
-export const getFleetRiderCounts = unstable_cache(async function getFleetRiderCounts(scope: HubScope = null) {
+export const getFleetRiderCounts = cached(async function getFleetRiderCounts(scope: HubScope = null) {
   const S = schemas.ops;
   const [vehicles, riders, availableRiders] = await Promise.all([
     pool.query(`SELECT status, COUNT(*) FROM ${S}.vehicles v WHERE true${hubScopeSql(scope, 'v.hub_id')} GROUP BY status`),

@@ -1,6 +1,6 @@
 import pool from "@/lib/db";
 import { schemas } from "@/lib/schemas";
-import { unstable_cache } from "next/cache";
+import { cached } from "@/lib/cache";
 import Link from "next/link";
 import { VSTATUS } from "@/lib/vehicleStatus";
 import { getPendingThisWeekRiders } from "@/lib/rent";
@@ -8,7 +8,7 @@ import { greeting, dateIN } from "@/lib/format";
 
 type Props = { name: string };
 
-const getStats = unstable_cache(async function getStats() {
+const getStats = cached(async function getStats() {
   const [riders, vehicles] = await Promise.all([
     pool.query(`SELECT status, COUNT(*) FROM ${schemas.ops}.riders GROUP BY status`),
     pool.query(`SELECT status, COUNT(*) FROM ${schemas.ops}.vehicles GROUP BY status`),
@@ -27,7 +27,7 @@ const getStats = unstable_cache(async function getStats() {
   };
 }, ["hub-stats"], { revalidate: 60 });
 
-const getRecentRiders = unstable_cache(async function getRecentRiders() {
+const getRecentRiders = cached(async function getRecentRiders() {
   const res = await pool.query(`
     SELECT r.id, r.name, r.mobile, r.status, r.created_at,
            v.ev_number
