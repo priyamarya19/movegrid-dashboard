@@ -1,11 +1,11 @@
 import pool from "@/lib/db";
 import { schemas } from "@/lib/schemas";
-import { unstable_cache } from "next/cache";
+import { cached } from "@/lib/cache";
 
 // Single source of truth for the financial headline numbers (rent MTD, investments,
 // payouts) — any dashboard/role that needs these calls this same function instead of
 // re-querying. Currently shown on AdminHome; reusable as-is for any future role.
-export const getFinancialStats = unstable_cache(async function getFinancialStats() {
+export const getFinancialStats = cached(async function getFinancialStats() {
   const S = schemas.ops;
   const [rentMTD, onboardMTD, securityMTD, totalCollected, totalInvestments, payoutsDone, payoutsPending] = await Promise.all([
     pool.query(`SELECT COALESCE(SUM(amount_collected),0) AS total FROM ${S}.rider_payments WHERE DATE_TRUNC('month', payment_date) = DATE_TRUNC('month', CURRENT_DATE)`),
