@@ -101,7 +101,13 @@ export async function GET(req: NextRequest) {
   ]);
   const headers: Record<string, string> = { "X-Total-Count": String(countRes.rows[0]?.n ?? result.rows.length) };
   if (paginated) {
-    const sc = await pool.query(`SELECT status, count(*)::int AS n FROM ${schemas.ops}.vehicles GROUP BY status`);
+    // Scoped like the rows below it. Unscoped, a hub incharge would read their
+    // own list under a fleet-wide breakdown — invisible with one hub, wrong the
+    // day hub #2 opens. The status filter is deliberately NOT applied: this is
+    // the breakdown of everything the user can see, not of what's on screen.
+    const sc = await pool.query(
+      `SELECT status, count(*)::int AS n FROM ${schemas.ops}.vehicles v WHERE true${hubWhere} GROUP BY status`
+    );
     const counts: Record<string, number> = {};
     for (const row of sc.rows) counts[row.status] = row.n;
     headers["X-Status-Counts"] = JSON.stringify(counts);
