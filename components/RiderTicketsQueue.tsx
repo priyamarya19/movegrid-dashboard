@@ -45,7 +45,9 @@ export default function RiderTicketsQueue() {
     load();
   }, []);
 
-  async function resolve(t: Ticket) {
+  // Reply and resolve were one button, so every answer closed the ticket. They
+  // are two decisions: "here is what we found" and "this is finished".
+  async function send(t: Ticket, action: "reply" | "resolve") {
     if (note.trim().length < 3) {
       toast.show("Add a note — the rider sees this", "error");
       return;
@@ -54,15 +56,18 @@ export default function RiderTicketsQueue() {
     const res = await fetch(`/api/rider-tickets/${t.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "resolve", resolution_note: note.trim() }),
+      body: JSON.stringify({ action, resolution_note: note.trim() }),
     });
     setSaving(false);
     const j = await res.json().catch(() => ({}));
     if (!res.ok) {
-      toast.show(j.error || "Couldn't resolve this", "error");
+      toast.show(j.error || "Couldn't send that", "error");
       return;
     }
-    toast.show(`Replied to ${t.rider_name}`, "success");
+    toast.show(
+      action === "resolve" ? `Resolved · ${t.rider_name} notified` : `Replied to ${t.rider_name} — still open`,
+      "success"
+    );
     setReplyingId(null);
     setNote("");
     load();
@@ -171,11 +176,18 @@ export default function RiderTicketsQueue() {
                     />
                     <div className="flex gap-2">
                       <button
-                        onClick={() => resolve(t)}
+                        onClick={() => send(t, "reply")}
                         disabled={saving}
                         className="px-4 py-2 rounded-lg text-xs font-semibold bg-accent-teal text-on-dark disabled:opacity-50"
                       >
-                        {saving ? "Saving…" : "Reply & resolve"}
+                        {saving ? "Sending…" : "Send reply"}
+                      </button>
+                      <button
+                        onClick={() => send(t, "resolve")}
+                        disabled={saving}
+                        className="px-4 py-2 rounded-lg text-xs font-semibold border border-default text-secondary hover:text-primary disabled:opacity-50"
+                      >
+                        Reply & resolve
                       </button>
                       <button
                         onClick={() => {
@@ -196,7 +208,7 @@ export default function RiderTicketsQueue() {
                     }}
                     className="px-4 py-2 rounded-lg text-xs font-semibold bg-accent-teal/15 text-accent-teal hover:bg-accent-teal/25 transition-colors"
                   >
-                    Reply & resolve
+                    Reply
                   </button>
                 )
               ) : (
