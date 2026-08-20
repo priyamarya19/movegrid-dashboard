@@ -28,6 +28,7 @@ export async function getFleetRentStatusReport(): Promise<FleetRentStatusRow[]> 
   const res = await pool.query(`
     WITH q AS (
       SELECT a.id AS assignment_id, a.rider_id, a.daily_rent,
+        COALESCE(a.rent_credit, 0) AS rent_credit,
         COALESCE(a.paid_through_date, a.assigned_date) AS paid_through,
         (${IST} - COALESCE(a.paid_through_date, a.assigned_date)) AS days_behind
       FROM ${S}.rider_vehicle_assignments a
@@ -61,8 +62,17 @@ export async function getFleetRentStatusReport(): Promise<FleetRentStatusRow[]> 
       to_char(q.paid_through + 1, 'YYYY-MM-DD') AS next_due_date,
       -- Rent is billed weekly — round up to a whole week even if only partway into
       -- an unpaid one (paid_through_date itself stays day-precise internally).
-      CASE WHEN q.days_behind > 0 AND q.days_behind <= 2 THEN CEIL(q.days_behind / 7.0) * q.daily_rent * 7 ELSE 0 END AS pending_amount,
-      CASE WHEN q.days_behind > 2 THEN CEIL(q.days_behind / 7.0) * q.daily_rent * 7 ELSE 0 END AS overdue_amount
+      --
+      -- Banked credit is subtracted, exactly as outstandingSql does it. Without
+      -- this the emailed sheet and the dashboard disagreed for any rider holding
+      -- the remainder of a part-payment: Gopal jha read ₹5,460 in the mail and
+      -- ₹5,360 on screen, the difference being his ₹100 credit.
+      CASE WHEN q.days_behind > 0 AND q.days_behind <= 2
+           THEN GREATEST(0, CEIL(q.days_behind / 7.0)::int * q.daily_rent * 7 - q.rent_credit)
+           ELSE 0 END AS pending_amount,
+      CASE WHEN q.days_behind > 2
+           THEN GREATEST(0, CEIL(q.days_behind / 7.0)::int * q.daily_rent * 7 - q.rent_credit)
+           ELSE 0 END AS overdue_amount
     FROM q
     JOIN ${S}.rider_vehicle_assignments a ON a.id = q.assignment_id
     JOIN ${S}.riders r ON r.id = a.rider_id
