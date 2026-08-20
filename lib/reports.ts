@@ -8,8 +8,12 @@ export type FleetRentStatusRow = {
   rider_name: string;
   mobile: string;
   onboarding_fee: number | null;
-  security_deposit: number | null;
   total_paid: number;
+  /** Payment history, so ops can see collection rhythm without opening a rider. */
+  last_payment_date: string | null;
+  paid_last_7_days: number;
+  paid_last_month: number;
+  paid_mtd: number;
   weekly_rent: number | null;
   next_due_date: string | null;
   pending_amount: number;
@@ -30,13 +34,29 @@ export async function getFleetRentStatusReport(): Promise<FleetRentStatusRow[]> 
       WHERE a.status = 'active'
     ),
     paid_total AS (
-      SELECT rider_id, COALESCE(SUM(amount_collected), 0) AS total_paid
+      -- One pass over the rider's payments: lifetime total plus the three windows
+      -- ops asked for. "Last month" is the previous CALENDAR month, so it sits
+      -- next to month-to-date and the two read as a pair.
+      SELECT rider_id,
+        COALESCE(SUM(amount_collected), 0) AS total_paid,
+        MAX(payment_date) AS last_payment_date,
+        COALESCE(SUM(amount_collected) FILTER (
+          WHERE payment_date > ${IST} - 7), 0) AS paid_last_7_days,
+        COALESCE(SUM(amount_collected) FILTER (
+          WHERE payment_date >= date_trunc('month', ${IST} - INTERVAL '1 month')::date
+            AND payment_date <  date_trunc('month', ${IST}::timestamp)::date), 0) AS paid_last_month,
+        COALESCE(SUM(amount_collected) FILTER (
+          WHERE payment_date >= date_trunc('month', ${IST}::timestamp)::date), 0) AS paid_mtd
       FROM ${S}.rider_payments
       GROUP BY rider_id
     )
     SELECT v.ev_number, h.hub_name,
-      r.name AS rider_name, r.mobile, r.onboarding_fee, r.security_deposit,
+      r.name AS rider_name, r.mobile, r.onboarding_fee,
       COALESCE(pt.total_paid, 0) AS total_paid,
+      to_char(pt.last_payment_date, 'YYYY-MM-DD') AS last_payment_date,
+      COALESCE(pt.paid_last_7_days, 0) AS paid_last_7_days,
+      COALESCE(pt.paid_last_month, 0) AS paid_last_month,
+      COALESCE(pt.paid_mtd, 0) AS paid_mtd,
       (q.daily_rent * 7) AS weekly_rent,
       to_char(q.paid_through + 1, 'YYYY-MM-DD') AS next_due_date,
       -- Rent is billed weekly — round up to a whole week even if only partway into
@@ -57,8 +77,11 @@ export async function getFleetRentStatusReport(): Promise<FleetRentStatusRow[]> 
     rider_name: r.rider_name,
     mobile: r.mobile,
     onboarding_fee: r.onboarding_fee === null ? null : Number(r.onboarding_fee),
-    security_deposit: r.security_deposit === null ? null : Number(r.security_deposit),
     total_paid: Number(r.total_paid),
+    last_payment_date: r.last_payment_date,
+    paid_last_7_days: Number(r.paid_last_7_days),
+    paid_last_month: Number(r.paid_last_month),
+    paid_mtd: Number(r.paid_mtd),
     weekly_rent: r.weekly_rent === null ? null : Number(r.weekly_rent),
     next_due_date: r.next_due_date,
     pending_amount: Number(r.pending_amount),
