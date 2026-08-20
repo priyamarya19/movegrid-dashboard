@@ -18,7 +18,11 @@ const { Client } = require("pg");
 
 const SRC = "mg_data";
 const DST = "mg_data_uat";
-const SKIP = new Set(["schema_migrations"]);
+// user_hub_access is deliberately NOT copied: its rows point at auth users, and
+// each environment has its own. Prod grants Ajay and Amit, who have no login in
+// uat_auth at all, so copying them fails the FK and rolls the whole refresh back.
+// UAT's own staff are re-granted after the copy instead (see REGRANT below).
+const SKIP = new Set(["schema_migrations", "user_hub_access"]);
 const APPLY = process.argv.includes("--apply");
 
 (async () => {
@@ -99,8 +103,23 @@ const APPLY = process.argv.includes("--apply");
       await c.query(`SELECT setval('${DST}."${sequencename}"', $1, $2)`, [v.rows[0].last_value, v.rows[0].is_called]);
     }
 
+    // Re-grant hub access to UAT's own staff. Same rule as migration 025's
+    // backfill: every active non-admin gets every hub (admins are unscoped and
+    // need no row). Without this, a refreshed UAT shows an empty dashboard to
+    // ops and hub-incharge logins, because no grants means no data.
+    await c.query(`DELETE FROM ${DST}.user_hub_access`);
+    const granted = await c.query(`
+      INSERT INTO ${DST}.user_hub_access (user_id, hub_id, created_by)
+      SELECT u.id, h.id, 'refresh-uat'
+      FROM uat_auth.users u
+      JOIN uat_auth.roles r ON r.id = u.role_id
+      CROSS JOIN ${DST}.hubs h
+      WHERE u.status = 'active' AND r.name <> 'admin'
+      ON CONFLICT (user_id, hub_id) DO NOTHING`);
+
     await c.query("COMMIT");
     console.table(report);
+    console.log(`Hub access re-granted to UAT staff: ${granted.rowCount} row(s)`);
     console.log("Sequences synced:", seqs.map((s) => s.sequencename).join(", ") || "none");
   } catch (e) {
     await c.query("ROLLBACK");
