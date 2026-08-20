@@ -88,7 +88,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const S = schemas.ops;
 
   const res = await pool.query(
-    `SELECT (COALESCE(paid_through_date, assigned_date - 1) >= (now() AT TIME ZONE 'Asia/Kolkata')::date) AS received
+    `SELECT (COALESCE(paid_through_date, assigned_date) >= (now() AT TIME ZONE 'Asia/Kolkata')::date) AS received
      FROM ${S}.rider_vehicle_assignments WHERE rider_id = $1 AND status = 'active' LIMIT 1`,
     [id]
   );

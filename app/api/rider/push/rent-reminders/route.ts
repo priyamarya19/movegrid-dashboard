@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
     SELECT a.rider_id, (a.daily_rent * 7)::int AS amount
     FROM ${S}.rider_vehicle_assignments a
     WHERE a.status = 'active'
-      AND COALESCE(a.paid_through_date, a.assigned_date - 1) = ${IST}`);
+      AND COALESCE(a.paid_through_date, a.assigned_date) = ${IST}`);
 
   // Overdue: past the two-day grace. Amount is the whole-week-rounded figure the
   // rider sees everywhere else, so the number in the notification matches the app.
@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
     SELECT a.rider_id, ${outstandingSql("a")}::int AS amount
     FROM ${S}.rider_vehicle_assignments a
     WHERE a.status = 'active'
-      AND COALESCE(a.paid_through_date, a.assigned_date - 1) < ${OVERDUE_CUTOFF}`);
+      AND COALESCE(a.paid_through_date, a.assigned_date) < ${OVERDUE_CUTOFF}`);
 
   let sentDue = 0;
   for (const r of dueTomorrow.rows) {

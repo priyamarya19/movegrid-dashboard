@@ -28,10 +28,10 @@ export async function GET(req: NextRequest) {
   const res = await pool.query(`
     SELECT r.id AS rider_id, r.rider_code, v.id AS vehicle_id, v.ev_number,
       to_char(a.assigned_date, 'YYYY-MM-DD') AS assigned_date,
-      to_char(COALESCE(a.paid_through_date, a.assigned_date - 1) + 1, 'YYYY-MM-DD') AS week_start,
-      to_char(COALESCE(a.paid_through_date, a.assigned_date - 1) + 7, 'YYYY-MM-DD') AS week_end,
+      to_char(COALESCE(a.paid_through_date, a.assigned_date) + 1, 'YYYY-MM-DD') AS week_start,
+      to_char(COALESCE(a.paid_through_date, a.assigned_date) + 7, 'YYYY-MM-DD') AS week_end,
       a.allotted_by,
-      (${IST} - COALESCE(a.paid_through_date, a.assigned_date - 1))::int AS days_behind
+      (${IST} - COALESCE(a.paid_through_date, a.assigned_date))::int AS days_behind
     FROM ${S}.rider_vehicle_assignments a
     JOIN ${S}.riders r ON r.id = a.rider_id
     JOIN ${S}.vehicles v ON v.id = a.vehicle_id
@@ -184,8 +184,12 @@ export async function POST(req: NextRequest) {
         [carryOver.id]
       );
     } else {
+      // Ops rule (confirmed 20 Aug 2026): the handover day is free — rent runs
+      // from the day AFTER the rider takes the scooter. So a prepaid week covers
+      // assigned+1 .. assigned+7, and an unpaid allotment is "paid through" the
+      // handover day itself, meaning day one of charging is the next day.
       const base = new Date(assignedDate + "T00:00:00Z");
-      base.setUTCDate(base.getUTCDate() + (week1Paid ? 6 : -1));
+      base.setUTCDate(base.getUTCDate() + (week1Paid ? 7 : 0));
       paidThroughDateValue = base.toISOString().slice(0, 10);
     }
 
@@ -270,7 +274,7 @@ export async function POST(req: NextRequest) {
     if (week1Paid) {
       await client.query(
         `INSERT INTO ${schemas.ops}.rider_payments (rider_id, vehicle_id, amount_collected, payment_date, rental_period_start, rental_period_end)
-         VALUES ($1, $2, $3, (now() AT TIME ZONE 'Asia/Kolkata')::date, $4, $4::date + 6)`,
+         VALUES ($1, $2, $3, (now() AT TIME ZONE 'Asia/Kolkata')::date, $4::date + 1, $4::date + 7)`,
         [b.rider_id, b.vehicle_id, dailyRent * 7, assignedDate]
       );
     }

@@ -76,7 +76,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       }
       await client.query(
         `UPDATE ${schemas.ops}.rider_vehicle_assignments
-         SET paid_through_date = COALESCE(paid_through_date, assigned_date - 1) + $1::int,
+         SET paid_through_date = COALESCE(paid_through_date, assigned_date) + $1::int,
              rent_credit = $2
          WHERE id = $3`,
         [wholeDays, newCredit, req_.rows[0].assignment_id]

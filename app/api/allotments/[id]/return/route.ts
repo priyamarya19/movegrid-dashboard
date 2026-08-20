@@ -112,7 +112,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const returnedOn = b.returned_date || istTodayISO();
     const leftover = await client.query(
       `SELECT
-         GREATEST(0, COALESCE(a.paid_through_date, a.assigned_date - 1) - $2::date)::int AS unused_days,
+         GREATEST(0, COALESCE(a.paid_through_date, a.assigned_date) - $2::date)::int AS unused_days,
          a.daily_rent::numeric AS daily_rent,
          COALESCE(a.rent_credit, 0)::numeric AS rent_credit
        FROM ${schemas.ops}.rider_vehicle_assignments a WHERE a.id = $1`,
@@ -143,7 +143,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       // same rupees can't be counted both here and on the old assignment.
       await client.query(
         `UPDATE ${schemas.ops}.rider_vehicle_assignments
-         SET paid_through_date = LEAST(COALESCE(paid_through_date, assigned_date - 1), $2::date),
+         SET paid_through_date = LEAST(COALESCE(paid_through_date, assigned_date), $2::date),
              rent_credit = 0
          WHERE id = $1`,
         [id, returnedOn]

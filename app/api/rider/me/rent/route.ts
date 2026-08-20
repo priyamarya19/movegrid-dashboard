@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
     getRiderCycle(riderId),
     pool.query(
       `SELECT a.daily_rent, COALESCE(a.rent_credit, 0) AS rent_credit,
-         to_char(COALESCE(a.paid_through_date, a.assigned_date - 1), 'YYYY-MM-DD') AS paid_through_date,
+         to_char(COALESCE(a.paid_through_date, a.assigned_date), 'YYYY-MM-DD') AS paid_through_date,
          to_char(${nextDueSql("a")}, 'YYYY-MM-DD') AS next_due_date,
          ${outstandingSql("a")} AS outstanding_now
        FROM ${S}.rider_vehicle_assignments a WHERE a.rider_id = $1 AND a.status = 'active' LIMIT 1`,

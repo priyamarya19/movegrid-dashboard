@@ -164,13 +164,13 @@ export async function GET(req: NextRequest) {
       SELECT rva.rider_id,
         7 AS period_days,
         (rva.daily_rent * 7) AS period_amount,
-        (${T} - COALESCE(rva.paid_through_date, rva.assigned_date - 1)) AS days_behind,
+        (${T} - COALESCE(rva.paid_through_date, rva.assigned_date)) AS days_behind,
         ${nextDueSql("rva")} AS next_due_date,
-        (COALESCE(rva.paid_through_date, rva.assigned_date - 1) + 1) AS last_due_date,
+        (COALESCE(rva.paid_through_date, rva.assigned_date) + 1) AS last_due_date,
         -- Rent is billed weekly — round up to a whole week even if only partway
         -- into an unpaid one (the day-precise paid_through_date stays exact internally).
-        CEIL(GREATEST(${T} - COALESCE(rva.paid_through_date, rva.assigned_date - 1), 1) / 7.0) AS overdue_weeks,
-        (CEIL(GREATEST(${T} - COALESCE(rva.paid_through_date, rva.assigned_date - 1), 1) / 7.0) * rva.daily_rent * 7) AS amount_due
+        CEIL(GREATEST(${T} - COALESCE(rva.paid_through_date, rva.assigned_date), 1) / 7.0) AS overdue_weeks,
+        (CEIL(GREATEST(${T} - COALESCE(rva.paid_through_date, rva.assigned_date), 1) / 7.0) * rva.daily_rent * 7) AS amount_due
       FROM ${schemas.ops}.rider_vehicle_assignments rva
       WHERE rva.status = 'active'
     )
@@ -184,10 +184,10 @@ export async function GET(req: NextRequest) {
            h.id AS hub_id, h.hub_name,
            v.id AS vehicle_id, v.ev_number AS vehicle_number,
            rva.daily_rent, rva.allotment_code,
-           COALESCE(rva.paid_through_date, rva.assigned_date - 1) >= ${IST} AS rent_paid_this_week,
+           COALESCE(rva.paid_through_date, rva.assigned_date) >= ${IST} AS rent_paid_this_week,
            -- outstanding rent (whole-week-rounded) for the active assignment, 0 if paid up
-           CASE WHEN rva.id IS NOT NULL AND COALESCE(rva.paid_through_date, rva.assigned_date - 1) < ${IST}
-                THEN CEIL((${IST} - COALESCE(rva.paid_through_date, rva.assigned_date - 1)) / 7.0) * rva.daily_rent * 7
+           CASE WHEN rva.id IS NOT NULL AND COALESCE(rva.paid_through_date, rva.assigned_date) < ${IST}
+                THEN CEIL((${IST} - COALESCE(rva.paid_through_date, rva.assigned_date)) / 7.0) * rva.daily_rent * 7
                 ELSE 0 END AS amount_due,
            EXISTS (
              SELECT 1 FROM ${schemas.ops}.rider_vehicle_assignments rva_a
