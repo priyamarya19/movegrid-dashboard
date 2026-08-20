@@ -100,6 +100,56 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       ]
     );
 
+    // ── Unused prepaid days → rider balance ────────────────────────────────
+    //
+    // Rent lives on the assignment, so closing one used to throw away whatever
+    // the rider had paid beyond the day they handed the scooter back. A week
+    // paid on the 1st and returned on the 3rd lost four days.
+    //
+    // Only days already PAID FOR are carried. A started-but-unpaid week is
+    // still a full week's rent — that policy is unchanged, so this can never
+    // reduce what a rider owes, only preserve what they already gave us.
+    const returnedOn = b.returned_date || istTodayISO();
+    const leftover = await client.query(
+      `SELECT
+         GREATEST(0, COALESCE(a.paid_through_date, a.assigned_date - 1) - $2::date)::int AS unused_days,
+         a.daily_rent::numeric AS daily_rent,
+         COALESCE(a.rent_credit, 0)::numeric AS rent_credit
+       FROM ${schemas.ops}.rider_vehicle_assignments a WHERE a.id = $1`,
+      [id, returnedOn]
+    );
+    const lo = leftover.rows[0];
+    // Part-rupees left over from an earlier payment travel too — they are just
+    // as paid-for as the whole days.
+    const carried =
+      Math.round((Number(lo?.unused_days ?? 0) * Number(lo?.daily_rent ?? 0) + Number(lo?.rent_credit ?? 0)) * 100) / 100;
+
+    if (carried > 0) {
+      const bal = await client.query(
+        `UPDATE ${schemas.ops}.riders SET balance = COALESCE(balance, 0) + $2
+         WHERE id = $1 RETURNING balance`,
+        [rider_id, carried]
+      );
+      await client.query(
+        `INSERT INTO ${schemas.ops}.rider_balance_entries
+           (rider_id, delta, balance_after, reason, assignment_id, created_by)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [
+          rider_id, carried, bal.rows[0].balance,
+          `${lo.unused_days} unused day(s) at return`, id, session.name,
+        ]
+      );
+      // The closed row is now paid through exactly the day it came back, so the
+      // same rupees can't be counted both here and on the old assignment.
+      await client.query(
+        `UPDATE ${schemas.ops}.rider_vehicle_assignments
+         SET paid_through_date = LEAST(COALESCE(paid_through_date, assigned_date - 1), $2::date),
+             rent_credit = 0
+         WHERE id = $1`,
+        [id, returnedOn]
+      );
+    }
+
     // Record a penalty (if any) against the rider, frozen to the submitted vehicle + assignment.
     const hasPenaltyAmt = b.penalty_amount != null && b.penalty_amount !== "";
     if (b.penalty_detail || hasPenaltyAmt) {

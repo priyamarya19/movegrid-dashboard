@@ -10,6 +10,8 @@ import RecordPayment from "@/components/riders/RecordPayment";
 
 type Rider = {
   id: string; rider_code: string; name: string; mobile: string; status: string;
+  /** Prepaid days carried from a previous scooter. Credit, so always ≥ 0. */
+  balance?: number | string | null;
   hub_id: string; hub_name: string;
   vehicle_id: string; vehicle_number: string;
   onboarding_fee: number; security_deposit: number;
@@ -44,6 +46,7 @@ const cols: { label: string; key: string }[] = [
   { label: "KYC", key: "aadhaar_verified" },
   { label: "Status", key: "status" },
   { label: "Rent", key: "rent_paid_this_week" },
+  { label: "Balance", key: "balance" },
   { label: "Joined", key: "created_at" },
 ];
 
@@ -229,14 +232,14 @@ export default function RidersTable({ rentFilter, statusFilter: initialStatus }:
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={11} className="px-5 py-10 text-center text-muted">Loading...</td></tr>
+                <tr><td colSpan={12} className="px-5 py-10 text-center text-muted">Loading...</td></tr>
               ) : loadError ? (
-                <tr><td colSpan={11} className="px-5 py-10 text-center">
+                <tr><td colSpan={12} className="px-5 py-10 text-center">
                   <p className="text-accent-danger-alt-text text-sm">Couldn&apos;t load riders.</p>
                   <button onClick={() => fetchRiders()} className="mt-2 text-xs text-accent-purple hover:underline">Try again</button>
                 </td></tr>
               ) : sorted.length === 0 ? (
-                <tr><td colSpan={11} className="px-5 py-10 text-center text-muted">No riders found</td></tr>
+                <tr><td colSpan={12} className="px-5 py-10 text-center text-muted">No riders found</td></tr>
               ) : sorted.map((r) => (
                 <tr key={r.id} className="border-b border-subtle hover:bg-overlay-hover transition-colors">
                   <td className="px-5 py-3">
@@ -271,6 +274,19 @@ export default function RidersTable({ rentFilter, statusFilter: initialStatus }:
                   </td>
                   <td className="px-5 py-3">
                     <RentToggle rider={r} onToggled={fetchRiders} />
+                  </td>
+                  {/* Prepaid days carried from a previous scooter. Only ever a
+                      credit, so a dash is the normal state, not a zero. */}
+                  <td className="px-5 py-3 whitespace-nowrap">
+                    {Number(r.balance ?? 0) > 0 ? (
+                      <span
+                        className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-accent-teal/13 text-accent-teal"
+                        title="Already paid on an earlier scooter — applied automatically to the next allotment">
+                        {inr(Number(r.balance))}
+                      </span>
+                    ) : (
+                      <span className="text-muted">—</span>
+                    )}
                   </td>
                   <td className="px-5 py-3 text-muted text-xs whitespace-nowrap">
                     {dateIN(r.created_at, { day: "numeric", month: "short", year: "2-digit" })}

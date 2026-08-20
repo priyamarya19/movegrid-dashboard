@@ -230,6 +230,39 @@ export async function POST(req: NextRequest) {
       ]
     );
 
+    // ── Spend any balance the rider is carrying ────────────────────────────
+    //
+    // Days paid for on a previous scooter and not used up (see the return
+    // route). Moved into this assignment's rent_credit, which the outstanding
+    // calculation already subtracts — so it lands as a reduction on the very
+    // first week rather than needing a rule of its own.
+    //
+    // Never refunded in cash, by policy; it can only be spent this way.
+    // Read under a row lock, then clear. Deliberately two statements: RETURNING
+    // hands back the NEW row (always zero), and a CTE that reads the old value
+    // returns NULL to RETURNING — which silently wiped the balance without ever
+    // applying it. Two plain statements inside the transaction are correct and
+    // obvious, and the lock still stops two allotments spending it twice.
+    const balRow = await client.query(
+      `SELECT COALESCE(balance, 0)::numeric AS balance FROM ${schemas.ops}.riders WHERE id = $1 FOR UPDATE`,
+      [b.rider_id]
+    );
+    const spent = Number(balRow.rows[0]?.balance ?? 0);
+    if (spent > 0) {
+      await client.query(`UPDATE ${schemas.ops}.riders SET balance = 0 WHERE id = $1`, [b.rider_id]);
+      await client.query(
+        `UPDATE ${schemas.ops}.rider_vehicle_assignments
+         SET rent_credit = COALESCE(rent_credit, 0) + $2 WHERE id = $1`,
+        [result.rows[0].id, spent]
+      );
+      await client.query(
+        `INSERT INTO ${schemas.ops}.rider_balance_entries
+           (rider_id, delta, balance_after, reason, assignment_id, created_by)
+         VALUES ($1, $2, 0, $3, $4, $5)`,
+        [b.rider_id, -spent, "Applied to new allotment", result.rows[0].id, session.name]
+      );
+    }
+
     // Record the week-1 prepaid advance so it shows up in the rider's payment history
     // (one week's rent, not the raw cash figure). payment_date is the day the money
     // was actually received — today — not the period end, which put future dates in

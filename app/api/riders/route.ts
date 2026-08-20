@@ -178,6 +178,7 @@ export async function GET(req: NextRequest) {
 
   const baseSelect = `
     SELECT r.id, r.rider_code, r.name, r.mobile, r.status, r.onboarding_fee, r.security_deposit,
+           COALESCE(r.balance, 0)::numeric AS balance,
            r.rental_mode, r.business_type, r.b2b_company, r.b2b_location, r.employer, r.created_at,
            r.aadhaar_verified, r.pan_verified, r.dl_verified,
            h.id AS hub_id, h.hub_name,
