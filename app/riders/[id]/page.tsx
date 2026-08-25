@@ -4,6 +4,7 @@ import DashboardLayout from "@/components/DashboardLayout";
 import pool from "@/lib/db";
 import { schemas } from "@/lib/schemas";
 import KycVerifyButton from "@/components/riders/KycVerifyButton";
+import KycDocAdd from "@/components/riders/KycDocAdd";
 import BackButton from "@/components/BackButton";
 import BlacklistButton from "@/components/riders/BlacklistButton";
 import RecordPayment from "@/components/riders/RecordPayment";
@@ -272,6 +273,7 @@ export default async function RiderDetailPage({ params }: { params: Promise<{ id
                 masked: rider.aadhaar ? "XXXX XXXX " + rider.aadhaar.slice(-4) : null,
                 frontUrl: rider.aadhaar_front_url ?? null,
                 backUrl: rider.aadhaar_back_url ?? null,
+                wantsBack: true,
                 verified: !!rider.aadhaar_verified,
                 verifiedBy: rider.aadhaar_verified_by ?? null,
                 verifiedAt: rider.aadhaar_verified_at ?? null,
@@ -282,6 +284,7 @@ export default async function RiderDetailPage({ params }: { params: Promise<{ id
                 masked: rider.pan ?? null,
                 frontUrl: rider.pan_image_url ?? null,
                 backUrl: null,
+                wantsBack: false,
                 verified: !!rider.pan_verified,
                 verifiedBy: rider.pan_verified_by ?? null,
                 verifiedAt: rider.pan_verified_at ?? null,
@@ -292,6 +295,7 @@ export default async function RiderDetailPage({ params }: { params: Promise<{ id
                 masked: rider.dl_number ?? null,
                 frontUrl: rider.dl_front_url ?? null,
                 backUrl: rider.dl_back_url ?? null,
+                wantsBack: true,
                 verified: !!rider.dl_verified,
                 verifiedBy: rider.dl_verified_by ?? null,
                 verifiedAt: rider.dl_verified_at ?? null,
@@ -336,6 +340,17 @@ export default async function RiderDetailPage({ params }: { params: Promise<{ id
                   initialVerified={d.verified}
                   initialVerifiedBy={d.verifiedBy}
                   initialVerifiedAt={d.verifiedAt}
+                />
+                {/* Riders who onboarded at the hub often never open the app, so
+                    ops need a way to put the papers on the record themselves. */}
+                <KycDocAdd
+                  riderId={rider.id}
+                  document={d.doc}
+                  label={d.label}
+                  hasNumber={!!d.masked}
+                  hasFront={!!d.frontUrl}
+                  hasBack={!!d.backUrl}
+                  wantsBack={d.wantsBack}
                 />
               </div>
             ))}
