@@ -135,7 +135,17 @@ export default async function RiderDetailPage({ params }: { params: Promise<{ id
               </p>
             </div>
           </div>
-          <span className={`px-3 py-1 rounded-full text-sm font-medium capitalize shrink-0 ${statusColor[rider.status] ?? "bg-muted/20 text-muted"}`}>{rider.status}</span>
+          <div className="flex items-center gap-2 shrink-0">
+            {/* Riders from a lead or the app's own signup arrive with almost
+                nothing filled in; this opens the onboarding form over the record. */}
+            <Link
+              href={`/riders/${rider.id}/edit`}
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-accent-purple/15 text-accent-purple hover:bg-accent-purple/25 transition-colors"
+            >
+              Edit details
+            </Link>
+            <span className={`px-3 py-1 rounded-full text-sm font-medium capitalize ${statusColor[rider.status] ?? "bg-muted/20 text-muted"}`}>{rider.status}</span>
+          </div>
         </div>
 
         <BlacklistButton

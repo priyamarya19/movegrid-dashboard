@@ -25,8 +25,17 @@ function Field({ label, required, children }: { label: string; required?: boolea
 const inp = "w-full bg-base border border-default rounded-xl px-4 py-2.5 text-primary text-sm placeholder-faint focus:outline-none focus:border-accent-purple transition-colors";
 const sel = "w-full bg-base border border-default rounded-xl px-4 py-2.5 text-primary text-sm focus:outline-none focus:border-accent-purple transition-colors";
 
-export default function RiderForm() {
+/**
+ * Onboarding form, reused for editing.
+ *
+ * Riders arriving from a lead or from the app's own signup have a name, a
+ * mobile and little else. Passing `rider` opens the same form prefilled and
+ * saves with PATCH, so the record can be completed later rather than being
+ * stuck half-empty forever.
+ */
+export default function RiderForm({ rider, riderId }: { rider?: Record<string, unknown>; riderId?: string } = {}) {
   const router = useRouter();
+  const isEdit = !!riderId;
   const [hubs, setHubs] = useState<Hub[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -51,6 +60,25 @@ export default function RiderForm() {
     additional_photos: [] as string[],
   });
 
+  // Prefill from the existing record. Null/undefined become "" so the inputs
+  // stay controlled; numbers become strings because that is what inputs hold.
+  useEffect(() => {
+    if (!rider) return;
+    setForm((f) => {
+      const next = { ...f };
+      for (const k of Object.keys(f) as (keyof typeof f)[]) {
+        const v = rider[k as string];
+        if (v === undefined || v === null) continue;
+        if (k === "additional_photos") {
+          (next[k] as string[]) = Array.isArray(v) ? (v as string[]) : [];
+        } else {
+          (next[k] as unknown as string) = String(v);
+        }
+      }
+      return next;
+    });
+  }, [rider]);
+
   useEffect(() => {
     fetch("/api/hubs").then(r => r.json()).then(setHubs);
   }, []);
@@ -74,8 +102,8 @@ export default function RiderForm() {
     setSubmitting(true);
     setError("");
     try {
-      const res = await fetch("/api/riders", {
-        method: "POST",
+      const res = await fetch(isEdit ? `/api/riders/${riderId}` : "/api/riders", {
+        method: isEdit ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...form,
@@ -88,8 +116,9 @@ export default function RiderForm() {
         }),
       });
       const data = await res.json();
-      if (!res.ok) { setError(data.error || "Failed to create rider"); return; }
-      router.push(`/riders/${data.id}`);
+      if (!res.ok) { setError(data.error || (isEdit ? "Could not save changes" : "Failed to create rider")); return; }
+      router.push(`/riders/${isEdit ? riderId : data.id}`);
+      router.refresh();
     } finally { setSubmitting(false); }
   }
 
@@ -201,7 +230,7 @@ export default function RiderForm() {
       <div className="flex items-center gap-3 pt-2">
         <button type="submit" disabled={submitting}
           className="px-6 py-2.5 rounded-xl bg-accent-purple hover:bg-accent-purple text-on-dark text-sm font-semibold disabled:opacity-60 transition-colors">
-          {submitting ? "Saving..." : "Create Rider"}
+          {submitting ? "Saving..." : isEdit ? "Save Changes" : "Create Rider"}
         </button>
         <button type="button" onClick={() => router.back()}
           className="px-4 py-2.5 rounded-xl border border-default text-muted hover:text-primary text-sm transition-colors">
