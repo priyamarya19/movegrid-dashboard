@@ -6,7 +6,12 @@ import ImageUpload from "@/components/ImageUpload";
 
 type Hub = { id: string; hub_name: string; city: string };
 
-const OEMS = ["Shelby", "NXTE", "E-sprinto"];
+// Must match the oem values in vehicle_models — the API resolves the model by
+// this exact string and rejects anything it cannot find. The list had drifted:
+// "E-sprinto" had no model row (every save failed with "Unknown OEM/Assembler")
+// while "EV Juno", 21 vehicles of it, was missing and could not be selected.
+// Reading these from the table is the proper fix; this keeps them in step until then.
+const OEMS = ["Shelby", "NXTE", "EV Juno", "AB MOTOSS"];
 const IOT_PARTNERS = ["Fixx ev/Loconav", "Roadcast"];
 const BATTERY_PARTNERS = ["Battery Smart", "Sun Mobility", "Yuma", "Mooving"];
 
