@@ -24,6 +24,10 @@ export async function GET(req: NextRequest) {
             COUNT(*)                                AS variants
        FROM ${schemas.ops}.vehicle_models
       WHERE oem IS NOT NULL
+        -- A model with no rate set yet is not ready to be advertised: it would
+        -- show the rider "₹0 / day" and, because the list is ordered by price,
+        -- sort to the very top. A new OEM appears here once it has a price.
+        AND COALESCE(rental_per_day, 0) > 0
       GROUP BY oem
       ORDER BY MIN(rental_per_day), oem`
   );
