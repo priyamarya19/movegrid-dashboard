@@ -192,6 +192,13 @@ export default function AllotmentForm() {
             {RENTAL_PLANS.map(m => <option key={m} value={m}>{m[0].toUpperCase() + m.slice(1)}</option>)}
           </select>
         </Field>
+        {/* The rent week runs from this date, so an allotment entered on
+            Wednesday for a scooter handed over on Monday must be backdated —
+            otherwise the rider is billed from the wrong day. The ops app has
+            always had this field; the web form was silently sending today. */}
+        <Field label="Allotment Date" required hint="The day the rider actually took the scooter — the rent week starts here">
+          <input type="date" className={inp} value={form.assigned_date} onChange={e => set("assigned_date", e.target.value)} max={istTodayISO()} required />
+        </Field>
         <Field label="Daily Rental (₹)" required hint="Prefilled from the vehicle's model rate — edit if the rider's km/usage deal differs">
           <input type="number" className={inp} value={form.daily_rent} onChange={e => set("daily_rent", e.target.value)} placeholder="e.g. 240" required />
         </Field>

@@ -9,8 +9,10 @@ type NavItem = {
   href: string;
   icon: React.ReactNode;
   roles: string[];
-  // Some items are gated by a per-user permission flag instead of role.
+  // Some items are gated by a per-user permission instead of role: either the
+  // older allotments boolean, or an App Pages key (Settings -> Users).
   flag?: "allotments";
+  pageKey?: string;
 };
 
 const navItems: NavItem[] = [
@@ -50,6 +52,13 @@ const navItems: NavItem[] = [
     href: "/payment-claims",
     roles: ["admin", "ops_manager", "hub_incharge"],
     icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/><path d="M6 15h4"/></svg>,
+  },
+  {
+    label: "Rider Support",
+    href: "/rider-tickets",
+    roles: ["admin", "ops_manager", "hub_incharge"],
+    pageKey: "rider_tickets",
+    icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>,
   },
   {
     label: "Recoveries",
@@ -117,17 +126,23 @@ type Props = {
   role: string;
   name: string;
   canViewAllotments?: boolean;
+  appPages?: string[];
   onClose?: () => void;
 };
 
-export default function Sidebar({ role, name, canViewAllotments, onClose }: Props) {
+export default function Sidebar({ role, name, canViewAllotments, appPages, onClose }: Props) {
   const pathname = usePathname();
   const router = useRouter();
   const { theme, toggleTheme } = useTheme();
 
-  const visibleItems = navItems.filter((item) =>
-    item.flag === "allotments" ? !!canViewAllotments : item.roles.includes(role)
-  );
+  const visibleItems = navItems.filter((item) => {
+    if (item.flag === "allotments") return !!canViewAllotments;
+    // Admins see every App Pages section; everyone else needs it enabled.
+    if (item.pageKey) {
+      return role === "admin" || (appPages ?? []).includes(item.pageKey);
+    }
+    return item.roles.includes(role);
+  });
 
   const handleLogout = async () => {
     await fetch("/api/auth/logout", { method: "POST" });

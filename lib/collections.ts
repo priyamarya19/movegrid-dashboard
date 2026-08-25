@@ -96,7 +96,7 @@ export const getWeeklyCollections = cached(async function getWeeklyCollections()
   const res = await pool.query(`
     SELECT to_char(date_trunc('week', d.period_start), 'YYYY-MM-DD') AS week,
            SUM(d.amount)::numeric AS expected,
-           SUM(LEAST(GREATEST(0, LEAST(COALESCE(a.paid_through_date, a.assigned_date - 1), d.period_end) - d.period_start + 1) * a.daily_rent, d.amount))::numeric AS collected
+           SUM(LEAST(GREATEST(0, LEAST(COALESCE(a.paid_through_date, a.assigned_date), d.period_end) - d.period_start + 1) * a.daily_rent, d.amount))::numeric AS collected
     FROM ${S}.rent_dues d
     JOIN ${S}.rider_vehicle_assignments a ON a.id = d.assignment_id
     WHERE d.period_start <= ${IST}
@@ -120,7 +120,7 @@ export const getChaseList = cached(async function getChaseList(scope: HubScope =
   const S = schemas.ops;
   const res = await pool.query(`
     SELECT r.id AS rider_id, r.rider_code, r.name, a.allotment_code, a.sheet_note,
-      GREATEST(0, ${IST} - COALESCE(a.paid_through_date, a.assigned_date - 1)) AS days_behind,
+      GREATEST(0, ${IST} - COALESCE(a.paid_through_date, a.assigned_date)) AS days_behind,
       -- "Complete the started weeks" balance (option 2) — same formula as the
       -- rider page and app, so every screen shows one number.
       ${outstandingSql("a")} AS outstanding,

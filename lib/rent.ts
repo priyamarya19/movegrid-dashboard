@@ -22,11 +22,12 @@ export const OVERDUE_CUTOFF = `(${IST} - 2)`;
 // through the 21st is due the 21st for the week starting the 22nd; the date holds
 // through the 2-day grace after a miss, then rolls a week (due 7th, unpaid on the
 // 9th → 14th). Never-paid riders anchor on the allotment date (week 1 due =
-// assigned + 6). `a` is the rider_vehicle_assignments alias in the calling query.
+// assigned + 7 — the handover day itself is free, so week 1 runs assigned+1..assigned+7).
+// `a` is the rider_vehicle_assignments alias in the calling query.
 export const nextDueSql = (a: string) => `
-  (CASE WHEN COALESCE(${a}.paid_through_date, ${a}.assigned_date - 1) >= ${a}.assigned_date
+  (CASE WHEN COALESCE(${a}.paid_through_date, ${a}.assigned_date) > ${a}.assigned_date
     THEN ${a}.paid_through_date + 7 * CEIL(GREATEST(${IST} - 1 - ${a}.paid_through_date, 0) / 7.0)::int
-    ELSE (${a}.assigned_date - 1) + 7 * GREATEST(1, CEIL(GREATEST(${IST} - ${a}.assigned_date, 0) / 7.0)::int)
+    ELSE (${a}.assigned_date) + 7 * GREATEST(1, CEIL(GREATEST(${IST} - ${a}.assigned_date, 0) / 7.0)::int)
   END)`;
 
 // Outstanding balance, "complete the started weeks" definition (option 2, chosen
@@ -36,7 +37,7 @@ export const nextDueSql = (a: string) => `
 // Paid through today or beyond → 0. `a` is the assignments alias.
 export const outstandingSql = (a: string) => `
   GREATEST(0,
-    CEIL(GREATEST(${IST} - COALESCE(${a}.paid_through_date, ${a}.assigned_date - 1), 0) / 7.0)::int
+    CEIL(GREATEST(${IST} - COALESCE(${a}.paid_through_date, ${a}.assigned_date), 0) / 7.0)::int
       * ${a}.daily_rent * 7
     - COALESCE(${a}.rent_credit, 0)
   )`;
@@ -53,7 +54,7 @@ export const outstandingSql = (a: string) => `
 // runs. paid_through_date is always current. getRiderCycle is the one exception: it
 // exists specifically to show per-week history, so it legitimately needs rent_dues.
 export const PAID_FROM_BALANCE = `
-  GREATEST(0, LEAST(COALESCE(a.paid_through_date, a.assigned_date - 1), d.period_end) - d.period_start + 1) * a.daily_rent`;
+  GREATEST(0, LEAST(COALESCE(a.paid_through_date, a.assigned_date), d.period_end) - d.period_start + 1) * a.daily_rent`;
 
 export type CycleWeek = {
   // due_date is null for a collected week 1 — it's paid at handover, there's no
@@ -82,7 +83,7 @@ export async function getRiderCycle(riderId: string): Promise<CycleWeek[]> {
     ),
     gaps AS (
       SELECT a.id AS assignment_id, a.daily_rent,
-        COALESCE((SELECT MAX(e.period_end) FROM existing e WHERE e.assignment_id = a.id), a.assigned_date - 1) AS last_covered,
+        COALESCE((SELECT MAX(e.period_end) FROM existing e WHERE e.assignment_id = a.id), a.assigned_date) AS last_covered,
         COALESCE((SELECT MAX(e.week_no) FROM existing e WHERE e.assignment_id = a.id), 0) AS last_week_no
       FROM ${S}.rider_vehicle_assignments a
       WHERE a.rider_id = $1 AND a.status = 'active'
@@ -118,7 +119,7 @@ export async function getRiderCycle(riderId: string): Promise<CycleWeek[]> {
         to_char(CASE WHEN w.week_no = 1 THEN GREATEST(w.due_date, w.period_start) ELSE w.due_date END,'YYYY-MM-DD') AS due_date,
         w.period_start AS ps_dt, a.vehicle_id, a.status AS asgn_status,
         w.amount, a.sheet_note,
-        GREATEST(0, LEAST(COALESCE(a.paid_through_date, a.assigned_date - 1), w.period_end) - w.period_start + 1) * a.daily_rent AS paid,
+        GREATEST(0, LEAST(COALESCE(a.paid_through_date, a.assigned_date), w.period_end) - w.period_start + 1) * a.daily_rent AS paid,
         v.ev_number, a.assigned_date
       FROM weeks w
       JOIN ${S}.rider_vehicle_assignments a ON a.id = w.assignment_id
@@ -147,9 +148,9 @@ export const getLedgerSummary = cached(async function getLedgerSummary(scope: Hu
     live AS (
       -- Rent is billed weekly, so a display amount is always a whole week's rent —
       -- round up to the nearest week even if only partway into an unpaid one.
-      SELECT CEIL((${IST} - COALESCE(a.paid_through_date, a.assigned_date - 1)) / 7.0) * a.daily_rent * 7 AS overdue_amount
+      SELECT CEIL((${IST} - COALESCE(a.paid_through_date, a.assigned_date)) / 7.0) * a.daily_rent * 7 AS overdue_amount
       FROM ${S}.rider_vehicle_assignments a
-      WHERE a.status = 'active' AND COALESCE(a.paid_through_date, a.assigned_date - 1) < ${OVERDUE_CUTOFF}
+      WHERE a.status = 'active' AND COALESCE(a.paid_through_date, a.assigned_date) < ${OVERDUE_CUTOFF}
         ${hubHist}
     ),
     -- Riders at least one full day past their paid-through date — their current
@@ -161,7 +162,7 @@ export const getLedgerSummary = cached(async function getLedgerSummary(scope: Hu
       FROM ${S}.rider_vehicle_assignments a
       WHERE a.status = 'active'
         ${hubHist}
-        AND COALESCE(a.paid_through_date, a.assigned_date - 1) BETWEEN ${IST} - 7 AND ${IST} - 1
+        AND COALESCE(a.paid_through_date, a.assigned_date) BETWEEN ${IST} - 7 AND ${IST} - 1
     )
     SELECT
       (SELECT COALESCE(SUM(amount) FILTER (WHERE period_start < ${IST}), 0) FROM hist) AS expected_to_date,
@@ -198,11 +199,11 @@ export const getOverdueRiders = cached(async function getOverdueRiders(scope: Hu
   const S = schemas.ops;
   const res = await pool.query(`
     SELECT r.id AS rider_id, r.rider_code, r.name, r.mobile,
-      CEIL((${IST} - COALESCE(a.paid_through_date, a.assigned_date - 1)) / 7.0) AS overdue_weeks,
-      CEIL((${IST} - COALESCE(a.paid_through_date, a.assigned_date - 1)) / 7.0) * a.daily_rent * 7 AS overdue_amount
+      CEIL((${IST} - COALESCE(a.paid_through_date, a.assigned_date)) / 7.0) AS overdue_weeks,
+      CEIL((${IST} - COALESCE(a.paid_through_date, a.assigned_date)) / 7.0) * a.daily_rent * 7 AS overdue_amount
     FROM ${S}.rider_vehicle_assignments a
     JOIN ${S}.riders r ON r.id = a.rider_id
-    WHERE a.status = 'active' AND COALESCE(a.paid_through_date, a.assigned_date - 1) < ${OVERDUE_CUTOFF}
+    WHERE a.status = 'active' AND COALESCE(a.paid_through_date, a.assigned_date) < ${OVERDUE_CUTOFF}
       ${hubScopeSql(scope, 'a.hub_id')}
     ORDER BY overdue_amount DESC`);
   return res.rows.map((r) => ({
@@ -219,13 +220,13 @@ export const getDueSoonRiders = cached(async function getDueSoonRiders(scope: Hu
   const S = schemas.ops;
   const res = await pool.query(`
     SELECT r.id AS rider_id, r.rider_code, r.name, r.mobile,
-      to_char(COALESCE(a.paid_through_date, a.assigned_date - 1) + 1, 'YYYY-MM-DD') AS next_due_date
+      to_char(COALESCE(a.paid_through_date, a.assigned_date) + 1, 'YYYY-MM-DD') AS next_due_date
     FROM ${S}.rider_vehicle_assignments a
     JOIN ${S}.riders r ON r.id = a.rider_id
     WHERE a.status = 'active'
       ${hubScopeSql(scope, 'a.hub_id')}
-      AND COALESCE(a.paid_through_date, a.assigned_date - 1) >= ${OVERDUE_CUTOFF}
-      AND COALESCE(a.paid_through_date, a.assigned_date - 1) <= ${IST} + 1
+      AND COALESCE(a.paid_through_date, a.assigned_date) >= ${OVERDUE_CUTOFF}
+      AND COALESCE(a.paid_through_date, a.assigned_date) <= ${IST} + 1
     ORDER BY next_due_date ASC`);
   return res.rows.map((r) => ({
     rider_id: r.rider_id, rider_code: r.rider_code, name: r.name, mobile: r.mobile,
@@ -248,13 +249,13 @@ export const getPendingThisWeekRiders = cached(async function getPendingThisWeek
   const res = await pool.query(`
     SELECT r.id AS rider_id, r.rider_code, r.name, r.mobile,
       a.daily_rent * 7 AS pending_amount,
-      to_char(COALESCE(a.paid_through_date, a.assigned_date - 1) + 1, 'YYYY-MM-DD') AS week_start,
-      to_char(COALESCE(a.paid_through_date, a.assigned_date - 1) + 7, 'YYYY-MM-DD') AS week_end
+      to_char(COALESCE(a.paid_through_date, a.assigned_date) + 1, 'YYYY-MM-DD') AS week_start,
+      to_char(COALESCE(a.paid_through_date, a.assigned_date) + 7, 'YYYY-MM-DD') AS week_end
     FROM ${S}.rider_vehicle_assignments a
     JOIN ${S}.riders r ON r.id = a.rider_id
     WHERE a.status = 'active'
       ${hubScopeSql(scope, 'a.hub_id')}
-      AND COALESCE(a.paid_through_date, a.assigned_date - 1) BETWEEN ${IST} - 7 AND ${IST} - 1
+      AND COALESCE(a.paid_through_date, a.assigned_date) BETWEEN ${IST} - 7 AND ${IST} - 1
     ORDER BY week_start ASC`);
   return res.rows.map((r) => ({
     rider_id: r.rider_id, rider_code: r.rider_code, name: r.name, mobile: r.mobile,

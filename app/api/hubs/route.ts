@@ -12,11 +12,13 @@ export async function POST(req: NextRequest) {
   const result = await pool.query(`
     INSERT INTO ${schemas.ops}.hubs (
       hub_name, city, area, vehicle_capacity,
+      address, map_link, contact_name, contact_mobile,
       owner_name, owner_mobile, security_deposit, monthly_rent, agreement_pdf_url
-    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
     RETURNING id, hub_name, city`,
     [
       b.hub_name, b.city, b.area ?? null, b.vehicle_capacity ?? null,
+      b.address ?? null, b.map_link ?? null, b.contact_name ?? null, b.contact_mobile ?? null,
       b.owner_name ?? null, b.owner_mobile ?? null,
       b.security_deposit ?? null, b.monthly_rent ?? null, b.agreement_pdf_url ?? null,
     ]

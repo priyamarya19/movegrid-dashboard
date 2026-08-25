@@ -6,6 +6,7 @@ import { schemas } from "@/lib/schemas";
 import BackButton from "@/components/BackButton";
 import { vehicleStatusColor, vehicleStatusLabel } from "@/lib/vehicleStatus";
 import { inr } from "@/lib/format";
+import { getSession } from "@/lib/auth";
 
 async function getData(id: string) {
   const [hub, riders, vehicles] = await Promise.all([
@@ -50,8 +51,9 @@ const riderStatus: Record<string, string> = {
 
 export default async function HubDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const data = await getData(id);
+  const [data, session] = await Promise.all([getData(id), getSession()]);
   if (!data) notFound();
+  const isAdmin = session?.role === "admin";
 
   const { hub, riders, vehicles } = data;
   const activeRiders = riders.filter((r: { status: string }) => r.status === "active").length;
@@ -68,9 +70,17 @@ export default async function HubDetailPage({ params }: { params: Promise<{ id: 
           <span className="text-primary text-sm">{hub.hub_name}</span>
         </div>
 
-        <div>
-          <h1 className="text-primary text-2xl font-bold">{hub.hub_name}</h1>
-          <p className="text-muted text-sm mt-1">{hub.area}, {hub.city} · Capacity: {hub.vehicle_capacity} vehicles</p>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-primary text-2xl font-bold">{hub.hub_name}</h1>
+            <p className="text-muted text-sm mt-1">{hub.area}, {hub.city} · Capacity: {hub.vehicle_capacity} vehicles</p>
+          </div>
+          {isAdmin && (
+            <Link href={`/hubs/${id}/edit`}
+              className="shrink-0 px-4 py-2 rounded-xl border border-default text-secondary hover:text-primary text-sm transition-colors">
+              Edit hub
+            </Link>
+          )}
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -111,6 +121,42 @@ export default async function HubDetailPage({ params }: { params: Promise<{ id: 
               </div>
             )}
           </div>
+        </div>
+
+        {/* What riders waiting for KYC see in the rider app. Empty values are
+            called out rather than hidden — a blank map link means no directions. */}
+        <div className="bg-surface border border-default rounded-xl p-5">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-primary font-semibold">Rider App</h2>
+            <span className="text-faint text-xs">Shown to riders waiting for KYC</span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8">
+            {[
+              { label: "Address", value: hub.address },
+              { label: "Google Maps Link", value: hub.map_link, link: true },
+              { label: "Ops Contact", value: hub.contact_name },
+              { label: "Ops Mobile", value: hub.contact_mobile },
+            ].map((row) => (
+              <div key={row.label} className="flex justify-between gap-4 py-2 border-b border-default last:border-0 sm:[&:nth-last-child(2)]:border-0">
+                <span className="text-muted text-sm shrink-0">{row.label}</span>
+                {row.value ? (
+                  row.link ? (
+                    <a href={row.value} target="_blank" rel="noopener noreferrer"
+                      className="text-accent-purple text-sm hover:underline truncate">Open in Maps ↗</a>
+                  ) : (
+                    <span className="text-secondary text-sm text-right">{row.value}</span>
+                  )
+                ) : (
+                  <span className="text-accent-warning-text text-sm">Not set</span>
+                )}
+              </div>
+            ))}
+          </div>
+          {!hub.map_link && (
+            <p className="text-faint text-xs mt-3">
+              Without a map link the rider app hides the directions button. {isAdmin ? "Add one from Edit hub." : "Ask an admin to add one."}
+            </p>
+          )}
         </div>
 
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

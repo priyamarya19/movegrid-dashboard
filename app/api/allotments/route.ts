@@ -8,6 +8,7 @@ import { rangeCondition } from "@/lib/dateRange";
 import { writeAudit } from "@/lib/audit";
 import { highSpeedDocsMissing } from "@/lib/highSpeedGate";
 import { getHubScope, hubScopeSql, scopeAllowsHub } from "@/lib/hubScope";
+import { pushToRiderAsync } from "@/lib/riderPush";
 import { logVehicleStatus } from "@/lib/vehicleStatusLog";
 import { beginIdempotency, finishIdempotency, abortIdempotency } from "@/lib/idempotency";
 
@@ -27,10 +28,10 @@ export async function GET(req: NextRequest) {
   const res = await pool.query(`
     SELECT r.id AS rider_id, r.rider_code, v.id AS vehicle_id, v.ev_number,
       to_char(a.assigned_date, 'YYYY-MM-DD') AS assigned_date,
-      to_char(COALESCE(a.paid_through_date, a.assigned_date - 1) + 1, 'YYYY-MM-DD') AS week_start,
-      to_char(COALESCE(a.paid_through_date, a.assigned_date - 1) + 7, 'YYYY-MM-DD') AS week_end,
+      to_char(COALESCE(a.paid_through_date, a.assigned_date) + 1, 'YYYY-MM-DD') AS week_start,
+      to_char(COALESCE(a.paid_through_date, a.assigned_date) + 7, 'YYYY-MM-DD') AS week_end,
       a.allotted_by,
-      (${IST} - COALESCE(a.paid_through_date, a.assigned_date - 1))::int AS days_behind
+      (${IST} - COALESCE(a.paid_through_date, a.assigned_date))::int AS days_behind
     FROM ${S}.rider_vehicle_assignments a
     JOIN ${S}.riders r ON r.id = a.rider_id
     JOIN ${S}.vehicles v ON v.id = a.vehicle_id
@@ -183,8 +184,12 @@ export async function POST(req: NextRequest) {
         [carryOver.id]
       );
     } else {
+      // Ops rule (confirmed 20 Aug 2026): the handover day is free — rent runs
+      // from the day AFTER the rider takes the scooter. So a prepaid week covers
+      // assigned+1 .. assigned+7, and an unpaid allotment is "paid through" the
+      // handover day itself, meaning day one of charging is the next day.
       const base = new Date(assignedDate + "T00:00:00Z");
-      base.setUTCDate(base.getUTCDate() + (week1Paid ? 6 : -1));
+      base.setUTCDate(base.getUTCDate() + (week1Paid ? 7 : 0));
       paidThroughDateValue = base.toISOString().slice(0, 10);
     }
 
@@ -229,6 +234,39 @@ export async function POST(req: NextRequest) {
       ]
     );
 
+    // ── Spend any balance the rider is carrying ────────────────────────────
+    //
+    // Days paid for on a previous scooter and not used up (see the return
+    // route). Moved into this assignment's rent_credit, which the outstanding
+    // calculation already subtracts — so it lands as a reduction on the very
+    // first week rather than needing a rule of its own.
+    //
+    // Never refunded in cash, by policy; it can only be spent this way.
+    // Read under a row lock, then clear. Deliberately two statements: RETURNING
+    // hands back the NEW row (always zero), and a CTE that reads the old value
+    // returns NULL to RETURNING — which silently wiped the balance without ever
+    // applying it. Two plain statements inside the transaction are correct and
+    // obvious, and the lock still stops two allotments spending it twice.
+    const balRow = await client.query(
+      `SELECT COALESCE(balance, 0)::numeric AS balance FROM ${schemas.ops}.riders WHERE id = $1 FOR UPDATE`,
+      [b.rider_id]
+    );
+    const spent = Number(balRow.rows[0]?.balance ?? 0);
+    if (spent > 0) {
+      await client.query(`UPDATE ${schemas.ops}.riders SET balance = 0 WHERE id = $1`, [b.rider_id]);
+      await client.query(
+        `UPDATE ${schemas.ops}.rider_vehicle_assignments
+         SET rent_credit = COALESCE(rent_credit, 0) + $2 WHERE id = $1`,
+        [result.rows[0].id, spent]
+      );
+      await client.query(
+        `INSERT INTO ${schemas.ops}.rider_balance_entries
+           (rider_id, delta, balance_after, reason, assignment_id, created_by)
+         VALUES ($1, $2, 0, $3, $4, $5)`,
+        [b.rider_id, -spent, "Applied to new allotment", result.rows[0].id, session.name]
+      );
+    }
+
     // Record the week-1 prepaid advance so it shows up in the rider's payment history
     // (one week's rent, not the raw cash figure). payment_date is the day the money
     // was actually received — today — not the period end, which put future dates in
@@ -236,7 +274,7 @@ export async function POST(req: NextRequest) {
     if (week1Paid) {
       await client.query(
         `INSERT INTO ${schemas.ops}.rider_payments (rider_id, vehicle_id, amount_collected, payment_date, rental_period_start, rental_period_end)
-         VALUES ($1, $2, $3, (now() AT TIME ZONE 'Asia/Kolkata')::date, $4, $4::date + 6)`,
+         VALUES ($1, $2, $3, (now() AT TIME ZONE 'Asia/Kolkata')::date, $4::date + 1, $4::date + 7)`,
         [b.rider_id, b.vehicle_id, dailyRent * 7, assignedDate]
       );
     }
@@ -273,6 +311,10 @@ export async function POST(req: NextRequest) {
     });
 
     await client.query("COMMIT");
+
+    // The scooter is theirs from this moment — tell them.
+    pushToRiderAsync(b.rider_id, "vehicle_ready");
+
     await writeAudit({
       action: "allotment_created", entity: "assignment", entityId: result.rows[0].id,
       actorId: session.userId, actorName: session.name, req,

@@ -8,8 +8,12 @@ export type FleetRentStatusRow = {
   rider_name: string;
   mobile: string;
   onboarding_fee: number | null;
-  security_deposit: number | null;
   total_paid: number;
+  /** Payment history, so ops can see collection rhythm without opening a rider. */
+  last_payment_date: string | null;
+  paid_last_7_days: number;
+  paid_last_month: number;
+  paid_mtd: number;
   weekly_rent: number | null;
   next_due_date: string | null;
   pending_amount: number;
@@ -24,25 +28,51 @@ export async function getFleetRentStatusReport(): Promise<FleetRentStatusRow[]> 
   const res = await pool.query(`
     WITH q AS (
       SELECT a.id AS assignment_id, a.rider_id, a.daily_rent,
-        COALESCE(a.paid_through_date, a.assigned_date - 1) AS paid_through,
-        (${IST} - COALESCE(a.paid_through_date, a.assigned_date - 1)) AS days_behind
+        COALESCE(a.rent_credit, 0) AS rent_credit,
+        COALESCE(a.paid_through_date, a.assigned_date) AS paid_through,
+        (${IST} - COALESCE(a.paid_through_date, a.assigned_date)) AS days_behind
       FROM ${S}.rider_vehicle_assignments a
       WHERE a.status = 'active'
     ),
     paid_total AS (
-      SELECT rider_id, COALESCE(SUM(amount_collected), 0) AS total_paid
+      -- One pass over the rider's payments: lifetime total plus the three windows
+      -- ops asked for. "Last month" is the previous CALENDAR month, so it sits
+      -- next to month-to-date and the two read as a pair.
+      SELECT rider_id,
+        COALESCE(SUM(amount_collected), 0) AS total_paid,
+        MAX(payment_date) AS last_payment_date,
+        COALESCE(SUM(amount_collected) FILTER (
+          WHERE payment_date > ${IST} - 7), 0) AS paid_last_7_days,
+        COALESCE(SUM(amount_collected) FILTER (
+          WHERE payment_date >= date_trunc('month', ${IST} - INTERVAL '1 month')::date
+            AND payment_date <  date_trunc('month', ${IST}::timestamp)::date), 0) AS paid_last_month,
+        COALESCE(SUM(amount_collected) FILTER (
+          WHERE payment_date >= date_trunc('month', ${IST}::timestamp)::date), 0) AS paid_mtd
       FROM ${S}.rider_payments
       GROUP BY rider_id
     )
     SELECT v.ev_number, h.hub_name,
-      r.name AS rider_name, r.mobile, r.onboarding_fee, r.security_deposit,
+      r.name AS rider_name, r.mobile, r.onboarding_fee,
       COALESCE(pt.total_paid, 0) AS total_paid,
+      to_char(pt.last_payment_date, 'YYYY-MM-DD') AS last_payment_date,
+      COALESCE(pt.paid_last_7_days, 0) AS paid_last_7_days,
+      COALESCE(pt.paid_last_month, 0) AS paid_last_month,
+      COALESCE(pt.paid_mtd, 0) AS paid_mtd,
       (q.daily_rent * 7) AS weekly_rent,
       to_char(q.paid_through + 1, 'YYYY-MM-DD') AS next_due_date,
       -- Rent is billed weekly — round up to a whole week even if only partway into
       -- an unpaid one (paid_through_date itself stays day-precise internally).
-      CASE WHEN q.days_behind > 0 AND q.days_behind <= 2 THEN CEIL(q.days_behind / 7.0) * q.daily_rent * 7 ELSE 0 END AS pending_amount,
-      CASE WHEN q.days_behind > 2 THEN CEIL(q.days_behind / 7.0) * q.daily_rent * 7 ELSE 0 END AS overdue_amount
+      --
+      -- Banked credit is subtracted, exactly as outstandingSql does it. Without
+      -- this the emailed sheet and the dashboard disagreed for any rider holding
+      -- the remainder of a part-payment: Gopal jha read ₹5,460 in the mail and
+      -- ₹5,360 on screen, the difference being his ₹100 credit.
+      CASE WHEN q.days_behind > 0 AND q.days_behind <= 2
+           THEN GREATEST(0, CEIL(q.days_behind / 7.0)::int * q.daily_rent * 7 - q.rent_credit)
+           ELSE 0 END AS pending_amount,
+      CASE WHEN q.days_behind > 2
+           THEN GREATEST(0, CEIL(q.days_behind / 7.0)::int * q.daily_rent * 7 - q.rent_credit)
+           ELSE 0 END AS overdue_amount
     FROM q
     JOIN ${S}.rider_vehicle_assignments a ON a.id = q.assignment_id
     JOIN ${S}.riders r ON r.id = a.rider_id
@@ -57,8 +87,11 @@ export async function getFleetRentStatusReport(): Promise<FleetRentStatusRow[]> 
     rider_name: r.rider_name,
     mobile: r.mobile,
     onboarding_fee: r.onboarding_fee === null ? null : Number(r.onboarding_fee),
-    security_deposit: r.security_deposit === null ? null : Number(r.security_deposit),
     total_paid: Number(r.total_paid),
+    last_payment_date: r.last_payment_date,
+    paid_last_7_days: Number(r.paid_last_7_days),
+    paid_last_month: Number(r.paid_last_month),
+    paid_mtd: Number(r.paid_mtd),
     weekly_rent: r.weekly_rent === null ? null : Number(r.weekly_rent),
     next_due_date: r.next_due_date,
     pending_amount: Number(r.pending_amount),
@@ -86,7 +119,7 @@ export async function getRentDueAlert(): Promise<RentDueRow[]> {
       CEIL(GREATEST(days_behind, 1) / 7.0) * a.daily_rent * 7 AS amount_due,
       CASE WHEN days_behind > 2 THEN 'Overdue' WHEN days_behind = 1 THEN 'Today' ELSE 'Tomorrow' END AS due_label
     FROM (
-      SELECT a.*, (${IST} - COALESCE(a.paid_through_date, a.assigned_date - 1)) AS days_behind
+      SELECT a.*, (${IST} - COALESCE(a.paid_through_date, a.assigned_date)) AS days_behind
       FROM ${S}.rider_vehicle_assignments a WHERE a.status = 'active'
     ) a
     JOIN ${S}.riders r ON r.id = a.rider_id
@@ -125,7 +158,7 @@ export async function getCallList(): Promise<CallListRow[]> {
   const res = await pool.query(`
     SELECT r.id AS rider_id, r.name AS rider_name, r.rider_code, r.mobile,
       v.ev_number, h.hub_name, a.daily_rent, COALESCE(a.rent_credit, 0) AS rent_credit, a.allotment_code,
-      (${IST} - COALESCE(a.paid_through_date, a.assigned_date - 1)) AS days_behind,
+      (${IST} - COALESCE(a.paid_through_date, a.assigned_date)) AS days_behind,
       ${outstandingSql("a")} AS outstanding,
       to_char(${nextDueSql("a")}, 'YYYY-MM-DD') AS next_due_date,
       lp.d AS last_payment_date, lp.amt AS last_payment_amount,
@@ -141,7 +174,7 @@ export async function getCallList(): Promise<CallListRow[]> {
       ORDER BY p.payment_date DESC, p.created_at DESC LIMIT 1
     ) lp ON true
     WHERE a.status = 'active'
-      AND (${IST} - COALESCE(a.paid_through_date, a.assigned_date - 1)) >= 1
+      AND (${IST} - COALESCE(a.paid_through_date, a.assigned_date)) >= 1
     ORDER BY days_behind DESC, outstanding DESC`);
   return res.rows.map((r) => ({
     rider_id: r.rider_id, rider_name: r.rider_name, rider_code: r.rider_code, mobile: r.mobile,
@@ -183,11 +216,11 @@ export async function getWowBlock(): Promise<WowBlock> {
       WHERE a.assigned_date <= ${IST} AND COALESCE(a.returned_date, ${IST}) >= ${IST} - 6`),
     pool.query(`
       SELECT COUNT(*)::int AS n FROM ${S}.rider_vehicle_assignments a
-      WHERE a.status = 'active' AND (${IST} - COALESCE(a.paid_through_date, a.assigned_date - 1)) >= 1`),
+      WHERE a.status = 'active' AND (${IST} - COALESCE(a.paid_through_date, a.assigned_date)) >= 1`),
     pool.query(`
       WITH x AS (
-        SELECT COALESCE(a.paid_through_date, a.assigned_date - 1) AS pt_now,
-          COALESCE(a.paid_through_date, a.assigned_date - 1)
+        SELECT COALESCE(a.paid_through_date, a.assigned_date) AS pt_now,
+          COALESCE(a.paid_through_date, a.assigned_date)
             - COALESCE((SELECT SUM(p.rental_period_end - p.rental_period_start)::int
                         FROM ${S}.rider_payments p
                         WHERE p.rider_id = a.rider_id AND p.payment_date > ${IST} - 7), 0) AS pt_then,
@@ -233,7 +266,7 @@ export async function writeDailySnapshot(): Promise<void> {
     INSERT INTO ${S}.report_snapshots (snapshot_date, riders_owing, outstanding_total, collected_7d, expected_7d, bad_debt_total)
     SELECT ${IST},
       (SELECT COUNT(*) FROM ${S}.rider_vehicle_assignments a
-        WHERE a.status = 'active' AND (${IST} - COALESCE(a.paid_through_date, a.assigned_date - 1)) >= 1),
+        WHERE a.status = 'active' AND (${IST} - COALESCE(a.paid_through_date, a.assigned_date)) >= 1),
       (SELECT COALESCE(SUM(${outstandingSql("a")}), 0) FROM ${S}.rider_vehicle_assignments a WHERE a.status = 'active'),
       (SELECT COALESCE(SUM(amount_collected), 0) FROM ${S}.rider_payments WHERE payment_date > ${IST} - 7),
       (SELECT COALESCE(SUM(

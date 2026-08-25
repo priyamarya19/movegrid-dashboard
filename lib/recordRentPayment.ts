@@ -26,7 +26,7 @@ export async function recordRentPayment(
   const S = schemas.ops;
 
   const asgn = await client.query(
-    `SELECT id, vehicle_id, daily_rent, rent_credit, to_char(COALESCE(paid_through_date, assigned_date - 1), 'YYYY-MM-DD') AS paid_through_date
+    `SELECT id, vehicle_id, daily_rent, rent_credit, to_char(COALESCE(paid_through_date, assigned_date), 'YYYY-MM-DD') AS paid_through_date
      FROM ${S}.rider_vehicle_assignments WHERE rider_id = $1 AND status = 'active' LIMIT 1 FOR UPDATE`,
     [args.riderId]
   );
@@ -44,7 +44,7 @@ export async function recordRentPayment(
 
   const updated = await client.query(
     `UPDATE ${S}.rider_vehicle_assignments
-     SET paid_through_date = COALESCE(paid_through_date, assigned_date - 1) + $1::int,
+     SET paid_through_date = COALESCE(paid_through_date, assigned_date) + $1::int,
          rent_credit = $2
      WHERE id = $3
      RETURNING to_char(paid_through_date, 'YYYY-MM-DD') AS new_paid_through_date`,

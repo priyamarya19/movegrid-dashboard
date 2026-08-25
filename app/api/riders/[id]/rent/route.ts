@@ -14,7 +14,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const [weeks, asgn] = await Promise.all([
     getRiderCycle(id),
     pool.query(
-      `SELECT a.daily_rent, to_char(COALESCE(a.paid_through_date, a.assigned_date - 1), 'YYYY-MM-DD') AS paid_through_date,
+      `SELECT a.daily_rent, to_char(COALESCE(a.paid_through_date, a.assigned_date), 'YYYY-MM-DD') AS paid_through_date,
          to_char(${nextDueSql("a")}, 'YYYY-MM-DD') AS next_due_date,
          ${outstandingSql("a")} AS outstanding_now
        FROM ${schemas.ops}.rider_vehicle_assignments a WHERE a.rider_id = $1 AND a.status = 'active' LIMIT 1`,

@@ -20,7 +20,17 @@ const ALLOWED_TYPES: Record<string, string> = {
   "image/heic": "heic",
   "image/heif": "heif",
 };
+
+// Support tickets may carry a short clip — a rattling wheel or a dead display
+// is far easier to show than to describe, especially for a rider typing in a
+// second language. Images only everywhere else.
+const ALLOWED_VIDEO_TYPES: Record<string, string> = {
+  "video/mp4": "mp4",
+  "video/quicktime": "mov",
+};
 const MAX_BYTES = 15 * 1024 * 1024;
+// A 10-second clip off a mid-range Android lands around 10-20 MB.
+const MAX_VIDEO_BYTES = 30 * 1024 * 1024;
 
 export async function POST(req: NextRequest) {
   const guard = await requireRider(req);
@@ -31,12 +41,31 @@ export async function POST(req: NextRequest) {
   if (!file) return NextResponse.json({ error: "No file provided" }, { status: 400 });
 
   // Purpose-scoped prefixes only — a rider upload can never land elsewhere.
-  const purpose = formData.get("purpose") === "kyc" ? "rider-kyc" : "rider-claims";
+  const rawPurpose = formData.get("purpose");
+  const purpose =
+    rawPurpose === "kyc" ? "rider-kyc" : rawPurpose === "ticket" ? "rider-tickets" : "rider-claims";
+  const videoAllowed = purpose === "rider-tickets";
 
   const contentType = (file.type || "").toLowerCase();
-  const ext = ALLOWED_TYPES[contentType];
-  if (!ext) return NextResponse.json({ error: "Upload a JPG, PNG, WEBP or HEIC image" }, { status: 415 });
-  if (file.size > MAX_BYTES) return NextResponse.json({ error: "File too large. Maximum size is 15 MB." }, { status: 413 });
+  const isVideo = videoAllowed && contentType in ALLOWED_VIDEO_TYPES;
+  const ext = isVideo ? ALLOWED_VIDEO_TYPES[contentType] : ALLOWED_TYPES[contentType];
+  if (!ext) {
+    return NextResponse.json(
+      {
+        error: videoAllowed
+          ? "Upload a JPG, PNG, WEBP or HEIC image, or an MP4/MOV video"
+          : "Upload a JPG, PNG, WEBP or HEIC image",
+      },
+      { status: 415 }
+    );
+  }
+  const limit = isVideo ? MAX_VIDEO_BYTES : MAX_BYTES;
+  if (file.size > limit) {
+    return NextResponse.json(
+      { error: `File too large. Maximum size is ${Math.round(limit / (1024 * 1024))} MB.` },
+      { status: 413 }
+    );
+  }
 
   const key = `${purpose}/${guard.rider.riderId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
   await s3.send(new PutObjectCommand({

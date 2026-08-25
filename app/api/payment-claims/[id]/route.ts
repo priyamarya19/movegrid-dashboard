@@ -3,6 +3,7 @@ import pool from "@/lib/db";
 import { schemas } from "@/lib/schemas";
 import { requireRole } from "@/lib/auth";
 import { writeAudit } from "@/lib/audit";
+import { pushToRiderAsync } from "@/lib/riderPush";
 import { recordRentPayment, NoActiveAssignmentError } from "@/lib/recordRentPayment";
 
 // PATCH /api/payment-claims/[id] { action: 'approve' | 'reject', reason? }
@@ -73,6 +74,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         ...(paymentResult ? { days_added: paymentResult.daysAdded, paid_through_date: paymentResult.newPaidThrough } : { reason: String(reason ?? "").trim() }),
       },
     });
+    pushToRiderAsync(
+      c.rider_id,
+      action === "approve" ? "claim_approved" : "claim_rejected",
+      action === "approve" ? { amount: Number(c.amount) } : { reason: String(reason ?? "").trim() }
+    );
+
     return NextResponse.json({ ok: true, ...(paymentResult ? { paid_through_date: paymentResult.newPaidThrough } : {}) });
   } catch (e) {
     await client.query("ROLLBACK");
