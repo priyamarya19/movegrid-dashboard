@@ -106,8 +106,20 @@ async function position(c, riderId) {
       console.log("C. Rajendra: ₹960 moved from penalty to rent (31 Jul – 3 Aug)");
     }
 
-    // ── D. Sonu Yadav's phantom week ────────────────────────────────────
+    // ── D. Sonu Yadav's phantom week — HELD BACK ────────────────────────
+    //
+    // Reconstructed across both assignments: coverage runs 9 Jul → 27 Aug (50
+    // days) against ₹10,920 of real rent (42 days), so ~8 days were never paid
+    // for — the ₹1 continuation on 17 Jul added a week with no money behind it.
+    // Correcting it takes him from ₹1,820 to ₹3,640 owing, on a rider who has
+    // not missed a week since 23 July.
+    //
+    // Held at Priyam's instruction (28 Aug) pending his decision. Note for
+    // whoever picks this up: the weekly-rental change governs FUTURE rent
+    // starts and will not clear these days by itself.
+    const FIX_SONU = false;
     const sonu = await riderByName(c, "Sonu Yadav");
+    if (FIX_SONU) {
     const ph = await q(c, `UPDATE ${S}.rider_payments SET amount_collected = 1
                            WHERE rider_id=$1 AND payment_date='2026-07-17' AND amount_collected=1820
                              AND payment_mode IS NULL RETURNING id`, [sonu.id]);
@@ -117,6 +129,9 @@ async function position(c, riderId) {
       console.log("D. Sonu Yadav: fabricated ₹1,820 corrected to the ₹1 actually taken; 7 days removed");
     } else {
       console.log("D. Sonu Yadav: phantom row not found — already corrected?");
+    }
+    } else {
+      console.log("D. Sonu Yadav: SKIPPED — awaiting Priyam's decision");
     }
 
     for (const n of names) { const r = await riderByName(c, n); after[n] = await position(c, r.id); }
