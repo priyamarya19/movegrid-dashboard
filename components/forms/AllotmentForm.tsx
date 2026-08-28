@@ -56,7 +56,7 @@ export default function AllotmentForm() {
   const [form, setForm] = useState({
     rider_mode: "", rental_plan: "", daily_rent: "",
     onboarding_fee: "", security_deposit: "",
-    amount_collected: "", payment_screenshot_url: "",
+    amount_collected: "", rent_collected: "", payment_screenshot_url: "",
     undertaking_url: "",
     allotment_pics: ["", "", "", "", ""],
     assigned_date: istTodayISO(),
@@ -120,6 +120,7 @@ export default function AllotmentForm() {
           onboarding_fee: form.onboarding_fee ? Number(form.onboarding_fee) : null,
           security_deposit: form.security_deposit ? Number(form.security_deposit) : null,
           amount_collected: form.amount_collected ? Number(form.amount_collected) : null,
+          rent_collected: form.rent_collected === "" ? null : Number(form.rent_collected),
           payment_screenshot_url: form.payment_screenshot_url || null,
           undertaking_url: form.undertaking_url || null,
           allotment_pics: pics.length ? pics : null,
@@ -204,8 +205,13 @@ export default function AllotmentForm() {
         </Field>
         <Field label="Onboarding Fee (₹)"><input type="number" className={inp} value={form.onboarding_fee} onChange={e => set("onboarding_fee", e.target.value)} placeholder="0" /></Field>
         <Field label="Security Deposit (₹)"><input type="number" className={inp} value={form.security_deposit} onChange={e => set("security_deposit", e.target.value)} placeholder="0" /></Field>
-        <Field label="Amount Collected (₹)" required hint="Total of onboarding fee + security deposit">
-          <input type="number" className={inp} value={form.amount_collected} onChange={e => set("amount_collected", e.target.value)} placeholder="0" required />
+        <Field label="Amount Collected (₹)" required hint="Everything taken at handover — fee, deposit and rent together. ₹0 is allowed.">
+          <input type="number" min="0" className={inp} value={form.amount_collected} onChange={e => set("amount_collected", e.target.value)} placeholder="0" required />
+        </Field>
+        {/* Stated, never inferred. Reading a week's rent out of the bundled cash
+            is what invented ₹5,180 of payments that never happened. */}
+        <Field label="Of which, rent (₹)" required hint="How much of that is rent. ₹0 on a no-cash swap — the rest is fee and deposit.">
+          <input type="number" min="0" className={inp} value={form.rent_collected} onChange={e => set("rent_collected", e.target.value)} placeholder="0" required />
         </Field>
         <ImageUpload label="Payment Screenshot" folder="payments" value={form.payment_screenshot_url} onChange={v => set("payment_screenshot_url", v)} />
         <ImageUpload label="Signed Undertaking" folder="undertakings" value={form.undertaking_url} onChange={v => set("undertaking_url", v)} />

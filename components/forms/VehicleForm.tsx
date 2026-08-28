@@ -6,12 +6,10 @@ import ImageUpload from "@/components/ImageUpload";
 
 type Hub = { id: string; hub_name: string; city: string };
 
-// Must match the oem values in vehicle_models — the API resolves the model by
-// this exact string and rejects anything it cannot find. The list had drifted:
-// "E-sprinto" had no model row (every save failed with "Unknown OEM/Assembler")
-// while "EV Juno", 21 vehicles of it, was missing and could not be selected.
-// Reading these from the table is the proper fix; this keeps them in step until then.
-const OEMS = ["Shelby", "NXTE", "EV Juno", "AB MOTOSS"];
+// OEMs come from vehicle_models, not from a list in the code. A hardcoded array
+// drifts from the data — "E-sprinto" was offered here with no model row behind
+// it, so every save failed, while "EV Juno" and its 21 vehicles could not be
+// picked at all. Adding a supplier is now a row in the table, not a deploy.
 const IOT_PARTNERS = ["Fixx ev/Loconav", "Roadcast"];
 const BATTERY_PARTNERS = ["Battery Smart", "Sun Mobility", "Yuma", "Mooving"];
 
@@ -32,6 +30,7 @@ const sel = "w-full bg-base border border-default rounded-xl px-4 py-2.5 text-pr
 export default function VehicleForm() {
   const router = useRouter();
   const [hubs, setHubs] = useState<Hub[]>([]);
+  const [oems, setOems] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
@@ -43,7 +42,8 @@ export default function VehicleForm() {
     vehicle_photos: [] as string[],
   });
 
-  useEffect(() => { fetch("/api/hubs").then(r => r.json()).then(setHubs); }, []);
+  useEffect(() => { fetch("/api/hubs").then(r => r.json()).then(setHubs);
+    fetch("/api/vehicle-models").then(r => r.json()).then(d => setOems((d.oems ?? []).map((o: { oem: string }) => o.oem))); }, []);
 
   function set(k: string, v: string) { setForm(p => ({ ...p, [k]: v })); }
 
@@ -82,7 +82,7 @@ export default function VehicleForm() {
         <Field label="OEM / Assembler" required>
           <select className={sel} value={form.oem} onChange={e => set("oem", e.target.value)} required>
             <option value="">Select OEM</option>
-            {OEMS.map(o => <option key={o} value={o}>{o}</option>)}
+            {oems.map(o => <option key={o} value={o}>{o}</option>)}
           </select>
         </Field>
         <Field label="Hub">

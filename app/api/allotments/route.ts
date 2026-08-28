@@ -147,11 +147,41 @@ export async function POST(req: NextRequest) {
       : Number(rateRes.rows[0]?.rate ?? 240);
     const assignedDate = b.assigned_date || istTodayISO();
 
-    // Rent is always collected one week in advance at allotment (see RENT_SHEET_GUIDE.md).
-    // Whatever cash amount ops records as "amount_collected" (rent + deposit + fees bundled
-    // together) always covers at least week 1, so week 1 counts as paid — unless nothing was
-    // collected at all, in which case don't fabricate a payment that didn't happen.
-    const week1Paid = b.amount_collected != null && Number(b.amount_collected) > 0;
+    // How much of the cash taken at handover is RENT.
+    //
+    // This used to be inferred: any positive amount_collected was read as "week 1
+    // paid" and a payment of exactly daily_rent x 7 was written, whatever was
+    // actually handed over. That invented ₹5,180 of payments across three riders —
+    // ops typed ₹1 on a no-cash swap because the form rejected ₹0, and the system
+    // recorded a full week and gave away seven days of coverage.
+    //
+    // It cannot be derived from the other fields either: the onboarding fee is
+    // charged once per relationship, so subtracting it on a continuation
+    // double-counts (Rajendra's ₹2,640 came out as 4.75 days), and a partly-paid
+    // fee makes it negative. So ops state it.
+    //
+    // Older ops-app builds cannot send this field. For them we fall back to the
+    // previous behaviour rather than recording no rent and showing every new
+    // rider as instantly overdue. Remove the fallback once the fleet is updated —
+    // until then an old APK can still create a phantom.
+    const rentStated = b.rent_collected != null && b.rent_collected !== "";
+    const collectedTotal = Number(b.amount_collected ?? 0) || 0;
+    const rentCollected = rentStated
+      ? Math.max(0, Number(b.rent_collected) || 0)
+      : collectedTotal > 0
+        ? dailyRent * 7          // legacy client: assume the usual advance week
+        : 0;
+    if (rentStated && rentCollected > collectedTotal) {
+      if (idem.mode === "claimed") await abortIdempotency(idem);
+      return NextResponse.json(
+        { error: "Rent collected cannot be more than the total amount collected", field: "rent_collected" },
+        { status: 400 }
+      );
+    }
+    // Days bought = money / rate, exactly as a mid-cycle payment works. The
+    // remainder is banked rather than rounded away.
+    const daysBought = Math.floor(rentCollected / dailyRent + 1e-9);
+    const rentRemainder = Math.round((rentCollected - daysBought * dailyRent) * 100) / 100;
 
     // If the rider's vehicle was just swapped out due to a hardware fault (marked at
     // return time — see app/api/allotments/[id]/return), continue their existing rent
@@ -162,7 +192,9 @@ export async function POST(req: NextRequest) {
     // Marks the old row consumed immediately so this can never be matched again by a
     // later, unrelated allotment for the same rider.
     const priorSwap = await client.query(
-      `SELECT id, to_char(paid_through_date,'YYYY-MM-DD') AS paid_through_date, non_functional_days, allotment_code
+      `SELECT id, to_char(paid_through_date,'YYYY-MM-DD') AS paid_through_date,
+              to_char(returned_date,'YYYY-MM-DD') AS returned_date,
+              non_functional_days, allotment_code
        FROM ${schemas.ops}.rider_vehicle_assignments
        WHERE rider_id = $1 AND status = 'returned' AND is_issue_swap = true
        ORDER BY returned_date DESC, created_at DESC LIMIT 1`,
@@ -171,25 +203,36 @@ export async function POST(req: NextRequest) {
     const carryOver = priorSwap.rows[0];
 
     let paidThroughDateValue;
+    // Days between giving one vehicle back and taking the next — not chargeable.
+    // (Distinct from the `gapDays` further down, which decides whether the
+    // onboarding fee applies again after a 15-day break.)
+    let noVehicleDays = 0;
     if (carryOver) {
-      // Base is the carried paid-through (the last ALREADY-PAID day), so a full prepaid
-      // week must add 7 to keep paid-through in step with the ₹week payment we record
-      // below. (The fresh branch adds 6 because ITS base is the first day of the period,
-      // not the day before it — +6 there and +7 here both mean "one 7-day week".)
-      const base = new Date(carryOver.paid_through_date + "T00:00:00Z");
-      base.setUTCDate(base.getUTCDate() + (week1Paid ? 7 : 0));
-      paidThroughDateValue = base.toISOString().slice(0, 10);
+      // Continue the existing cycle — the rider already paid past the swap date.
+      //
+      // Days between handing the old vehicle back and taking the new one are NOT
+      // chargeable: the rider had nothing. Carrying the date without crediting
+      // that gap is what billed Rajendra for 5–13 Aug and Ankesh for three days.
+      // Genuine arrears from the previous tenancy still carry, because they sit
+      // before the return rather than inside the gap.
+      const carried = new Date(carryOver.paid_through_date + "T00:00:00Z");
+      if (carryOver.returned_date) {
+        const back = new Date(carryOver.returned_date + "T00:00:00Z");
+        const start = new Date(assignedDate + "T00:00:00Z");
+        noVehicleDays = Math.max(0, Math.round((start.getTime() - back.getTime()) / 86400000) - 1);
+      }
+      carried.setUTCDate(carried.getUTCDate() + noVehicleDays + daysBought);
+      paidThroughDateValue = carried.toISOString().slice(0, 10);
       await client.query(
         `UPDATE ${schemas.ops}.rider_vehicle_assignments SET is_issue_swap = false WHERE id = $1`,
         [carryOver.id]
       );
     } else {
       // Ops rule (confirmed 20 Aug 2026): the handover day is free — rent runs
-      // from the day AFTER the rider takes the scooter. So a prepaid week covers
-      // assigned+1 .. assigned+7, and an unpaid allotment is "paid through" the
-      // handover day itself, meaning day one of charging is the next day.
+      // from the day AFTER the rider takes the scooter, so an unpaid allotment is
+      // "paid through" the handover day itself and day one of charging is the next.
       const base = new Date(assignedDate + "T00:00:00Z");
-      base.setUTCDate(base.getUTCDate() + (week1Paid ? 7 : 0));
+      base.setUTCDate(base.getUTCDate() + daysBought);
       paidThroughDateValue = base.toISOString().slice(0, 10);
     }
 
@@ -271,11 +314,24 @@ export async function POST(req: NextRequest) {
     // (one week's rent, not the raw cash figure). payment_date is the day the money
     // was actually received — today — not the period end, which put future dates in
     // the Payments Received list for freshly onboarded riders.
-    if (week1Paid) {
+    if (rentCollected > 0) {
+      // Record what was actually handed over, for the days it actually buys —
+      // not an assumed week. payment_date is the day the money arrived; the
+      // period is the stretch it covers, starting the day after handover.
       await client.query(
         `INSERT INTO ${schemas.ops}.rider_payments (rider_id, vehicle_id, amount_collected, payment_date, rental_period_start, rental_period_end)
-         VALUES ($1, $2, $3, (now() AT TIME ZONE 'Asia/Kolkata')::date, $4::date + 1, $4::date + 7)`,
-        [b.rider_id, b.vehicle_id, dailyRent * 7, assignedDate]
+         VALUES ($1, $2, $3, (now() AT TIME ZONE 'Asia/Kolkata')::date, $4::date + 1, $4::date + $5::int)`,
+        [b.rider_id, b.vehicle_id, rentCollected, assignedDate, Math.max(1, daysBought)]
+      );
+    }
+
+    // Part-rupees that didn't buy a whole day are banked on the assignment, the
+    // same as any mid-cycle payment, instead of being rounded away.
+    if (rentRemainder > 0) {
+      await client.query(
+        `UPDATE ${schemas.ops}.rider_vehicle_assignments
+         SET rent_credit = COALESCE(rent_credit, 0) + $2 WHERE id = $1`,
+        [result.rows[0].id, rentRemainder]
       );
     }
 
