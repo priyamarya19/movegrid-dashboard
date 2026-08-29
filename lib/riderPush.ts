@@ -21,11 +21,12 @@ export type RiderPushEvent =
   | "claim_rejected"
   | "kyc_verified"
   | "vehicle_ready"
-  | "ticket_answered";
+  | "ticket_answered"
+  | "ticket_close_requested";
 
 type Message = { title: string; body: string };
 
-/** The six approved events, plus ticket replies. Hindi with the English loanwords riders actually use. */
+/** The six approved events, plus the two ticket ones. Hindi with the English loanwords riders actually use. */
 function messageFor(event: RiderPushEvent, vars: Record<string, string | number> = {}): Message {
   const inr = (v: string | number) => `₹${Number(v).toLocaleString("en-IN")}`;
   switch (event) {
@@ -55,6 +56,10 @@ function messageFor(event: RiderPushEvent, vars: Record<string, string | number>
       return { title: "आपकी scooter तैयार है 🛵", body: "Hub आकर collect कर लें" };
     case "ticket_answered":
       return { title: "Team ने जवाब दिया", body: "App में अपनी request देखें" };
+    // The one push that needs an answer back — the ticket stays open until the
+    // rider taps yes or no, so the body says exactly that.
+    case "ticket_close_requested":
+      return { title: "Aapki request solve हो गई?", body: "App में Haan या Nahi बताएं" };
   }
 }
 

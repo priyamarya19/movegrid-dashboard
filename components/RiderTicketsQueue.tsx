@@ -5,22 +5,36 @@ import Link from "next/link";
 import { useToast } from "@/components/Toast";
 import { dateIN } from "@/lib/format";
 
+type Message = {
+  id: string;
+  author: "rider" | "ops" | "system";
+  author_name: string | null;
+  body: string | null;
+  media_url: string | null;
+  media_type: "image" | "video" | null;
+  kind: "message" | "close_request" | "close_approved" | "close_declined" | "auto_closed";
+  created_at: string;
+};
+
 type Ticket = {
   id: string;
   message: string;
   media_url: string | null;
   media_type: "image" | "video" | null;
-  status: "open" | "resolved";
+  status: "open" | "pending_closure" | "resolved";
   resolution_note: string | null;
   resolved_by: string | null;
   created_at: string;
   resolved_at: string | null;
+  close_requested_at: string | null;
+  close_requested_by: string | null;
   age_hours: number;
   rider_id: string;
   rider_name: string;
   rider_code: string | null;
   mobile: string;
   ev_number: string | null;
+  messages: Message[];
 };
 
 // Support queue. Open tickets sit at the top, oldest first, so the rider who
@@ -47,7 +61,7 @@ export default function RiderTicketsQueue() {
 
   // Reply and resolve were one button, so every answer closed the ticket. They
   // are two decisions: "here is what we found" and "this is finished".
-  async function send(t: Ticket, action: "reply" | "resolve") {
+  async function send(t: Ticket, action: "reply" | "resolve" | "request_close") {
     if (note.trim().length < 3) {
       toast.show("Add a note — the rider sees this", "error");
       return;
@@ -65,7 +79,11 @@ export default function RiderTicketsQueue() {
       return;
     }
     toast.show(
-      action === "resolve" ? `Resolved · ${t.rider_name} notified` : `Replied to ${t.rider_name} — still open`,
+      action === "resolve"
+        ? `Closed · ${t.rider_name} notified`
+        : action === "request_close"
+          ? `Asked ${t.rider_name} to confirm — closes when they say yes`
+          : `Replied to ${t.rider_name} — still open`,
       "success"
     );
     setReplyingId(null);
@@ -92,7 +110,7 @@ export default function RiderTicketsQueue() {
       <div>
         <h1 className="text-primary text-2xl font-bold">Rider Support</h1>
         <p className="text-muted text-sm mt-1">
-          {openCount} open{openCount === 1 ? "" : ""} · resolved tickets from the last 7 days shown for context
+          {openCount} needing attention · closed tickets from the last 7 days shown for context
         </p>
       </div>
 
@@ -132,6 +150,10 @@ export default function RiderTicketsQueue() {
                     >
                       {t.age_hours < 1 ? "just now" : `${t.age_hours}h waiting`}
                     </span>
+                  ) : t.status === "pending_closure" ? (
+                    <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-accent-purple/15 text-accent-purple">
+                      Waiting on rider
+                    </span>
                   ) : (
                     <span className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-accent-success/15 text-accent-success-text">
                       Resolved
@@ -143,27 +165,59 @@ export default function RiderTicketsQueue() {
                 </div>
               </div>
 
-              <p className="text-primary text-sm whitespace-pre-wrap">{t.message}</p>
+              {/* The conversation, in order. Rider on the left, ops on the
+                  right, the way every messaging app the riders already use
+                  reads — and the state changes sit inline as their own lines,
+                  so "who closed this and when" is answered by reading down. */}
+              <div className="space-y-2">
+                {(t.messages?.length ? t.messages : [
+                  { id: t.id, author: "rider" as const, author_name: null, body: t.message,
+                    media_url: t.media_url, media_type: t.media_type, kind: "message" as const,
+                    created_at: t.created_at },
+                ]).map((m) => {
+                  if (m.kind !== "message") {
+                    const label =
+                      m.kind === "close_request" ? `${m.author_name ?? "Ops"} asked to close this`
+                      : m.kind === "close_approved" ? "Rider confirmed it is sorted"
+                      : m.kind === "close_declined" ? "Rider said it is not sorted yet"
+                      : "Closed automatically — no reply";
+                    return (
+                      <div key={m.id} className="flex items-center gap-2 py-1">
+                        <div className="h-px flex-1 bg-subtle" />
+                        <span className="text-faint text-[11px] px-2 text-center">
+                          {label}
+                          {m.body ? ` — “${m.body}”` : ""}
+                        </span>
+                        <div className="h-px flex-1 bg-subtle" />
+                      </div>
+                    );
+                  }
+                  const mine = m.author === "ops";
+                  return (
+                    <div key={m.id} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
+                      <div className={`max-w-[85%] rounded-2xl px-3 py-2 ${
+                        mine ? "bg-accent-teal/12 border border-accent-teal/25" : "bg-base border border-subtle"
+                      }`}>
+                        <p className="text-[11px] text-muted">
+                          {mine ? m.author_name ?? "Ops" : t.rider_name}
+                          <span className="text-faint"> · {dateIN(m.created_at, { day: "numeric", month: "short" })}</span>
+                        </p>
+                        {m.body ? <p className="text-primary text-sm mt-1 whitespace-pre-wrap">{m.body}</p> : null}
+                        {m.media_url ? (
+                          m.media_type === "video" ? (
+                            <video src={docHref(m.media_url)} controls className="rounded-xl max-h-72 border border-default mt-2" />
+                          ) : (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={docHref(m.media_url)} alt="Attachment" className="rounded-xl max-h-72 border border-default mt-2" />
+                          )
+                        ) : null}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
 
-              {t.media_url ? (
-                t.media_type === "video" ? (
-                  <video src={docHref(t.media_url)} controls className="rounded-xl max-h-72 border border-default" />
-                ) : (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={docHref(t.media_url)} alt="Attachment" className="rounded-xl max-h-72 border border-default" />
-                )
-              ) : null}
-
-              {t.resolution_note ? (
-                <div className="bg-base border border-subtle rounded-xl p-3">
-                  <p className="text-[11px] text-muted uppercase tracking-wider">
-                    Reply{t.resolved_by ? ` · ${t.resolved_by}` : ""}
-                  </p>
-                  <p className="text-secondary text-sm mt-1 whitespace-pre-wrap">{t.resolution_note}</p>
-                </div>
-              ) : null}
-
-              {t.status === "open" ? (
+              {t.status !== "resolved" ? (
                 replyingId === t.id ? (
                   <div className="space-y-2">
                     <textarea
@@ -182,12 +236,22 @@ export default function RiderTicketsQueue() {
                       >
                         {saving ? "Sending…" : "Send reply"}
                       </button>
+                      {/* Closing is the rider's word, so the normal path asks
+                          them. "Close without asking" stays for duplicates and
+                          riders who have gone quiet for good. */}
+                      <button
+                        onClick={() => send(t, "request_close")}
+                        disabled={saving}
+                        className="px-4 py-2 rounded-lg text-xs font-semibold bg-accent-purple/15 text-accent-purple hover:bg-accent-purple/25 disabled:opacity-50"
+                      >
+                        Ask rider to close
+                      </button>
                       <button
                         onClick={() => send(t, "resolve")}
                         disabled={saving}
                         className="px-4 py-2 rounded-lg text-xs font-semibold border border-default text-secondary hover:text-primary disabled:opacity-50"
                       >
-                        Reply & resolve
+                        Close without asking
                       </button>
                       <button
                         onClick={() => {
@@ -201,15 +265,24 @@ export default function RiderTicketsQueue() {
                     </div>
                   </div>
                 ) : (
-                  <button
-                    onClick={() => {
-                      setReplyingId(t.id);
-                      setNote("");
-                    }}
-                    className="px-4 py-2 rounded-lg text-xs font-semibold bg-accent-teal/15 text-accent-teal hover:bg-accent-teal/25 transition-colors"
-                  >
-                    Reply
-                  </button>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => {
+                        setReplyingId(t.id);
+                        setNote("");
+                      }}
+                      className="px-4 py-2 rounded-lg text-xs font-semibold bg-accent-teal/15 text-accent-teal hover:bg-accent-teal/25 transition-colors"
+                    >
+                      Reply
+                    </button>
+                    {t.status === "pending_closure" ? (
+                      <span className="text-faint text-xs">
+                        Asked {t.close_requested_by ? `by ${t.close_requested_by}` : ""}
+                        {t.close_requested_at ? ` on ${dateIN(t.close_requested_at, { day: "numeric", month: "short" })}` : ""}
+                        {" "}· closes on its own after 7 days of silence
+                      </span>
+                    ) : null}
+                  </div>
                 )
               ) : (
                 <button onClick={() => reopen(t)} className="text-xs text-muted hover:text-primary underline">

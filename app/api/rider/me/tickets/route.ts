@@ -5,7 +5,7 @@ import { requireRider } from "@/lib/riderAuth";
 
 // Rider support tickets.
 //
-// GET  — this rider's own tickets, newest first, with the ops resolution note.
+// GET  — this rider's own tickets, newest first, each with its full thread.
 // POST — raise one: a message plus an optional photo or short video.
 //
 // Only riders who hold a vehicle now, or have held one before, may raise a
@@ -25,12 +25,22 @@ export async function GET(req: NextRequest) {
   if ("response" in guard) return guard.response;
 
   const res = await pool.query(
-    `SELECT id, message, media_url, media_type, status, resolution_note,
-            to_char(created_at AT TIME ZONE 'Asia/Kolkata', 'YYYY-MM-DD"T"HH24:MI:SS') AS created_at,
-            to_char(resolved_at AT TIME ZONE 'Asia/Kolkata', 'YYYY-MM-DD"T"HH24:MI:SS') AS resolved_at
-     FROM ${schemas.ops}.rider_tickets
-     WHERE rider_id = $1
-     ORDER BY created_at DESC
+    `SELECT t.id, t.message, t.media_url, t.media_type, t.status, t.resolution_note,
+            to_char(t.created_at AT TIME ZONE 'Asia/Kolkata', 'YYYY-MM-DD"T"HH24:MI:SS') AS created_at,
+            to_char(t.resolved_at AT TIME ZONE 'Asia/Kolkata', 'YYYY-MM-DD"T"HH24:MI:SS') AS resolved_at,
+            COALESCE(m.messages, '[]'::json) AS messages
+     FROM ${schemas.ops}.rider_tickets t
+     LEFT JOIN LATERAL (
+       SELECT json_agg(json_build_object(
+                'id', x.id, 'author', x.author, 'author_name', x.author_name,
+                'body', x.body, 'media_url', x.media_url, 'media_type', x.media_type,
+                'kind', x.kind,
+                'created_at', to_char(x.created_at AT TIME ZONE 'Asia/Kolkata', 'YYYY-MM-DD"T"HH24:MI:SS')
+              ) ORDER BY x.created_at) AS messages
+         FROM ${schemas.ops}.rider_ticket_messages x WHERE x.ticket_id = t.id
+     ) m ON true
+     WHERE t.rider_id = $1
+     ORDER BY t.created_at DESC
      LIMIT 50`,
     [guard.rider.riderId]
   );
@@ -65,12 +75,31 @@ export async function POST(req: NextRequest) {
   }
 
   // Denormalise the hub so the ops queue can be hub-scoped like every other list.
-  const res = await pool.query(
-    `INSERT INTO ${schemas.ops}.rider_tickets (rider_id, hub_id, message, media_url, media_type)
-     VALUES ($1, (SELECT assigned_hub_id FROM ${schemas.ops}.riders WHERE id = $1), $2, $3, $4)
-     RETURNING id, status,
-       to_char(created_at AT TIME ZONE 'Asia/Kolkata', 'YYYY-MM-DD"T"HH24:MI:SS') AS created_at`,
-    [riderId, message, mediaUrl, mediaType]
-  );
-  return NextResponse.json(res.rows[0], { status: 201 });
+  //
+  // The opening message is written twice on purpose: rider_tickets.message
+  // stays the ticket's subject line for every list and report that reads it,
+  // and the same text starts the thread so the conversation reads in order.
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const res = await client.query(
+      `INSERT INTO ${schemas.ops}.rider_tickets (rider_id, hub_id, message, media_url, media_type)
+       VALUES ($1, (SELECT assigned_hub_id FROM ${schemas.ops}.riders WHERE id = $1), $2, $3, $4)
+       RETURNING id, status,
+         to_char(created_at AT TIME ZONE 'Asia/Kolkata', 'YYYY-MM-DD"T"HH24:MI:SS') AS created_at`,
+      [riderId, message, mediaUrl, mediaType]
+    );
+    await client.query(
+      `INSERT INTO ${schemas.ops}.rider_ticket_messages (ticket_id, author, body, media_url, media_type)
+       VALUES ($1, 'rider', $2, $3, $4)`,
+      [res.rows[0].id, message, mediaUrl, mediaType]
+    );
+    await client.query("COMMIT");
+    return NextResponse.json(res.rows[0], { status: 201 });
+  } catch (e) {
+    await client.query("ROLLBACK");
+    throw e;
+  } finally {
+    client.release();
+  }
 }
