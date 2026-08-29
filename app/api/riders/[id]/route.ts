@@ -4,6 +4,7 @@ import { schemas } from "@/lib/schemas";
 import { writeAudit } from "@/lib/audit";
 import { riderIdentityConflict } from "@/lib/riderUnique";
 import { requireRole } from "@/lib/auth";
+import { consumeApproval, fingerprint } from "@/lib/approvals";
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const guard = await requireRole(req);
@@ -76,7 +77,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const b = await req.json().catch(() => ({}));
 
   const existing = await pool.query(
-    `SELECT id, mobile FROM ${schemas.ops}.riders WHERE id = $1`, [id]
+    `SELECT id, mobile, name,
+            (current_address IS NOT NULL AND bank IS NOT NULL AND account_number IS NOT NULL
+             AND aadhaar IS NOT NULL) AS record_complete
+       FROM ${schemas.ops}.riders WHERE id = $1`,
+    [id]
   );
   if (!existing.rows[0]) return NextResponse.json({ error: "Rider not found" }, { status: 404 });
 
@@ -128,21 +133,69 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
   if (!sets.length) return NextResponse.json({ error: "Nothing to update" }, { status: 400 });
 
-  values.push(id);
-  const res = await pool.query(
-    `UPDATE ${schemas.ops}.riders SET ${sets.join(", ")} WHERE id = $${values.length} RETURNING id, name`,
-    values
-  );
+  // What the admin is actually approving: the exact columns and the exact
+  // values. Built from `sets`/`values` so it cannot drift from the UPDATE.
+  const fingerprintParts: Record<string, unknown> = { rider: id };
+  sets.forEach((assignment, i) => { fingerprintParts[assignment.split(" =")[0]] = values[i]; });
 
-  await writeAudit({
-    action: "rider_updated",
-    entity: "rider",
-    entityId: id,
-    actorId: session.userId,
-    actorName: session.name,
-    req,
-    details: { fields: sets.length },
-  });
+  // Once a rider's details are captured, changing them needs an admin's code.
+  // Completing a half-empty record — the lead and app-signup case — stays free,
+  // which is the distinction Priyam drew: fill in freely, amend with sign-off.
+  const needsApproval = existing.rows[0].record_complete === true;
+  const client = await pool.connect();
+  let approvedBy: string | null = null;
+  try {
+    await client.query("BEGIN");
 
-  return NextResponse.json({ ok: true, id: res.rows[0].id });
+    if (needsApproval) {
+      const approvalId = typeof b.approval_id === "string" ? b.approval_id : "";
+      if (!approvalId) {
+        await client.query("ROLLBACK");
+        client.release();
+        return NextResponse.json(
+          {
+            error: "An admin has to approve changes to a completed rider record",
+            code: "approval_required",
+            // The client asks for a code with exactly these values, so the
+            // approval is bound to this change and cannot be spent on another.
+            approval: {
+              action: "rider_edit",
+              summary: `Edit ${existing.rows[0].name}'s details (${sets.length} field${sets.length === 1 ? "" : "s"})`,
+              parts: fingerprintParts,
+            },
+          },
+          { status: 428 }
+        );
+      }
+      const check = await consumeApproval(client, {
+        id: approvalId,
+        action: "rider_edit",
+        fingerprint: fingerprint("rider_edit", fingerprintParts),
+      });
+      if (!check.ok) {
+        await client.query("ROLLBACK");
+        client.release();
+        return NextResponse.json({ error: check.error, code: "approval_invalid" }, { status: 400 });
+      }
+      approvedBy = check.approvedBy;
+    }
+
+    values.push(id);
+    const res = await client.query(
+      `UPDATE ${schemas.ops}.riders SET ${sets.join(", ")} WHERE id = $${values.length} RETURNING id, name`,
+      values
+    );
+    await client.query("COMMIT");
+    client.release();
+    await writeAudit({
+      action: "rider_updated", entity: "rider", entityId: id,
+      actorId: session.userId, actorName: session.name, req,
+      details: { fields: sets.length, approved_by: approvedBy },
+    });
+    return NextResponse.json({ ok: true, id: res.rows[0].id, approved_by: approvedBy });
+  } catch (e) {
+    await client.query("ROLLBACK");
+    client.release();
+    throw e;
+  }
 }

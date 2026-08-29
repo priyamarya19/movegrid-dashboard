@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useApprovalGate, ApprovalPanel } from "@/components/ApprovalGate";
 import ImageUpload from "@/components/ImageUpload";
 
 type Hub = { id: string; hub_name: string; city: string };
@@ -39,6 +40,7 @@ export default function RiderForm({ rider, riderId }: { rider?: Record<string, u
   const [hubs, setHubs] = useState<Hub[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const gate = useApprovalGate();
   const [blacklistWarning, setBlacklistWarning] = useState<string | null>(null);
 
   const [form, setForm] = useState({
@@ -97,29 +99,49 @@ export default function RiderForm({ rider, riderId }: { rider?: Record<string, u
     }
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  function payload(approvalId?: string) {
+    return {
+      ...form,
+      onboarding_fee: form.onboarding_fee ? Number(form.onboarding_fee) : null,
+      security_deposit: form.security_deposit ? Number(form.security_deposit) : null,
+      assigned_hub_id: form.assigned_hub_id || null,
+      b2b_company: form.business_type === "b2b" ? form.b2b_company : null,
+      b2b_location: form.business_type === "b2b" ? form.b2b_location : null,
+      additional_photos: form.additional_photos.filter(Boolean).length ? form.additional_photos.filter(Boolean) : null,
+      ...(approvalId ? { approval_id: approvalId } : {}),
+    };
+  }
+
+  async function save(approvalId?: string) {
     setSubmitting(true);
     setError("");
     try {
       const res = await fetch(isEdit ? `/api/riders/${riderId}` : "/api/riders", {
         method: isEdit ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...form,
-          onboarding_fee: form.onboarding_fee ? Number(form.onboarding_fee) : null,
-          security_deposit: form.security_deposit ? Number(form.security_deposit) : null,
-          assigned_hub_id: form.assigned_hub_id || null,
-          b2b_company: form.business_type === "b2b" ? form.b2b_company : null,
-          b2b_location: form.business_type === "b2b" ? form.b2b_location : null,
-          additional_photos: form.additional_photos.filter(Boolean).length ? form.additional_photos.filter(Boolean) : null,
-        }),
+        body: JSON.stringify(payload(approvalId)),
       });
       const data = await res.json();
+
+      // 428: the record is already complete, so an admin has to sign this off.
+      // The server hands back the exact values it will check, so the code we
+      // ask for is tied to this edit and no other.
+      if (res.status === 428 && data.approval) {
+        gate.reset();
+        const sent = await gate.request(data.approval);
+        if (!sent) setError(gate.error || "Could not reach an approver");
+        return;
+      }
       if (!res.ok) { setError(data.error || (isEdit ? "Could not save changes" : "Failed to create rider")); return; }
+      gate.reset();
       router.push(`/riders/${isEdit ? riderId : data.id}`);
       router.refresh();
     } finally { setSubmitting(false); }
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    await save();
   }
 
   const Section = ({ title, color = "var(--accent-purple)" }: { title: string; color?: string }) => (
@@ -226,6 +248,8 @@ export default function RiderForm({ rider, riderId }: { rider?: Record<string, u
       </div>
 
       {error && <p className="text-accent-danger-alt-text text-sm">{error}</p>}
+
+      <ApprovalPanel gate={gate} actionLabel="Approve & save" onApproved={(id) => save(id)} />
 
       <div className="flex items-center gap-3 pt-2">
         <button type="submit" disabled={submitting}

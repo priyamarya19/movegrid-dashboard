@@ -3,6 +3,7 @@ import DashboardLayout from "@/components/DashboardLayout";
 import UsersManager from "@/components/settings/UsersManager";
 import ChangePasswordForm from "@/components/settings/ChangePasswordForm";
 import ReportRecipientsManager from "@/components/settings/ReportRecipientsManager";
+import ApproversManager from "@/components/settings/ApproversManager";
 import { getSession } from "@/lib/auth";
 
 export default async function SettingsPage() {
@@ -15,6 +16,7 @@ export default async function SettingsPage() {
         <ChangePasswordForm />
         {session.role === "admin" && <UsersManager />}
         {session.role === "admin" && <ReportRecipientsManager />}
+        {session.role === "admin" && <ApproversManager />}
       </div>
     </DashboardLayout>
   );
