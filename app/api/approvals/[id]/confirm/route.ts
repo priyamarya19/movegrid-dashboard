@@ -13,5 +13,5 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   const res = await confirmApproval({ id, code: String(code) });
   if (!res.ok) return NextResponse.json({ error: res.error }, { status: 400 });
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, approved_by: res.approvedBy });
 }

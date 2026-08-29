@@ -11,6 +11,8 @@ import { getHubScope, hubScopeSql, scopeAllowsHub } from "@/lib/hubScope";
 import { pushToRiderAsync } from "@/lib/riderPush";
 import { logVehicleStatus } from "@/lib/vehicleStatusLog";
 import { beginIdempotency, finishIdempotency, abortIdempotency } from "@/lib/idempotency";
+import { defaultRentStart } from "@/lib/rentStart";
+import { consumeApproval, fingerprint } from "@/lib/approvals";
 
 // GET /api/allotments — active allotments for the permissioned Allotments list,
 // optionally filtered by allotment date (?range=today|yesterday|last7|mtd, or
@@ -147,6 +149,52 @@ export async function POST(req: NextRequest) {
       : Number(rateRes.rows[0]?.rate ?? 240);
     const assignedDate = b.assigned_date || istTodayISO();
 
+    // ── When rent starts ───────────────────────────────────────────────────
+    //
+    // The 3 PM rule (see lib/rentStart.ts). Ops may type a different date, but
+    // then an admin has to have approved it — the approval is bound to the
+    // rider, the vehicle and the date itself, so a code cannot be moved onto a
+    // different allotment or a different day.
+    // Ops can state when the rider actually took it; otherwise it is now.
+    const handedOverAt = b.handed_over_at ? new Date(b.handed_over_at) : new Date();
+    const defaultStart = defaultRentStart(assignedDate, handedOverAt);
+    const requestedStart = typeof b.rent_start_date === "string" && b.rent_start_date
+      ? b.rent_start_date
+      : defaultStart;
+    const startOverridden = requestedStart !== defaultStart;
+    let startApprovedBy: string | null = null;
+    if (startOverridden) {
+      const approvalId = typeof b.approval_id === "string" ? b.approval_id : "";
+      const parts = { rider: b.rider_id, vehicle: b.vehicle_id, rent_start_date: requestedStart };
+      if (!approvalId) {
+        await client.query("ROLLBACK");
+        if (idem.mode === "claimed") await abortIdempotency(idem);
+        return NextResponse.json(
+          {
+            error: `Rent would normally start on ${defaultStart} — a different date needs an admin's approval`,
+            code: "approval_required",
+            approval: {
+              action: "allotment_start_date",
+              summary: `Start rent on ${requestedStart} instead of ${defaultStart}`,
+              parts,
+            },
+          },
+          { status: 428 }
+        );
+      }
+      const check = await consumeApproval(client, {
+        id: approvalId,
+        action: "allotment_start_date",
+        fingerprint: fingerprint("allotment_start_date", parts),
+      });
+      if (!check.ok) {
+        await client.query("ROLLBACK");
+        if (idem.mode === "claimed") await abortIdempotency(idem);
+        return NextResponse.json({ error: check.error, code: "approval_invalid" }, { status: 400 });
+      }
+      startApprovedBy = check.approvedBy;
+    }
+
     // How much of the cash taken at handover is RENT.
     //
     // This used to be inferred: any positive amount_collected was read as "week 1
@@ -228,11 +276,12 @@ export async function POST(req: NextRequest) {
         [carryOver.id]
       );
     } else {
-      // Ops rule (confirmed 20 Aug 2026): the handover day is free — rent runs
-      // from the day AFTER the rider takes the scooter, so an unpaid allotment is
-      // "paid through" the handover day itself and day one of charging is the next.
-      const base = new Date(assignedDate + "T00:00:00Z");
-      base.setUTCDate(base.getUTCDate() + daysBought);
+      // "Paid through" is the last covered day, so with nothing paid it is the
+      // day BEFORE rent starts. Anchoring on the rent start date rather than the
+      // handover date is what makes the 3 PM rule (and any approved override)
+      // actually move the money.
+      const base = new Date(requestedStart + "T00:00:00Z");
+      base.setUTCDate(base.getUTCDate() - 1 + daysBought);
       paidThroughDateValue = base.toISOString().slice(0, 10);
     }
 
@@ -266,14 +315,16 @@ export async function POST(req: NextRequest) {
       INSERT INTO ${schemas.ops}.rider_vehicle_assignments (
         rider_id, vehicle_id, hub_id, assigned_date, status,
         amount_collected, payment_screenshot_url, undertaking_url, allotment_pics, allotted_by,
-        daily_rent, paid_through_date, continues_from_assignment_id, allotment_code
-      ) VALUES ($1,$2,$3,$4,'active',$5,$6,$7,$8,$9,$10,$11,$12,$13)
+        daily_rent, paid_through_date, continues_from_assignment_id, allotment_code,
+        handed_over_at, rent_start_date, rent_start_overridden, rent_start_approved_by
+      ) VALUES ($1,$2,$3,$4,'active',$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
       RETURNING id, allotment_code`,
       [
         b.rider_id, b.vehicle_id, b.hub_id ?? null, assignedDate,
         b.amount_collected ?? null, b.payment_screenshot_url ?? null,
         b.undertaking_url ?? null, b.allotment_pics ?? null, session.name,
         dailyRent, paidThroughDateValue, carryOver ? carryOver.id : null, allotmentCode,
+        handedOverAt, requestedStart, startOverridden, startApprovedBy,
       ]
     );
 
@@ -374,7 +425,14 @@ export async function POST(req: NextRequest) {
     await writeAudit({
       action: "allotment_created", entity: "assignment", entityId: result.rows[0].id,
       actorId: session.userId, actorName: session.name, req,
-      details: { rider_id: b.rider_id, vehicle_id: b.vehicle_id, allotment_code: result.rows[0].allotment_code, amount_collected: b.amount_collected ?? null },
+      details: {
+        rider_id: b.rider_id, vehicle_id: b.vehicle_id,
+        allotment_code: result.rows[0].allotment_code,
+        amount_collected: b.amount_collected ?? null,
+        rent_start_date: requestedStart,
+        rent_start_overridden: startOverridden,
+        rent_start_approved_by: startApprovedBy,
+      },
     });
     const respBody = { id: result.rows[0].id, allotment_code: result.rows[0].allotment_code };
     if (idem.mode === "claimed") await finishIdempotency(idem, 201, respBody);

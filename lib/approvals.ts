@@ -69,31 +69,50 @@ export async function requestApproval(args: {
     throw new Error("No admin is set up to approve this. Add one in Settings → Approvals.");
   }
 
-  const code = generateCode();
+  // One code EACH, not one code for everyone. Ops type in whichever code they
+  // were read, and that tells us which admin actually approved it — with a
+  // shared code the record can only ever say "somebody said yes".
+  const codes = approvers.map((a) => ({ approver: a, code: generateCode() }));
+
   const res = await pool.query(
     `INSERT INTO ${schemas.ops}.approval_requests
        (action, subject_id, summary, fingerprint, code_hash, requested_by, requested_by_name, sent_to, expires_at)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8, now() + ($9 || ' minutes')::interval)
      RETURNING id`,
     [
-      args.action, args.subjectId ?? null, args.summary, args.fingerprint, hash(code),
+      // code_hash is kept for the single-approver case and for anything written
+      // before per-approver codes existed; the real check is the codes table.
+      args.action, args.subjectId ?? null, args.summary, args.fingerprint, hash(codes[0].code),
       args.requestedBy, args.requestedByName, approvers.map((a) => a.email), String(CODE_TTL_MINUTES),
     ]
   );
+  const id = res.rows[0].id;
 
-  await sendEmail({
-    to: approvers.map((a) => a.email),
-    subject: `MOVEGRID approval code ${code} — ${args.summary}`,
-    text:
-      `${args.requestedByName} is asking to make a change that needs your approval.\n\n` +
-      `  ${args.summary}\n\n` +
-      `Approval code: ${code}\n` +
-      `Valid for ${CODE_TTL_MINUTES} minutes.\n\n` +
-      `Only give this code to ${args.requestedByName} if you are happy with the change above. ` +
-      `If you are not expecting this request, do not share it.`,
-  });
+  for (const { approver, code } of codes) {
+    await pool.query(
+      `INSERT INTO ${schemas.ops}.approval_request_codes (request_id, user_id, user_name, user_email, code_hash)
+       VALUES ($1,$2,$3,$4,$5)`,
+      [id, approver.id, approver.name, approver.email, hash(code)]
+    );
+  }
 
-  return { id: res.rows[0].id, sentTo: approvers.map((a) => a.email) };
+  // Sent one at a time so nobody sees anyone else's code.
+  for (const { approver, code } of codes) {
+    await sendEmail({
+      to: [approver.email],
+      subject: `MOVEGRID approval code ${code} — ${args.summary}`,
+      text:
+        `${args.requestedByName} is asking to make a change that needs your approval.\n\n` +
+        `  ${args.summary}\n\n` +
+        `Approval code: ${code}\n` +
+        `Valid for ${CODE_TTL_MINUTES} minutes.\n\n` +
+        `This code is yours alone — the record will show that YOU approved this. ` +
+        `Only give it to ${args.requestedByName} if you are happy with the change above. ` +
+        `If you are not expecting this request, do not share it.`,
+    });
+  }
+
+  return { id, sentTo: approvers.map((a) => a.email) };
 }
 
 /** Ops entering the code the admin read out. */
@@ -101,7 +120,7 @@ export async function confirmApproval(args: {
   id: string;
   code: string;
   approverName?: string | null;
-}): Promise<{ ok: true } | { ok: false; error: string }> {
+}): Promise<{ ok: true; approvedBy: string | null } | { ok: false; error: string }> {
   const res = await pool.query(
     `SELECT id, status, code_hash, attempts, expires_at FROM ${schemas.ops}.approval_requests WHERE id = $1`,
     [args.id]
@@ -119,17 +138,28 @@ export async function confirmApproval(args: {
     return { ok: false, error: "Too many wrong attempts — ask for a new code" };
   }
 
-  if (hash(String(args.code).trim()) !== r.code_hash) {
+  // Which approver's code is this? That is the whole answer to "who said yes".
+  const given = hash(String(args.code).trim());
+  const owner = await pool.query(
+    `SELECT user_id, user_name FROM ${schemas.ops}.approval_request_codes
+      WHERE request_id = $1 AND code_hash = $2`,
+    [args.id, given]
+  );
+
+  // Fall back to the request's own hash for requests raised before per-approver
+  // codes existed; those simply cannot name anyone.
+  const matched = owner.rows[0] ?? (given === r.code_hash ? { user_id: null, user_name: null } : null);
+  if (!matched) {
     await pool.query(`UPDATE ${schemas.ops}.approval_requests SET attempts = attempts + 1 WHERE id=$1`, [args.id]);
     return { ok: false, error: "That code is not right" };
   }
 
   await pool.query(
     `UPDATE ${schemas.ops}.approval_requests
-     SET status='approved', approved_at = now(), approved_by_name = $2 WHERE id = $1`,
-    [args.id, args.approverName ?? null]
+     SET status='approved', approved_at = now(), approved_by = $2, approved_by_name = $3 WHERE id = $1`,
+    [args.id, matched.user_id, matched.user_name ?? args.approverName ?? null]
   );
-  return { ok: true };
+  return { ok: true, approvedBy: matched.user_name ?? null };
 }
 
 /**

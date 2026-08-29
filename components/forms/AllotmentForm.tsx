@@ -4,6 +4,8 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import ImageUpload from "@/components/ImageUpload";
 import { istTodayISO } from "@/lib/date";
+import { defaultRentStart, rentStartReason } from "@/lib/rentStart";
+import { useApprovalGate, ApprovalPanel } from "@/components/ApprovalGate";
 
 const RIDER_MODES = ["B2B fleet rental", "Rider rental", "B2B rider"];
 const RENTAL_PLANS = ["weekly", "monthly"];
@@ -60,9 +62,27 @@ export default function AllotmentForm() {
     undertaking_url: "",
     allotment_pics: ["", "", "", "", ""],
     assigned_date: istTodayISO(),
+    rent_start_date: defaultRentStart(istTodayISO()),
   });
+  const gate = useApprovalGate();
 
   function set(k: string, v: string) { setForm(p => ({ ...p, [k]: v })); }
+
+  // The default follows the allotment date: back-date the handover and the
+  // free day comes back, because today's clock says nothing about when that
+  // rider actually collected.
+  const suggestedStart = defaultRentStart(form.assigned_date);
+  const startOverridden = form.rent_start_date !== suggestedStart;
+  const rentStartHint = startOverridden
+    ? `Normally ${suggestedStart} — ${rentStartReason(form.assigned_date)}. A different date needs an admin's approval.`
+    : `${rentStartReason(form.assigned_date)}`;
+
+  // Correcting the handover day moves the suggested start with it — until ops
+  // deliberately type a start date, after which their choice stands.
+  const [startTouched, setStartTouched] = useState(false);
+  useEffect(() => {
+    if (!startTouched) setForm(p => ({ ...p, rent_start_date: defaultRentStart(p.assigned_date) }));
+  }, [form.assigned_date, startTouched]);
 
   // Auto-fill EV details after debounce
   useEffect(() => {
@@ -100,6 +120,10 @@ export default function AllotmentForm() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    await submit();
+  }
+
+  async function submit(approvalId?: string) {
     if (!vehicle) { setError("Please enter a valid EV number"); return; }
     if (!rider) { setError("Please look up and confirm the rider"); return; }
     if (vehicle.status === "assigned") { setError("This vehicle is already assigned to another rider"); return; }
@@ -125,10 +149,22 @@ export default function AllotmentForm() {
           undertaking_url: form.undertaking_url || null,
           allotment_pics: pics.length ? pics : null,
           assigned_date: form.assigned_date,
+          rent_start_date: form.rent_start_date,
+          ...(approvalId ? { approval_id: approvalId } : {}),
         }),
       });
       const data = await res.json();
+
+      // 428: the start date isn't the one the clock implies, so an admin has to
+      // sign it off. The server hands back the exact values it will check.
+      if (res.status === 428 && data.approval) {
+        gate.reset();
+        const sent = await gate.request(data.approval);
+        if (!sent) setError(gate.error || "Could not reach an approver");
+        return;
+      }
       if (!res.ok) { setError(data.error || "Failed to create allotment"); return; }
+      gate.reset();
       router.push(`/riders/${rider.id}`);
     } finally { setSubmitting(false); }
   }
@@ -193,12 +229,18 @@ export default function AllotmentForm() {
             {RENTAL_PLANS.map(m => <option key={m} value={m}>{m[0].toUpperCase() + m.slice(1)}</option>)}
           </select>
         </Field>
-        {/* The rent week runs from this date, so an allotment entered on
-            Wednesday for a scooter handed over on Monday must be backdated —
-            otherwise the rider is billed from the wrong day. The ops app has
-            always had this field; the web form was silently sending today. */}
-        <Field label="Allotment Date" required hint="The day the rider actually took the scooter — the rent week starts here">
+        {/* An allotment entered on Wednesday for a scooter handed over on
+            Monday must be backdated. The ops app has always had this field; the
+            web form was silently sending today. */}
+        <Field label="Allotment Date" required hint="The day the rider actually took the scooter">
           <input type="date" className={inp} value={form.assigned_date} onChange={e => set("assigned_date", e.target.value)} max={istTodayISO()} required />
+        </Field>
+        {/* The 3 PM rule. The default is computed, shown with its reason, and
+            typing anything else costs an admin's code — the whole point being
+            that a free day is a real ₹240 decision, not a form field. */}
+        <Field label="Rent Starts" required hint={rentStartHint}>
+          <input type="date" className={inp} value={form.rent_start_date}
+            onChange={e => { setStartTouched(true); set("rent_start_date", e.target.value); }} required />
         </Field>
         <Field label="Daily Rental (₹)" required hint="Prefilled from the vehicle's model rate — edit if the rider's km/usage deal differs">
           <input type="number" className={inp} value={form.daily_rent} onChange={e => set("daily_rent", e.target.value)} placeholder="e.g. 240" required />
@@ -215,8 +257,6 @@ export default function AllotmentForm() {
         </Field>
         <ImageUpload label="Payment Screenshot" folder="payments" value={form.payment_screenshot_url} onChange={v => set("payment_screenshot_url", v)} />
         <ImageUpload label="Signed Undertaking" folder="undertakings" value={form.undertaking_url} onChange={v => set("undertaking_url", v)} />
-        <Field label="Allotment Date" required><input type="date" className={inp} value={form.assigned_date} onChange={e => set("assigned_date", e.target.value)} required /></Field>
-
         <Section title="Allotment Photos" />
         {form.allotment_pics.map((_, i) => (
           <ImageUpload key={i} label={["Front", "Left side", "Right side", "Back", "Rider on scooter"][i] ?? `Photo ${i + 1}`} folder="allotments"
@@ -233,6 +273,8 @@ export default function AllotmentForm() {
       </div>
 
       {error && <p className="text-accent-danger-alt-text text-sm">{error}</p>}
+
+      <ApprovalPanel gate={gate} actionLabel="Approve & allot" onApproved={(id) => submit(id)} />
 
       <div className="flex items-center gap-3 pt-2">
         <button type="submit" disabled={submitting || !vehicle || !rider}
