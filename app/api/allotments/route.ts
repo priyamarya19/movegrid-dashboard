@@ -13,6 +13,7 @@ import { logVehicleStatus } from "@/lib/vehicleStatusLog";
 import { beginIdempotency, finishIdempotency, abortIdempotency } from "@/lib/idempotency";
 import { defaultRentStart } from "@/lib/rentStart";
 import { consumeApproval, fingerprint } from "@/lib/approvals";
+import { expireBalanceIfLapsed } from "@/lib/riderBalance";
 
 // GET /api/allotments — active allotments for the permissioned Allotments list,
 // optionally filtered by allotment date (?range=today|yesterday|last7|mtd, or
@@ -341,13 +342,23 @@ export async function POST(req: NextRequest) {
     // returns NULL to RETURNING — which silently wiped the balance without ever
     // applying it. Two plain statements inside the transaction are correct and
     // obvious, and the lock still stops two allotments spending it twice.
+    //
+    // The 15-day window is checked FIRST. A rider who comes back on the 20th of
+    // a window that closed on the 16th does not get the days — they lapsed, and
+    // lapsing is a recorded event rather than a silent one.
+    const lapsed = await expireBalanceIfLapsed(client, b.rider_id, assignedDate, session.name);
     const balRow = await client.query(
-      `SELECT COALESCE(balance, 0)::numeric AS balance FROM ${schemas.ops}.riders WHERE id = $1 FOR UPDATE`,
+      `SELECT COALESCE(balance, 0)::numeric AS balance, COALESCE(balance_days, 0)::int AS days
+         FROM ${schemas.ops}.riders WHERE id = $1 FOR UPDATE`,
       [b.rider_id]
     );
     const spent = Number(balRow.rows[0]?.balance ?? 0);
+    const spentDays = Number(balRow.rows[0]?.days ?? 0);
     if (spent > 0) {
-      await client.query(`UPDATE ${schemas.ops}.riders SET balance = 0 WHERE id = $1`, [b.rider_id]);
+      await client.query(
+        `UPDATE ${schemas.ops}.riders SET balance = 0, balance_days = 0, balance_expires_on = NULL WHERE id = $1`,
+        [b.rider_id]
+      );
       await client.query(
         `UPDATE ${schemas.ops}.rider_vehicle_assignments
          SET rent_credit = COALESCE(rent_credit, 0) + $2 WHERE id = $1`,
@@ -355,9 +366,9 @@ export async function POST(req: NextRequest) {
       );
       await client.query(
         `INSERT INTO ${schemas.ops}.rider_balance_entries
-           (rider_id, delta, balance_after, reason, assignment_id, created_by)
-         VALUES ($1, $2, 0, $3, $4, $5)`,
-        [b.rider_id, -spent, "Applied to new allotment", result.rows[0].id, session.name]
+           (rider_id, delta, balance_after, days, kind, reason, assignment_id, created_by)
+         VALUES ($1, $2, 0, $3, 'spent', $4, $5, $6)`,
+        [b.rider_id, -spent, -spentDays, "Applied to new allotment", result.rows[0].id, session.name]
       );
     }
 
@@ -432,6 +443,8 @@ export async function POST(req: NextRequest) {
         rent_start_date: requestedStart,
         rent_start_overridden: startOverridden,
         rent_start_approved_by: startApprovedBy,
+        balance_applied: spent || null,
+        balance_expired: lapsed.expired ? lapsed.amount : null,
       },
     });
     const respBody = { id: result.rows[0].id, allotment_code: result.rows[0].allotment_code };

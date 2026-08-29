@@ -7,6 +7,9 @@ import { recordRentPayment } from "@/lib/recordRentPayment";
 import { istTodayISO } from "@/lib/date";
 import { writeAudit } from "@/lib/audit";
 import { logVehicleStatus } from "@/lib/vehicleStatusLog";
+import {
+  maxCarryForwardDays, suggestedCarryForwardDays, balanceExpiryDate, expireBalanceIfLapsed,
+} from "@/lib/riderBalance";
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const guard = await requireRole(req);
@@ -112,31 +115,80 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const returnedOn = b.returned_date || istTodayISO();
     const leftover = await client.query(
       `SELECT
-         GREATEST(0, COALESCE(a.paid_through_date, a.assigned_date) - $2::date)::int AS unused_days,
+         to_char(COALESCE(a.paid_through_date, a.assigned_date),'YYYY-MM-DD') AS paid_through,
          a.daily_rent::numeric AS daily_rent,
          COALESCE(a.rent_credit, 0)::numeric AS rent_credit
        FROM ${schemas.ops}.rider_vehicle_assignments a WHERE a.id = $1`,
-      [id, returnedOn]
+      [id]
     );
     const lo = leftover.rows[0];
+
+    // How many days carry is ops' call, inside a ceiling. A week paid through
+    // the 7th and handed back on the 5th is "2 or 3?" depending on whether the
+    // rider had the use of the 5th — the person taking the scooter back is the
+    // only one who knows, so they say, and both their number and the ceiling
+    // are stored against the assignment.
+    const maxDays = maxCarryForwardDays(lo?.paid_through ?? null, returnedOn);
+    const askedDays = b.carry_forward_days != null && b.carry_forward_days !== ""
+      ? Number(b.carry_forward_days)
+      : suggestedCarryForwardDays(lo?.paid_through ?? null, returnedOn);
+    if (Number.isNaN(askedDays) || askedDays < 0) {
+      await client.query("ROLLBACK");
+      return NextResponse.json({ error: "Carry-forward days must be 0 or more" }, { status: 400 });
+    }
+    if (askedDays > maxDays) {
+      // The ceiling is what the rider actually paid for. Above it we would be
+      // giving away days nobody bought.
+      await client.query("ROLLBACK");
+      return NextResponse.json(
+        { error: `Only ${maxDays} day(s) were paid for beyond ${returnedOn} — you cannot carry more than that`,
+          field: "carry_forward_days", max: maxDays },
+        { status: 400 }
+      );
+    }
+    const carryDays = Math.floor(askedDays);
+
     // Part-rupees left over from an earlier payment travel too — they are just
     // as paid-for as the whole days.
     const carried =
-      Math.round((Number(lo?.unused_days ?? 0) * Number(lo?.daily_rent ?? 0) + Number(lo?.rent_credit ?? 0)) * 100) / 100;
+      Math.round((carryDays * Number(lo?.daily_rent ?? 0) + Number(lo?.rent_credit ?? 0)) * 100) / 100;
+
+    // The day count has to agree with the rupees, or the profile says "2 days"
+    // over a balance worth five. Banked credit from an earlier carry-forward is
+    // real prepaid time too, so it counts — ops' choice still decides `carried`,
+    // this only describes it.
+    const dailyRent = Number(lo?.daily_rent ?? 0);
+    const carriedDays = dailyRent > 0 ? Math.floor(carried / dailyRent + 1e-9) : carryDays;
+
+    await client.query(
+      `UPDATE ${schemas.ops}.rider_vehicle_assignments
+          SET carry_forward_days = $2, carry_forward_max_days = $3 WHERE id = $1`,
+      [id, carryDays, maxDays]
+    );
 
     if (carried > 0) {
+      // Anything the rider was still carrying from an EARLIER return is either
+      // spent or lapsed by now; adding to a live balance would silently extend
+      // its window, so the older one is closed off first if its time is up.
+      await expireBalanceIfLapsed(client, rider_id, returnedOn, session.name);
       const bal = await client.query(
-        `UPDATE ${schemas.ops}.riders SET balance = COALESCE(balance, 0) + $2
-         WHERE id = $1 RETURNING balance`,
-        [rider_id, carried]
+        `UPDATE ${schemas.ops}.riders
+            SET balance = COALESCE(balance, 0) + $2,
+                balance_days = COALESCE(balance_days, 0) + $3,
+                -- The window runs from THIS return: the rider is only just now
+                -- without a scooter.
+                balance_expires_on = $4::date
+          WHERE id = $1 RETURNING balance`,
+        [rider_id, carried, carriedDays, balanceExpiryDate(returnedOn)]
       );
       await client.query(
         `INSERT INTO ${schemas.ops}.rider_balance_entries
-           (rider_id, delta, balance_after, reason, assignment_id, created_by)
-         VALUES ($1, $2, $3, $4, $5, $6)`,
+           (rider_id, delta, balance_after, days, kind, reason, assignment_id, created_by)
+         VALUES ($1, $2, $3, $4, 'carry_forward', $5, $6, $7)`,
         [
-          rider_id, carried, bal.rows[0].balance,
-          `${lo.unused_days} unused day(s) at return`, id, session.name,
+          rider_id, carried, bal.rows[0].balance, carriedDays,
+          `${carriedDays} unused day(s) at return — usable until ${balanceExpiryDate(returnedOn)}`,
+          id, session.name,
         ]
       );
       // The closed row is now paid through exactly the day it came back, so the
@@ -189,7 +241,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     await writeAudit({
       action: "vehicle_returned", entity: "assignment", entityId: id,
       actorId: session.userId, actorName: session.name, req,
-      details: { rider_id, vehicle_id, is_issue_swap: b.is_issue_swap === true, penalty_amount: b.penalty_amount ?? null },
+      details: {
+        rider_id, vehicle_id, is_issue_swap: b.is_issue_swap === true,
+        penalty_amount: b.penalty_amount ?? null,
+        carry_forward_days: carryDays, carry_forward_max_days: maxDays,
+      },
     });
     return NextResponse.json({ ok: true });
   } catch (e) {

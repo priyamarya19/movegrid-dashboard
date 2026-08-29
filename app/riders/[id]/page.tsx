@@ -19,6 +19,7 @@ import ExportButton from "@/components/ExportButton";
 import { maskPan, maskAccount, maskDl } from "@/lib/mask";
 import { getSession } from "@/lib/auth";
 import { inr, dateIN } from "@/lib/format";
+import { istTodayISO } from "@/lib/date";
 
 // Stored document values are S3 keys (e.g. "kyc/1784...jpg") — always serve
 // them through the /api/file proxy. Legacy full URLs pass through untouched.
@@ -96,6 +97,11 @@ export default async function RiderDetailPage({ params }: { params: Promise<{ id
   const cycle = await getRiderCycle(rider.id); // unbroken weekly ledger (no gaps; stops at return)
 
   const todayIST = toISTMidnight(new Date());
+  // Shown as lapsed the moment the window closes, even before the nightly sweep
+  // gets to it — the screen should never promise money that is already gone.
+  const balanceLapsed =
+    !!rider.balance_expires_on &&
+    new Date(rider.balance_expires_on).toISOString().slice(0, 10) < istTodayISO();
 
   return (
     <DashboardLayout allowedRoles={["admin", "ops_manager", "hub_incharge"]}>
@@ -156,6 +162,25 @@ export default async function RiderDetailPage({ params }: { params: Promise<{ id
           blacklistedAt={rider.blacklisted_at}
           role={session?.role ?? ""}
         />
+
+        {/* Carry-forward. Ops and riders talk in days, so the days lead and the
+            rupees follow, with the date it stops being spendable — the whole
+            point of the 15-day window is that somebody can see it running out. */}
+        {Number(rider.balance ?? 0) > 0 && (
+          <div className="bg-accent-teal/8 border border-accent-teal/30 rounded-xl p-4 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <span className="text-accent-teal font-semibold">
+              {Number(rider.balance_days ?? 0)} day{Number(rider.balance_days ?? 0) === 1 ? "" : "s"} carried forward
+            </span>
+            <span className="text-secondary text-sm">{inr(Math.round(Number(rider.balance)))} already paid, not yet ridden</span>
+            {rider.balance_expires_on ? (
+              <span className={`text-xs ${balanceLapsed ? "text-accent-danger-alt-text" : "text-muted"}`}>
+                {balanceLapsed
+                  ? `Window closed ${dateIN(rider.balance_expires_on)} — this will be written off`
+                  : `Usable until ${dateIN(rider.balance_expires_on)}`}
+              </span>
+            ) : null}
+          </div>
+        )}
 
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
           {[

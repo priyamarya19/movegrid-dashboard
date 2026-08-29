@@ -12,6 +12,8 @@ const PUBLIC_PATHS = [
   // Cron-triggered report sends: no user session, gated by their own X-Cron-Secret check instead.
   "/api/reports/fleet-status/send",
   "/api/reports/rent-due/send",
+  // Nightly balance sweep: same deal, its own X-Cron-Secret check inside.
+  "/api/rider-balances/expire",
   // Rider-app login: pre-auth by definition (OTP request/verify), rate-limited inside.
   "/api/rider-auth",
 ];

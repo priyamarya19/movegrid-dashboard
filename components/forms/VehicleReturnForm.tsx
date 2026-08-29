@@ -6,6 +6,7 @@ import ImageUpload from "@/components/ImageUpload";
 import PaymentProof, { PaymentProofValue, emptyProof, proofValid } from "@/components/PaymentProof";
 import { istTodayISO } from "@/lib/date";
 import { dateIN } from "@/lib/format";
+import { maxCarryForwardDays, suggestedCarryForwardDays, CARRY_FORWARD_WINDOW_DAYS, balanceExpiryDate } from "@/lib/riderBalance";
 
 const CONDITIONS = ["Same as allotted", "Motor damaged", "Controller issue", "Branding issue", "Any other issue"];
 
@@ -23,7 +24,8 @@ function Field({ label, required, hint, children }: { label: string; required?: 
 
 const inp = "w-full bg-base border border-default rounded-xl px-4 py-2.5 text-primary text-sm placeholder-faint focus:outline-none focus:border-accent-danger transition-colors";
 
-type AssignmentInfo = { id: string; rider_name: string; ev_number: string; assigned_date: string; status: string };
+type AssignmentInfo = { id: string; rider_name: string; ev_number: string; assigned_date: string; status: string;
+  paid_through_date?: string | null; daily_rent?: number | string | null };
 
 export default function VehicleReturnForm() {
   const router = useRouter();
@@ -48,11 +50,24 @@ export default function VehicleReturnForm() {
     is_issue_swap: false,
     non_functional_days: "",
     amount_collected: "",
+    carry_forward_days: "",
   });
 
   const [settle, setSettle] = useState<PaymentProofValue>(emptyProof);
 
   function set(k: string, v: string) { setForm(p => ({ ...p, [k]: v })); }
+
+  // Days the rider paid for and did not ride. The ceiling is arithmetic; the
+  // number is a judgement, so ops get the suggestion and the last word.
+  const paidThrough = assignment?.paid_through_date ?? null;
+  const maxCarry = maxCarryForwardDays(paidThrough, form.returned_date);
+  const suggestedCarry = suggestedCarryForwardDays(paidThrough, form.returned_date);
+  const carryDays = form.carry_forward_days === "" ? suggestedCarry : Number(form.carry_forward_days);
+  const dailyRent = Number(assignment?.daily_rent ?? 0);
+  const carryValue = Math.max(0, carryDays) * dailyRent;
+
+  // Reset the choice when the return date moves — the ceiling moved with it.
+  useEffect(() => { setForm(p => ({ ...p, carry_forward_days: "" })); }, [form.returned_date, assignment?.id]);
 
   function toggleCondition(c: string) {
     setForm(p => ({
@@ -107,6 +122,7 @@ export default function VehicleReturnForm() {
           return_photos: photos.length ? photos : null,
           return_remarks: form.return_remarks || null,
           amount_collected: form.rent_cleared === "false" && form.amount_collected !== "" ? Number(form.amount_collected) : 0,
+          carry_forward_days: carryDays,
           rent_settlement_mode: form.rent_cleared === "true" || Number(form.amount_collected) > 0 ? settle.mode : null,
           rent_settlement_utr: form.rent_cleared === "true" || Number(form.amount_collected) > 0 ? (settle.utr || null) : null,
           rent_settlement_proof_url: form.rent_cleared === "true" || Number(form.amount_collected) > 0 ? settle.proof : null,
@@ -147,6 +163,22 @@ export default function VehicleReturnForm() {
         <Field label="Submission / Return Date" required>
           <input type="date" className={inp} value={form.returned_date} onChange={e => set("returned_date", e.target.value)} required />
         </Field>
+        {assignment && maxCarry > 0 && (
+          <Field
+            label="Days to Carry Forward"
+            hint={`Paid through ${dateIN(paidThrough!)}, so up to ${maxCarry} day(s) are unridden. ${
+              carryDays > 0
+                ? `₹${carryValue.toLocaleString("en-IN")} held for ${CARRY_FORWARD_WINDOW_DAYS} days — usable until ${dateIN(balanceExpiryDate(form.returned_date))}.`
+                : "Nothing will be carried."
+            }`}
+          >
+            <input
+              type="number" min="0" max={maxCarry} className={inp}
+              value={form.carry_forward_days === "" ? String(suggestedCarry) : form.carry_forward_days}
+              onChange={e => set("carry_forward_days", e.target.value)}
+            />
+          </Field>
+        )}
 
         <Section title="Return Details" />
         <Field label="All Rent Paid?" required>

@@ -12,6 +12,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
   const result = await pool.query(`
     SELECT rva.id, rva.assigned_date, rva.status, rva.allotment_code,
+           to_char(COALESCE(rva.paid_through_date, rva.assigned_date),'YYYY-MM-DD') AS paid_through_date,
+           rva.daily_rent,
            r.name AS rider_name, r.id AS rider_id,
            v.ev_number
     FROM ${schemas.ops}.rider_vehicle_assignments rva
