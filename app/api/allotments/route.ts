@@ -300,6 +300,12 @@ export async function POST(req: NextRequest) {
     const obApplies = gapDays === null || gapDays > 15;
     const onboardingFeeValue = obApplies ? (b.onboarding_fee ?? null) : null;
 
+    // A scooter belongs to a hub, so an allotment always has one — the client
+    // sending no hub_id is not a reason to store NULL. Fifteen riders ended up
+    // with no hub anywhere on their record because of exactly that, which then
+    // trapped them on the app's city screen with nothing to compare against.
+    const hubForAllotment = b.hub_id ?? vCheck.rows[0].hub_id ?? null;
+
     // Allotment ID: an issue-swap continuation stays inside the same tenancy, so it
     // inherits the swapped-out assignment's allotment_code (one sheet row = one code,
     // even across a vehicle change). A genuine new allotment takes the next code in
@@ -321,7 +327,7 @@ export async function POST(req: NextRequest) {
       ) VALUES ($1,$2,$3,$4,'active',$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
       RETURNING id, allotment_code`,
       [
-        b.rider_id, b.vehicle_id, b.hub_id ?? null, assignedDate,
+        b.rider_id, b.vehicle_id, hubForAllotment, assignedDate,
         b.amount_collected ?? null, b.payment_screenshot_url ?? null,
         b.undertaking_url ?? null, b.allotment_pics ?? null, session.name,
         dailyRent, paidThroughDateValue, carryOver ? carryOver.id : null, allotmentCode,
@@ -409,11 +415,16 @@ export async function POST(req: NextRequest) {
 
     // Update rider: status → active, rental_mode, onboarding_fee, security_deposit
     await client.query(
+      // assigned_hub_id is set here, not COALESCEd: taking a scooter from a hub
+      // IS the rider's hub, and it moves when they are re-allotted elsewhere.
+      // Leaving it unset is what sent riders to the app's city screen while
+      // they were sitting on one of our scooters.
       `UPDATE ${schemas.ops}.riders SET status = 'active',
        rental_mode = COALESCE($1, rental_mode), rider_mode = COALESCE($2, rider_mode),
-       onboarding_fee = COALESCE($3, onboarding_fee), security_deposit = COALESCE($4, security_deposit)
+       onboarding_fee = COALESCE($3, onboarding_fee), security_deposit = COALESCE($4, security_deposit),
+       assigned_hub_id = COALESCE($6, assigned_hub_id)
        WHERE id = $5`,
-      [b.rental_mode ?? null, b.rider_mode ?? null, onboardingFeeValue, b.security_deposit ?? null, b.rider_id]
+      [b.rental_mode ?? null, b.rider_mode ?? null, onboardingFeeValue, b.security_deposit ?? null, b.rider_id, hubForAllotment]
     );
 
     // Update vehicle status → assigned
