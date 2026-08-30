@@ -36,7 +36,7 @@ function toISTMidnight(d: Date): Date {
 }
 
 async function getData(id: string) {
-  const [rider, payments, assignments] = await Promise.all([
+  const [rider, payments, assignments, writeOffs] = await Promise.all([
     pool.query(`
       SELECT r.*, h.hub_name, h.id AS hub_id, h.city AS hub_city,
              r.aadhaar_front_url, r.aadhaar_back_url,
@@ -69,6 +69,16 @@ async function getData(id: string) {
       WHERE rva.rider_id = $1
       ORDER BY rva.assigned_date DESC
     `, [id]),
+
+    // Rent we recorded but never collected, and chose to absorb. Shown on the
+    // profile because that is where anyone asking "why does the payment say
+    // ₹1,680 when we took ₹800" is standing.
+    pool.query(`
+      SELECT w.amount::float8 AS amount, w.days, w.reason, w.decided_by,
+             to_char(w.occurred_on,'YYYY-MM-DD') AS occurred_on
+        FROM ${schemas.ops}.revenue_write_offs w
+       WHERE w.rider_id = $1
+       ORDER BY w.occurred_on DESC`, [id]),
   ]);
 
   if (!rider.rows[0]) return null;
@@ -77,7 +87,8 @@ async function getData(id: string) {
     (sum: number, p: { amount_collected: number }) => sum + Number(p.amount_collected), 0
   );
 
-  return { rider: rider.rows[0], payments: payments.rows, assignments: assignments.rows, totalCollected };
+  return { rider: rider.rows[0], payments: payments.rows, assignments: assignments.rows, totalCollected,
+           writeOffs: writeOffs.rows };
 }
 
 const statusColor: Record<string, string> = {
@@ -92,7 +103,7 @@ export default async function RiderDetailPage({ params }: { params: Promise<{ id
   const [data, session] = await Promise.all([getData(id), getSession()]);
   if (!data) notFound();
 
-  const { rider, payments, assignments, totalCollected } = data;
+  const { rider, payments, assignments, totalCollected, writeOffs } = data;
   const activeAssignment = assignments.find((a: { assignment_status: string }) => a.assignment_status === "active");
   const cycle = await getRiderCycle(rider.id); // unbroken weekly ledger (no gaps; stops at return)
 
@@ -162,6 +173,30 @@ export default async function RiderDetailPage({ params }: { params: Promise<{ id
           blacklistedAt={rider.blacklisted_at}
           role={session?.role ?? ""}
         />
+
+        {/* Rent we recorded but never took, and absorbed. It sits here because
+            this is where the question gets asked — the payment row says ₹1,680
+            and the counter took ₹800, and without this the profile just looks
+            wrong. For a filed month the payment row cannot be corrected, so
+            this line is the only place the difference is visible at all. */}
+        {writeOffs.length > 0 && (
+          <div className="bg-accent-warning/8 border border-accent-warning/30 rounded-xl p-4 space-y-2">
+            <p className="text-accent-warning-text font-semibold text-sm">
+              {inr(Math.round(writeOffs.reduce((s: number, w: { amount: number }) => s + Number(w.amount), 0)))} of rent written off
+              {" — recorded but never collected, and not charged to this rider"}
+            </p>
+            {writeOffs.map((w: { amount: number; days: number | null; reason: string; decided_by: string; occurred_on: string | null }, i: number) => (
+              <div key={i} className="text-xs">
+                <span className="text-secondary font-semibold">
+                  {inr(Math.round(Number(w.amount)))}{w.days ? ` · ${w.days} day${w.days === 1 ? "" : "s"}` : ""}
+                  {w.occurred_on ? ` · ${dateIN(w.occurred_on, { day: "numeric", month: "short" })}` : ""}
+                </span>
+                <span className="text-muted"> — {w.reason}</span>
+                <span className="text-faint"> (decided by {w.decided_by})</span>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Carry-forward. Ops and riders talk in days, so the days lead and the
             rupees follow, with the date it stops being spendable — the whole
