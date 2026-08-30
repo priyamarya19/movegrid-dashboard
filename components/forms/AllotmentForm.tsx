@@ -80,9 +80,23 @@ export default function AllotmentForm() {
   // Correcting the handover day moves the suggested start with it — until ops
   // deliberately type a start date, after which their choice stands.
   const [startTouched, setStartTouched] = useState(false);
+
+  // Rent is what's left after the fee and the deposit. Ops used to have to work
+  // that out and type it, and the first allotment after this field shipped had
+  // ₹3,180 collected with ₹0 of rent — a rider who had paid a full week looked
+  // overdue the next morning. So we do the subtraction and they correct it.
+  const [rentTouched, setRentTouched] = useState(false);
+  const suggestedRent = Math.max(
+    0,
+    (Number(form.amount_collected) || 0) - (Number(form.onboarding_fee) || 0) - (Number(form.security_deposit) || 0)
+  );
   useEffect(() => {
     if (!startTouched) setForm(p => ({ ...p, rent_start_date: defaultRentStart(p.assigned_date) }));
   }, [form.assigned_date, startTouched]);
+
+  useEffect(() => {
+    if (!rentTouched) setForm(p => ({ ...p, rent_collected: suggestedRent ? String(suggestedRent) : "" }));
+  }, [suggestedRent, rentTouched]);
 
   // Auto-fill EV details after debounce
   useEffect(() => {
@@ -250,10 +264,31 @@ export default function AllotmentForm() {
         <Field label="Amount Collected (₹)" required hint="Everything taken at handover — fee, deposit and rent together. ₹0 is allowed.">
           <input type="number" min="0" className={inp} value={form.amount_collected} onChange={e => set("amount_collected", e.target.value)} placeholder="0" required />
         </Field>
-        {/* Stated, never inferred. Reading a week's rent out of the bundled cash
-            is what invented ₹5,180 of payments that never happened. */}
-        <Field label="Of which, rent (₹)" required hint="How much of that is rent. ₹0 on a no-cash swap — the rest is fee and deposit.">
-          <input type="number" min="0" className={inp} value={form.rent_collected} onChange={e => set("rent_collected", e.target.value)} placeholder="0" required />
+        {/* Suggested, then stated. Inferring it silently invented ₹8,817 of
+            payments that never happened; leaving it blank and mandatory made
+            ops enter ₹0 on a rider who had paid a full week. So: show the
+            arithmetic, let them override it, and say plainly when ₹0 means the
+            rider bought no days. */}
+        <Field
+          label="Of which, rent (₹)"
+          required
+          hint={
+            Number(form.rent_collected) === 0 && Number(form.amount_collected) > 0
+              ? "₹0 means the rider buys no days and shows as due tomorrow. Right for a no-cash swap — otherwise enter the rent."
+              : `Fee and deposit taken out. ${
+                  Number(form.daily_rent) > 0 && Number(form.rent_collected) > 0
+                    ? `Buys ${Math.floor(Number(form.rent_collected) / Number(form.daily_rent))} day(s).`
+                    : "Edit if the split is different."
+                }`
+          }
+        >
+          <input
+            type="number" min="0"
+            className={inp + (Number(form.rent_collected) === 0 && Number(form.amount_collected) > 0 ? " border-accent-warning/60" : "")}
+            value={form.rent_collected}
+            onChange={e => { setRentTouched(true); set("rent_collected", e.target.value); }}
+            placeholder="0" required
+          />
         </Field>
         <ImageUpload label="Payment Screenshot" folder="payments" value={form.payment_screenshot_url} onChange={v => set("payment_screenshot_url", v)} />
         <ImageUpload label="Signed Undertaking" folder="undertakings" value={form.undertaking_url} onChange={v => set("undertaking_url", v)} />
