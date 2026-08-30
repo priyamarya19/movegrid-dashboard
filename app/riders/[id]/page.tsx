@@ -48,7 +48,16 @@ async function getData(id: string) {
     `, [id]),
 
     pool.query(`
-      SELECT rp.amount_collected, rp.payment_date, rp.rental_period_start, rp.rental_period_end, v.ev_number
+      SELECT rp.amount_collected, rp.payment_date, rp.rental_period_start, rp.rental_period_end,
+             rp.payment_mode, rp.payment_utr, rp.payment_screenshot_url, v.ev_number,
+             -- Rent written off that this row STILL claims. Zero once the row
+             -- itself has been corrected, so it is never subtracted twice.
+             COALESCE((
+               SELECT SUM(w.amount) FROM ${schemas.ops}.revenue_write_offs w
+                WHERE w.rider_id = rp.rider_id
+                  AND w.occurred_on = rp.payment_date
+                  AND w.payment_row_corrected = false
+             ), 0)::float8 AS not_received
       FROM ${schemas.ops}.rider_payments rp
       LEFT JOIN ${schemas.ops}.vehicles v ON v.id = rp.vehicle_id
       WHERE rp.rider_id = $1
@@ -83,8 +92,11 @@ async function getData(id: string) {
 
   if (!rider.rows[0]) return null;
 
+  // What was actually received, not what was recorded. A filed period's row
+  // cannot be corrected, so the write-off comes off here instead.
   const totalCollected = payments.rows.reduce(
-    (sum: number, p: { amount_collected: number }) => sum + Number(p.amount_collected), 0
+    (sum: number, p: { amount_collected: number; not_received: number }) =>
+      sum + Number(p.amount_collected) - Number(p.not_received ?? 0), 0
   );
 
   return { rider: rider.rows[0], payments: payments.rows, assignments: assignments.rows, totalCollected,
@@ -560,24 +572,57 @@ export default async function RiderDetailPage({ params }: { params: Promise<{ id
         <div className="bg-surface border border-default rounded-xl overflow-hidden">
           <div className="px-5 py-4 border-b border-default flex items-center justify-between">
             <h2 className="text-primary font-semibold">Payment History</h2>
-            <span className="text-[11px] text-muted">{payments.length} payment{payments.length !== 1 ? "s" : ""} · {inr(totalCollected)} collected</span>
+            <span className="text-[11px] text-muted">{payments.length} payment{payments.length !== 1 ? "s" : ""} · {inr(totalCollected)} actually received</span>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-default">
-                  {["Date Received", "Amount", "Period Covered", "Vehicle"].map((h) => (
+                  {["Date Received", "Amount", "Mode", "SS", "Period Covered", "Vehicle"].map((h) => (
                     <th key={h} className="text-left px-5 py-3 text-[11px] text-muted uppercase tracking-wider whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {payments.length === 0 ? (
-                  <tr><td colSpan={4} className="px-5 py-8 text-center text-muted">No payments recorded yet</td></tr>
-                ) : payments.map((p: { payment_date: string; amount_collected: number; rental_period_start: string | null; rental_period_end: string | null; ev_number: string | null }, i: number) => (
+                  <tr><td colSpan={6} className="px-5 py-8 text-center text-muted">No payments recorded yet</td></tr>
+                ) : payments.map((p: { payment_date: string; amount_collected: number; not_received: number; payment_mode: string | null; payment_utr: string | null; payment_screenshot_url: string | null; rental_period_start: string | null; rental_period_end: string | null; ev_number: string | null }, i: number) => {
+                  // What the counter actually took. Differs from the row only
+                  // where a write-off could not be applied to the row itself,
+                  // because the period is filed and those figures were
+                  // submitted. Both are shown — the money that arrived, and
+                  // what the books had to keep saying.
+                  const notReceived = Number(p.not_received ?? 0);
+                  const received = Number(p.amount_collected) - notReceived;
+                  return (
                   <tr key={i} className="border-b border-subtle">
                     <td className="px-5 py-3 text-secondary whitespace-nowrap">{dateIN(p.payment_date, { day: "numeric", month: "short", year: "numeric" })}</td>
-                    <td className="px-5 py-3 text-accent-teal font-semibold whitespace-nowrap">{inr(Math.round(Number(p.amount_collected)))}</td>
+                    <td className="px-5 py-3 whitespace-nowrap">
+                      <span className="text-accent-teal font-semibold">{inr(Math.round(received))}</span>
+                      {notReceived > 0 ? (
+                        <span className="block text-[11px] text-accent-warning-text">
+                          booked {inr(Math.round(Number(p.amount_collected)))} · {inr(Math.round(notReceived))} written off
+                        </span>
+                      ) : null}
+                    </td>
+                    <td className="px-5 py-3 text-secondary whitespace-nowrap">
+                      {p.payment_mode ?? <span className="text-faint">at handover</span>}
+                      {p.payment_utr ? <span className="block text-[11px] text-faint">{p.payment_utr}</span> : null}
+                    </td>
+                    <td className="px-5 py-3 whitespace-nowrap">
+                      {p.payment_screenshot_url ? (
+                        <a
+                          href={docHref(p.payment_screenshot_url)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-accent-purple hover:underline"
+                        >
+                          View
+                        </a>
+                      ) : (
+                        <span className="text-faint">—</span>
+                      )}
+                    </td>
                     <td className="px-5 py-3 text-secondary whitespace-nowrap">
                       {p.rental_period_start && p.rental_period_end
                         ? `${dateIN(p.rental_period_start, { day: "numeric", month: "short" })} – ${dateIN(p.rental_period_end, { day: "numeric", month: "short" })}`
@@ -585,7 +630,8 @@ export default async function RiderDetailPage({ params }: { params: Promise<{ id
                     </td>
                     <td className="px-5 py-3 text-secondary">{p.ev_number ?? "—"}</td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>

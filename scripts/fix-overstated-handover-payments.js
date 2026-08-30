@@ -71,6 +71,14 @@ const inr = (n) => "₹" + Math.round(Number(n || 0)).toLocaleString("en-IN");
     for (const x of todo) {
       await c.query(`UPDATE ${S}.rider_payments SET amount_collected = $2 WHERE id = $1`,
         [x.payment_id, x.cash]);
+      // Tell the profile the row already reflects the write-off, so it does not
+      // subtract it a second time and report a negative payment.
+      await c.query(
+        `UPDATE ${S}.revenue_write_offs SET payment_row_corrected = true
+          WHERE rider_id = (SELECT rider_id FROM ${S}.rider_payments WHERE id = $1)
+            AND occurred_on = (SELECT payment_date FROM ${S}.rider_payments WHERE id = $1)`,
+        [x.payment_id]
+      );
     }
 
     const corrected = todo.reduce((s, x) => s + (Number(x.row_says) - Number(x.cash)), 0);
