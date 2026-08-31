@@ -15,6 +15,7 @@ const PUBLIC_PATHS = [
   // Nightly balance sweep: same deal, its own X-Cron-Secret check inside.
   "/api/rider-balances/expire",
   "/api/rider-tickets/auto-close",
+  "/api/rider-locations/prune",
   // Rider-app login: pre-auth by definition (OTP request/verify), rate-limited inside.
   "/api/rider-auth",
 ];

@@ -36,7 +36,7 @@ function toISTMidnight(d: Date): Date {
 }
 
 async function getData(id: string) {
-  const [rider, payments, assignments, writeOffs] = await Promise.all([
+  const [rider, payments, assignments, writeOffs, lastSeen] = await Promise.all([
     pool.query(`
       SELECT r.*, h.hub_name, h.id AS hub_id, h.city AS hub_city,
              r.aadhaar_front_url, r.aadhaar_back_url,
@@ -88,6 +88,17 @@ async function getData(id: string) {
         FROM ${schemas.ops}.revenue_write_offs w
        WHERE w.rider_id = $1
        ORDER BY w.occurred_on DESC`, [id]),
+
+    // Last known position. One row — a full trail belongs on a map screen, and
+    // what ops actually ask at the counter is "where is it now".
+    pool.query(`
+      SELECT lat, lng, accuracy_m,
+             to_char(recorded_at AT TIME ZONE 'Asia/Kolkata', 'DD Mon, HH24:MI') AS at,
+             EXTRACT(EPOCH FROM (now() - recorded_at))::int / 60 AS minutes_ago
+        FROM ${schemas.ops}.rider_locations
+       WHERE rider_id = $1
+       ORDER BY recorded_at DESC
+       LIMIT 1`, [id]),
   ]);
 
   if (!rider.rows[0]) return null;
@@ -100,7 +111,7 @@ async function getData(id: string) {
   );
 
   return { rider: rider.rows[0], payments: payments.rows, assignments: assignments.rows, totalCollected,
-           writeOffs: writeOffs.rows };
+           writeOffs: writeOffs.rows, lastSeen: lastSeen.rows[0] ?? null };
 }
 
 const statusColor: Record<string, string> = {
@@ -115,7 +126,7 @@ export default async function RiderDetailPage({ params }: { params: Promise<{ id
   const [data, session] = await Promise.all([getData(id), getSession()]);
   if (!data) notFound();
 
-  const { rider, payments, assignments, totalCollected, writeOffs } = data;
+  const { rider, payments, assignments, totalCollected, writeOffs, lastSeen } = data;
   const activeAssignment = assignments.find((a: { assignment_status: string }) => a.assignment_status === "active");
   const cycle = await getRiderCycle(rider.id); // unbroken weekly ledger (no gaps; stops at return)
 
@@ -185,6 +196,36 @@ export default async function RiderDetailPage({ params }: { params: Promise<{ id
           blacklistedAt={rider.blacklisted_at}
           role={session?.role ?? ""}
         />
+
+        {/* Where the scooter was last heard from. Age matters more than the
+            coordinates: a fix from three days ago is not "where it is", and
+            showing it without saying so would be worse than showing nothing.
+            Accuracy is on display for the same reason — a 2km fix proves
+            very little. */}
+        {lastSeen && (
+          <div className="bg-surface border border-default rounded-xl p-4 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <span className="text-primary font-semibold text-sm">Scooter last seen</span>
+            <span className={`text-sm ${Number(lastSeen.minutes_ago) > 24 * 60 ? "text-accent-warning-text" : "text-secondary"}`}>
+              {Number(lastSeen.minutes_ago) < 60
+                ? `${Number(lastSeen.minutes_ago)} min ago`
+                : Number(lastSeen.minutes_ago) < 24 * 60
+                  ? `${Math.floor(Number(lastSeen.minutes_ago) / 60)}h ago`
+                  : `${Math.floor(Number(lastSeen.minutes_ago) / 1440)} day(s) ago`}
+              {" · "}{lastSeen.at}
+            </span>
+            <a
+              href={`https://www.google.com/maps?q=${lastSeen.lat},${lastSeen.lng}`}
+              target="_blank"
+              rel="noreferrer"
+              className="text-accent-purple hover:underline text-sm"
+            >
+              Open in Maps
+            </a>
+            {lastSeen.accuracy_m ? (
+              <span className="text-faint text-xs">±{Math.round(Number(lastSeen.accuracy_m))}m</span>
+            ) : null}
+          </div>
+        )}
 
         {/* Rent we recorded but never took, and absorbed. It sits here because
             this is where the question gets asked — the payment row says ₹1,680
