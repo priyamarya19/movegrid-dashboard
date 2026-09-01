@@ -53,8 +53,49 @@ export const outstandingSql = (a: string) => `
 // rent_dues is a periodically-regenerated display ledger that can go stale between
 // runs. paid_through_date is always current. getRiderCycle is the one exception: it
 // exists specifically to show per-week history, so it legitimately needs rent_dues.
+/**
+ * The set of assignments that share one continuous tenancy, and how far that
+ * tenancy is paid.
+ *
+ * A vehicle swap closes one assignment and opens another linked by
+ * continues_from_assignment_id. Coverage carries across that link — the rider
+ * never stopped renting — but paid_through_date stops moving on the closed row,
+ * because payments land on whichever assignment is live.
+ *
+ * So a week that happens to sit on the closed row showed as never paid, for
+ * ever, while the money that paid for it sat on the next row. Man Singh's
+ * 12–18 Aug is the case that surfaced it: paid on 19 Aug, shown as owed a
+ * fortnight later, on a profile whose own header said he owed half as much.
+ *
+ * Reading the furthest paid-through in the chain fixes every week at once.
+ * Only issue-swap continuations are linked, so a rider who genuinely left and
+ * came back still gets two separate tenancies, which is correct.
+ */
+export const CHAIN_CTE = (S: string, riderFilter = "") => `
+  chain_links AS (
+    SELECT a.id AS root, a.id AS node, a.paid_through_date, 0 AS depth
+      FROM ${S}.rider_vehicle_assignments a
+      ${riderFilter}
+    UNION ALL
+    SELECT l.root, n.id, n.paid_through_date, l.depth + 1
+      FROM ${S}.rider_vehicle_assignments n
+      JOIN chain_links l ON n.continues_from_assignment_id = l.node
+     -- Guard against a cycle in the links turning this into an infinite loop.
+     WHERE l.depth < 20
+  ),
+  chain AS (
+    SELECT root AS assignment_id, MAX(paid_through_date) AS paid_through_date
+      FROM chain_links GROUP BY root
+  )`;
+
+/**
+ * How much of a week the rider's money covers.
+ *
+ * Requires `chain c` joined on the week's assignment_id — see CHAIN_CTE. Falls
+ * back to the assignment's own dates if the join is missing anything.
+ */
 export const PAID_FROM_BALANCE = `
-  GREATEST(0, LEAST(COALESCE(a.paid_through_date, a.assigned_date), d.period_end) - d.period_start + 1) * a.daily_rent`;
+  GREATEST(0, LEAST(COALESCE(c.paid_through_date, a.paid_through_date, a.assigned_date), d.period_end) - d.period_start + 1) * a.daily_rent`;
 
 export type CycleWeek = {
   // due_date is null for a collected week 1 — it's paid at handover, there's no
@@ -76,7 +117,8 @@ export type CycleWeek = {
 export async function getRiderCycle(riderId: string): Promise<CycleWeek[]> {
   const S = schemas.ops;
   const res = await pool.query(`
-    WITH existing AS (
+    WITH RECURSIVE ${CHAIN_CTE(S, "WHERE a.rider_id = $1")},
+    existing AS (
       SELECT d.assignment_id, d.week_no, d.period_start, d.period_end, d.due_date, d.amount
       FROM ${S}.rent_dues d
       WHERE d.rider_id = $1
@@ -119,10 +161,13 @@ export async function getRiderCycle(riderId: string): Promise<CycleWeek[]> {
         to_char(CASE WHEN w.week_no = 1 THEN GREATEST(w.due_date, w.period_start) ELSE w.due_date END,'YYYY-MM-DD') AS due_date,
         w.period_start AS ps_dt, a.vehicle_id, a.status AS asgn_status,
         w.amount, a.sheet_note,
-        GREATEST(0, LEAST(COALESCE(a.paid_through_date, a.assigned_date), w.period_end) - w.period_start + 1) * a.daily_rent AS paid,
+        -- The tenancy's paid-through, not this row's: a swap moves payments
+        -- onto the next assignment while the week stays on the old one.
+        GREATEST(0, LEAST(COALESCE(c.paid_through_date, a.paid_through_date, a.assigned_date), w.period_end) - w.period_start + 1) * a.daily_rent AS paid,
         v.ev_number, a.assigned_date
       FROM weeks w
       JOIN ${S}.rider_vehicle_assignments a ON a.id = w.assignment_id
+      LEFT JOIN chain c ON c.assignment_id = w.assignment_id
       LEFT JOIN ${S}.vehicles v ON v.id = a.vehicle_id
     ) q
     ORDER BY assigned_date, period_start`, [riderId]);
@@ -139,10 +184,12 @@ export const getLedgerSummary = cached(async function getLedgerSummary(scope: Hu
   const S = schemas.ops;
   const hubHist = hubScopeSql(scope, 'a.hub_id');
   const res = await pool.query(`
-    WITH hist AS (
+    WITH RECURSIVE ${CHAIN_CTE(S)},
+    hist AS (
       SELECT d.amount, d.period_start, ${PAID_FROM_BALANCE} AS paid
       FROM ${S}.rent_dues d
       JOIN ${S}.rider_vehicle_assignments a ON a.id = d.assignment_id
+      LEFT JOIN chain c ON c.assignment_id = d.assignment_id
       WHERE true${hubHist}
     ),
     live AS (

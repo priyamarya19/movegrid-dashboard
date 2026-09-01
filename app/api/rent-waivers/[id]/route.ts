@@ -13,8 +13,8 @@ async function canApprove(userId: string): Promise<boolean> {
 }
 
 // Approve or reject a pending rent waiver request. Approving is the only path that
-// actually moves money: it extends paid_through_date on the assignment by the
-// credited days, which is what clears whatever "owed" amount built up while pending.
+// actually moves money: it credits the waived days' VALUE to the assignment,
+// which reduces what the rider owes without shifting their rent week.
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const guard = await requireSession(req);
   if ("response" in guard) return guard.response;
@@ -52,34 +52,42 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     );
 
     if (action === "approve") {
-      // Waiver days can be fractional (1.5) but paid_through_date only moves in
-      // whole days — the sub-day remainder is kept as an ₹ credit (rent_credit)
-      // on the assignment, which the next recorded payment folds in. An earlier
-      // remainder already sitting in rent_credit is combined first, so two half-
-      // day waivers add up to a full extra day rather than being lost.
+      // A waiver is a DISCOUNT, not free days.
+      //
+      // It used to move paid_through_date forward, which handed the rider the
+      // waived days as coverage — and shifted their whole cycle with it. Two
+      // waived days meant their collection day fell two days later, for ever,
+      // and again on the next waiver. Shashank's had drifted a week and a half.
+      //
+      // Ops' rule (Priyam, 1 Sep 2026): the rent week never moves. Week 1–7
+      // stays 1–7 and the next is still 8–14; what changes is that the rider
+      // hands over two days less cash for the week the vehicle was down.
+      //
+      // Crediting rupees does exactly that, and needs no other change:
+      //   * paid_through_date does not move, so the weeks stay put
+      //   * outstandingSql already subtracts rent_credit, so the amount due
+      //     drops the moment it is approved
+      //   * recordRentPayment already does payment + rent_credit before
+      //     dividing into days, so ₹1,200 cash + ₹480 credit still buys the
+      //     full 7 days and the next week starts on schedule
+      //
+      // Fractional days need no special handling any more — 1.5 days is simply
+      // 1.5 × the rate. The old whole-day rounding only existed because a date
+      // cannot move half a day.
       const asgn = await client.query(
         `SELECT daily_rent, rent_credit FROM ${schemas.ops}.rider_vehicle_assignments
          WHERE id = $1 FOR UPDATE`,
         [req_.rows[0].assignment_id]
       );
       const dailyRent = Number(asgn.rows[0]?.daily_rent) || 0;
-      const days = Number(req_.rows[0].non_functional_days);
-      let wholeDays: number, newCredit: number;
-      if (dailyRent > 0) {
-        const total = days * dailyRent + (Number(asgn.rows[0]?.rent_credit) || 0);
-        wholeDays = Math.floor(total / dailyRent + 1e-9);
-        newCredit = Math.max(0, Math.round((total - wholeDays * dailyRent) * 100) / 100);
-      } else {
-        // No daily rate to value a fraction with — credit the whole days only.
-        wholeDays = Math.floor(days);
-        newCredit = Number(asgn.rows[0]?.rent_credit) || 0;
-      }
+      const days = Number(req_.rows[0].non_functional_days) || 0;
+      const waivedValue = Math.round(days * dailyRent * 100) / 100;
+
       await client.query(
         `UPDATE ${schemas.ops}.rider_vehicle_assignments
-         SET paid_through_date = COALESCE(paid_through_date, assigned_date) + $1::int,
-             rent_credit = $2
-         WHERE id = $3`,
-        [wholeDays, newCredit, req_.rows[0].assignment_id]
+         SET rent_credit = COALESCE(rent_credit, 0) + $1
+         WHERE id = $2`,
+        [waivedValue, req_.rows[0].assignment_id]
       );
     }
 

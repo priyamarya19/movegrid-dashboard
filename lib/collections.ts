@@ -2,7 +2,7 @@ import pool from "@/lib/db";
 import { schemas } from "@/lib/schemas";
 import { hubScopeSql, type HubScope } from "@/lib/hubScope";
 import { cached } from "@/lib/cache";
-import { nextDueSql, outstandingSql } from "@/lib/rent";
+import { nextDueSql, outstandingSql, CHAIN_CTE, PAID_FROM_BALANCE } from "@/lib/rent";
 
 // Month-to-date window, in IST (the business timezone used elsewhere in the app).
 const IST = "(now() AT TIME ZONE 'Asia/Kolkata')::date";
@@ -94,11 +94,15 @@ export type WeeklyCollection = { week: string; expected: number; collected: numb
 export const getWeeklyCollections = cached(async function getWeeklyCollections(): Promise<WeeklyCollection[]> {
   const S = schemas.ops;
   const res = await pool.query(`
+    WITH RECURSIVE ${CHAIN_CTE(S)}
     SELECT to_char(date_trunc('week', d.period_start), 'YYYY-MM-DD') AS week,
            SUM(d.amount)::numeric AS expected,
-           SUM(LEAST(GREATEST(0, LEAST(COALESCE(a.paid_through_date, a.assigned_date), d.period_end) - d.period_start + 1) * a.daily_rent, d.amount))::numeric AS collected
+           -- Coverage follows the tenancy, not the individual assignment: a
+           -- vehicle swap otherwise makes the swap week look uncollected.
+           SUM(LEAST(${PAID_FROM_BALANCE}, d.amount))::numeric AS collected
     FROM ${S}.rent_dues d
     JOIN ${S}.rider_vehicle_assignments a ON a.id = d.assignment_id
+    LEFT JOIN chain c ON c.assignment_id = d.assignment_id
     WHERE d.period_start <= ${IST}
     GROUP BY 1 ORDER BY 1`);
   return res.rows.map((r) => ({ week: r.week, expected: Number(r.expected), collected: Number(r.collected) }));
