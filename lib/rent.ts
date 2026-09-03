@@ -275,7 +275,13 @@ export const getDueSoonRiders = cached(async function getDueSoonRiders(scope: Hu
   const S = schemas.ops;
   const res = await pool.query(`
     SELECT r.id AS rider_id, r.rider_code, r.name, r.mobile,
-      to_char(COALESCE(a.paid_through_date, a.assigned_date) + 1, 'YYYY-MM-DD') AS next_due_date
+      -- The LAST day the rider is covered, not the first uncovered one. That is
+      -- the definition the rest of the system uses: nextDueSql returns
+      -- paid_through_date, and the rent_due_tomorrow push fires on the day
+      -- paid_through_date equals today — so a rider is nudged while still
+      -- covered. The + 1 here put this list a day behind its own reminder, and
+      -- showed a different due date from the same rider's profile.
+      to_char(COALESCE(a.paid_through_date, a.assigned_date), 'YYYY-MM-DD') AS next_due_date
     FROM ${S}.rider_vehicle_assignments a
     JOIN ${S}.riders r ON r.id = a.rider_id
     WHERE a.status = 'active'
@@ -287,7 +293,7 @@ export const getDueSoonRiders = cached(async function getDueSoonRiders(scope: Hu
     rider_id: r.rider_id, rider_code: r.rider_code, name: r.name, mobile: r.mobile,
     next_due_date: r.next_due_date,
   }));
-}, ["due-soon-riders-v3"], { revalidate: 60 });
+}, ["due-soon-riders-v4"], { revalidate: 60 });
 
 // The "collect this week" worklist: riders at least one full day past their
 // paid-through date — their current payment-cycle week (paid_through + 1 …

@@ -59,7 +59,11 @@ export async function getFleetRentStatusReport(): Promise<FleetRentStatusRow[]> 
       COALESCE(pt.paid_last_month, 0) AS paid_last_month,
       COALESCE(pt.paid_mtd, 0) AS paid_mtd,
       (q.daily_rent * 7) AS weekly_rent,
-      to_char(q.paid_through + 1, 'YYYY-MM-DD') AS next_due_date,
+      -- The last day the rider is covered, matching nextDueSql, the profile and
+      -- the rent_due_tomorrow push (which fires on the day paid_through equals
+      -- today). The + 1 here put the emailed sheet a day later than every other
+      -- surface and a day after the reminder had already gone out.
+      to_char(q.paid_through, 'YYYY-MM-DD') AS next_due_date,
       -- Rent is billed weekly — round up to a whole week even if only partway into
       -- an unpaid one (paid_through_date itself stays day-precise internally).
       --
