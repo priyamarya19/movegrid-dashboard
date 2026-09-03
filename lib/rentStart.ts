@@ -1,7 +1,7 @@
 /**
  * When rent starts, given when the scooter went out.
  *
- * The 3 PM rule, agreed with ops: a rider who collects in the morning has the
+ * The 2 PM rule, agreed with ops: a rider who collects in the morning has the
  * day to earn in, so that day is chargeable. A rider who collects late does
  * not, so the day is free and charging starts tomorrow.
  *
@@ -12,7 +12,17 @@
 
 /** IST is UTC+5:30, with no daylight saving to worry about. */
 const IST_OFFSET_MIN = 330;
-export const RENT_START_CUTOFF_HOUR = 15;
+
+/**
+ * The cut-off, in IST hours. Collect before it and the day is chargeable;
+ * collect after and it is free.
+ *
+ * Moved from 15 to 14 on 3 Sep 2026. Gaurav and Rohit were handed scooters at
+ * 14:04 and 14:50 and charged for that day, which ops did not consider a full
+ * day's earning — the boundary is where a rider can still make the day pay,
+ * and 2 PM is where that actually sits.
+ */
+export const RENT_START_CUTOFF_HOUR: number = require("./rentStartCutoff").RENT_START_CUTOFF_HOUR;
 
 /** The wall-clock date and hour in IST for an instant. */
 export function istParts(at: Date): { date: string; hour: number; minute: number } {
@@ -50,6 +60,6 @@ export function rentStartReason(handoverDate: string, at: Date = new Date()): st
   const now = istParts(at);
   if (now.date !== handoverDate) return "back-dated allotment, so the handover day is free";
   return now.hour < RENT_START_CUTOFF_HOUR
-    ? "handed over before 3 PM, so today is chargeable"
-    : "handed over after 3 PM, so today is free";
+    ? "handed over before 2 PM, so today is chargeable"
+    : "handed over after 2 PM, so today is free";
 }

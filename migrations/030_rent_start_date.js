@@ -3,10 +3,14 @@
 // Until now the two were the same thing: rent ran from the day AFTER
 // assigned_date, always. That blanket free day is generous on a rider who
 // collects at 9 in the morning and gets a full day's earning out of it, and
-// mean on nobody — so ops asked for the 3 PM cut-off instead:
+// mean on nobody — so ops asked for a cut-off instead:
 //
-//   handed over BEFORE 3 PM IST  ->  rent starts the same day
-//   handed over AT/AFTER 3 PM    ->  rent starts the next day
+//   handed over BEFORE the cut-off  ->  rent starts the same day
+//   handed over AT/AFTER it         ->  rent starts the next day
+//
+// The cut-off was 3 PM when this migration ran and moved to 2 PM on 3 Sep 2026.
+// It lives in lib/rentStart.ts, not here — this migration only makes room for
+// the dates it produces.
 //
 // Ops can still type a different date — riders turn up late, a scooter goes out
 // on trial, things happen — but that is a money decision, so it needs an
@@ -20,8 +24,8 @@ module.exports.up = async ({ client, S }) => {
 
   await client.query(`
     ALTER TABLE ${T}
-      -- When the rider actually took the scooter. The 3 PM rule reads this, so
-      -- it has to be a timestamp, not a date.
+      -- When the rider actually took the scooter. The cut-off rule reads this,
+      -- so it has to be a timestamp, not a date.
       ADD COLUMN IF NOT EXISTS handed_over_at         timestamptz,
       -- First chargeable day.
       ADD COLUMN IF NOT EXISTS rent_start_date        date,

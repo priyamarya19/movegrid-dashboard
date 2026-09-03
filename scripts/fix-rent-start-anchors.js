@@ -3,7 +3,7 @@
 //   RDS_ENV=uat  node scripts/fix-rent-start-anchors.js            # DRY RUN
 //   RDS_ENV=prod node scripts/fix-rent-start-anchors.js --apply
 //
-// The 3 PM rule made a morning handover chargeable from the handover day
+// The 2 PM rule made a morning handover chargeable from the handover day
 // itself, and moved paid_through_date accordingly — but three places kept
 // anchoring on "the day after handover":
 //

@@ -249,7 +249,7 @@ export default function AllotmentForm() {
         <Field label="Allotment Date" required hint="The day the rider actually took the scooter">
           <input type="date" className={inp} value={form.assigned_date} onChange={e => set("assigned_date", e.target.value)} max={istTodayISO()} required />
         </Field>
-        {/* The 3 PM rule. The default is computed, shown with its reason, and
+        {/* The 2 PM rule. The default is computed, shown with its reason, and
             typing anything else costs an admin's code — the whole point being
             that a free day is a real ₹240 decision, not a form field. */}
         <Field label="Rent Starts" required hint={rentStartHint}>

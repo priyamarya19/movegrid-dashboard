@@ -152,7 +152,7 @@ export async function POST(req: NextRequest) {
 
     // ── When rent starts ───────────────────────────────────────────────────
     //
-    // The 3 PM rule (see lib/rentStart.ts). Ops may type a different date, but
+    // The 2 PM rule (see lib/rentStart.ts). Ops may type a different date, but
     // then an admin has to have approved it — the approval is bound to the
     // rider, the vehicle and the date itself, so a code cannot be moved onto a
     // different allotment or a different day.
@@ -279,7 +279,7 @@ export async function POST(req: NextRequest) {
     } else {
       // "Paid through" is the last covered day, so with nothing paid it is the
       // day BEFORE rent starts. Anchoring on the rent start date rather than the
-      // handover date is what makes the 3 PM rule (and any approved override)
+      // handover date is what makes the 2 PM rule (and any approved override)
       // actually move the money.
       const base = new Date(requestedStart + "T00:00:00Z");
       base.setUTCDate(base.getUTCDate() - 1 + daysBought);
@@ -393,7 +393,7 @@ export async function POST(req: NextRequest) {
       // Record what was actually handed over, for the days it actually buys —
       // not an assumed week. payment_date is the day the money arrived; the
       // period is the stretch it covers, which starts when RENT starts — not
-      // the day after handover. Those were the same thing until the 3 PM rule;
+      // the day after handover. Those were the same thing until the 2 PM rule;
       // now a morning handover is charged from the same day, and this row was
       // still labelling it from the next one. Gaurav and Rohit's ₹1,820 on
       // 3 Sep bought 3–9 Sep and the row claimed 4–10 Sep.
