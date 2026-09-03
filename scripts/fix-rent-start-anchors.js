@@ -7,9 +7,8 @@
 // itself, and moved paid_through_date accordingly — but three places kept
 // anchoring on "the day after handover":
 //
-//   * the handover payment's rental_period_start/end
-//   * the weekly rent_dues rows
-//   * the live week synthesis (code only, nothing stored)
+//   * the handover payment's rental_period_start/end  <- repaired here
+//   * the live week synthesis                          <- code fix, nothing stored
 //
 // So Gaurav and Rohit's ₹1,820 on 3 Sep bought 3–9 Sep while the row said
 // 4–10 Sep, and a fully paid week showed as "PARTIAL ₹1,560 / ₹1,820" beside
@@ -76,37 +75,11 @@ const APPLY = process.argv.includes("--apply");
       console.log("Handover payment periods: nothing to correct.");
     }
 
-    // ── 2. the stored weekly dues ──────────────────────────────────────────
-    const dues = await c.query(`
-      SELECT ri.name, d.id, d.week_no,
-             to_char(d.period_start,'DD Mon') AS old_from, to_char(d.period_end,'DD Mon') AS old_to,
-             to_char(d.period_start - 1,'DD Mon') AS new_from, to_char(d.period_end - 1,'DD Mon') AS new_to
-        FROM ${S}.rent_dues d
-        JOIN ${S}.rider_vehicle_assignments a ON a.id = d.assignment_id
-        JOIN ${S}.riders ri ON ri.id = d.rider_id
-       WHERE a.rent_start_date = a.assigned_date
-         AND a.continues_from_assignment_id IS NULL
-         AND d.period_start > a.rent_start_date
-         -- Only the run that began a day late; a continuation takes its cadence
-         -- from the previous assignment and is right as it stands.
-         AND d.period_start = a.assigned_date + 1 + (d.week_no - 1) * 7
-       ORDER BY ri.name, d.week_no`);
-
-    if (dues.rows.length) {
-      console.log("\nWeekly dues drawn a day late:");
-      console.table(dues.rows.map((x) => ({
-        rider: x.name.slice(0, 20), week: x.week_no,
-        period: `${x.old_from} – ${x.old_to}  →  ${x.new_from} – ${x.new_to}`,
-      })));
-      await c.query(
-        `UPDATE ${S}.rent_dues
-            SET period_start = period_start - 1, period_end = period_end - 1, due_date = due_date - 1
-          WHERE id = ANY($1::uuid[])`,
-        [dues.rows.map((x) => x.id)]
-      );
-    } else {
-      console.log("\nWeekly dues: nothing to correct.");
-    }
+    // The stored weekly dues are NOT touched. Every one of the 121 tenancies
+    // anchors week 1 on the handover day, which is what the nightly job
+    // produces and what the coverage arithmetic expects. The PARTIAL that
+    // started this was the live SYNTHESIS drawing week 1 a day late before the
+    // job had written anything — a code fault, with nothing stored to repair.
 
     // Nothing about the money may have moved.
     const money = await c.query(`
