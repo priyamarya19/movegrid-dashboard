@@ -63,9 +63,11 @@ async function fixtures(c, opts = {}) {
 
   const email = `test-${tag}@movegrid.in`;
   const password = `uat-test-${tag}`;
+  // can_approve_rent_waivers is a per-user permission that does NOT come with
+  // the admin role, so a suite touching waivers has to be granted it explicitly.
   const userId = (await c.query(
-    `INSERT INTO ${A}.users (name, email, mobile, password_hash, role_id, status)
-     VALUES ($1,$2,$3,$4,$5,'active') RETURNING id`,
+    `INSERT INTO ${A}.users (name, email, mobile, password_hash, role_id, status, can_approve_rent_waivers)
+     VALUES ($1,$2,$3,$4,$5,'active',true) RETURNING id`,
     [`ZZ Test ${tag}`, email, "+9190" + tag, await bcrypt.hash(password, 10), roleId]
   )).rows[0].id;
   made.users.push(userId);
