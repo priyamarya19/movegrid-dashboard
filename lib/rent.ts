@@ -125,7 +125,14 @@ export async function getRiderCycle(riderId: string): Promise<CycleWeek[]> {
     ),
     gaps AS (
       SELECT a.id AS assignment_id, a.daily_rent,
-        COALESCE((SELECT MAX(e.period_end) FROM existing e WHERE e.assignment_id = a.id), a.assigned_date) AS last_covered,
+        -- Where the first week starts. Anchored on rent_start_date - 1, NOT on
+        -- assigned_date: since the 3 PM rule a morning handover is charged from
+        -- the handover day itself, and anchoring on assigned_date drew the week
+        -- a day late — so a fully paid week showed as 6/7 Partial next to
+        -- "paid up ₹0". Migration 030 backfilled rent_start_date to
+        -- assigned_date + 1 for every older row, so this is identical for them.
+        COALESCE((SELECT MAX(e.period_end) FROM existing e WHERE e.assignment_id = a.id),
+                 COALESCE(a.rent_start_date, a.assigned_date + 1) - 1) AS last_covered,
         COALESCE((SELECT MAX(e.week_no) FROM existing e WHERE e.assignment_id = a.id), 0) AS last_week_no
       FROM ${S}.rider_vehicle_assignments a
       WHERE a.rider_id = $1 AND a.status = 'active'

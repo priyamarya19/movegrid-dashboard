@@ -323,8 +323,9 @@ export async function POST(req: NextRequest) {
         rider_id, vehicle_id, hub_id, assigned_date, status,
         amount_collected, payment_screenshot_url, undertaking_url, allotment_pics, allotted_by,
         daily_rent, paid_through_date, continues_from_assignment_id, allotment_code,
-        handed_over_at, rent_start_date, rent_start_overridden, rent_start_approved_by
-      ) VALUES ($1,$2,$3,$4,'active',$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+        handed_over_at, rent_start_date, rent_start_overridden, rent_start_approved_by,
+        rent_collected, fee_collected, deposit_collected
+      ) VALUES ($1,$2,$3,$4,'active',$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
       RETURNING id, allotment_code`,
       [
         b.rider_id, b.vehicle_id, hubForAllotment, assignedDate,
@@ -332,6 +333,12 @@ export async function POST(req: NextRequest) {
         b.undertaking_url ?? null, b.allotment_pics ?? null, session.name,
         dailyRent, paidThroughDateValue, carryOver ? carryOver.id : null, allotmentCode,
         handedOverAt, requestedStart, startOverridden, startApprovedBy,
+        // The whole split, as stated at the counter. amount_collected is one
+        // bundled figure; without these three, reconciling it against its parts
+        // means finding numbers that happen to add up.
+        rentCollected,
+        onboardingFeeValue,
+        b.security_deposit ?? null,
       ]
     );
 
@@ -385,11 +392,15 @@ export async function POST(req: NextRequest) {
     if (rentCollected > 0) {
       // Record what was actually handed over, for the days it actually buys —
       // not an assumed week. payment_date is the day the money arrived; the
-      // period is the stretch it covers, starting the day after handover.
+      // period is the stretch it covers, which starts when RENT starts — not
+      // the day after handover. Those were the same thing until the 3 PM rule;
+      // now a morning handover is charged from the same day, and this row was
+      // still labelling it from the next one. Gaurav and Rohit's ₹1,820 on
+      // 3 Sep bought 3–9 Sep and the row claimed 4–10 Sep.
       await client.query(
         `INSERT INTO ${schemas.ops}.rider_payments (rider_id, vehicle_id, amount_collected, payment_date, rental_period_start, rental_period_end)
-         VALUES ($1, $2, $3, (now() AT TIME ZONE 'Asia/Kolkata')::date, $4::date + 1, $4::date + $5::int)`,
-        [b.rider_id, b.vehicle_id, rentCollected, assignedDate, Math.max(1, daysBought)]
+         VALUES ($1, $2, $3, (now() AT TIME ZONE 'Asia/Kolkata')::date, $4::date, $4::date + $5::int - 1)`,
+        [b.rider_id, b.vehicle_id, rentCollected, requestedStart, Math.max(1, daysBought)]
       );
     }
 
@@ -451,6 +462,10 @@ export async function POST(req: NextRequest) {
         rider_id: b.rider_id, vehicle_id: b.vehicle_id,
         allotment_code: result.rows[0].allotment_code,
         amount_collected: b.amount_collected ?? null,
+        rent_collected: rentCollected,
+        fee_collected: onboardingFeeValue,
+        deposit_collected: b.security_deposit ?? null,
+        rent_stated_by_ops: rentStated,
         rent_start_date: requestedStart,
         rent_start_overridden: startOverridden,
         rent_start_approved_by: startApprovedBy,
