@@ -155,6 +155,7 @@ export type CallListRow = {
   last_payment_date: string | null; last_payment_amount: number | null;
   claim_pending: boolean; waiver_pending: boolean;
   daily_rent: number | null; rent_credit: number; allotment_code: string | null;
+  penalty_pending: number; penalty_count: number; penalty_oldest_days: number | null;
 };
 
 export async function getCallList(): Promise<CallListRow[]> {
@@ -166,6 +167,9 @@ export async function getCallList(): Promise<CallListRow[]> {
       ${outstandingSql("a")} AS outstanding,
       to_char(${nextDueSql("a")}, 'YYYY-MM-DD') AS next_due_date,
       lp.d AS last_payment_date, lp.amt AS last_payment_amount,
+      COALESCE(pen.total, 0) AS penalty_pending,
+      COALESCE(pen.n, 0) AS penalty_count,
+      pen.oldest_days AS penalty_oldest_days,
       EXISTS (SELECT 1 FROM ${S}.payment_claims c WHERE c.rider_id = r.id AND c.status = 'pending') AS claim_pending,
       EXISTS (SELECT 1 FROM ${S}.rent_waiver_requests w WHERE w.rider_id = r.id AND w.status = 'pending') AS waiver_pending
     FROM ${S}.rider_vehicle_assignments a
@@ -177,9 +181,20 @@ export async function getCallList(): Promise<CallListRow[]> {
       FROM ${S}.rider_payments p WHERE p.rider_id = r.id
       ORDER BY p.payment_date DESC, p.created_at DESC LIMIT 1
     ) lp ON true
+    -- Damage and challan penalties. They live in their own table and appeared on
+    -- no report, so ₹1.9L accumulated with nobody chasing any of it: a rider could
+    -- read ₹0 outstanding here while owing five figures for a smashed chassis.
+    LEFT JOIN LATERAL (
+      SELECT SUM(x.amount)::numeric AS total, COUNT(*)::int AS n,
+             MAX((${IST} - x.created_at::date))::int AS oldest_days
+      FROM ${S}.rider_penalties x
+      WHERE x.rider_id = r.id AND x.status = 'pending'
+    ) pen ON true
     WHERE a.status = 'active'
-      AND (${IST} - COALESCE(a.paid_through_date, a.assigned_date)) >= 1
-    ORDER BY days_behind DESC, outstanding DESC`);
+      -- A rider current on rent but holding an unpaid penalty still needs the call.
+      AND ((${IST} - COALESCE(a.paid_through_date, a.assigned_date)) >= 1
+           OR COALESCE(pen.total, 0) > 0)
+    ORDER BY days_behind DESC, outstanding DESC, penalty_pending DESC`);
   return res.rows.map((r) => ({
     rider_id: r.rider_id, rider_name: r.rider_name, rider_code: r.rider_code, mobile: r.mobile,
     ev_number: r.ev_number, hub_name: r.hub_name,
@@ -189,6 +204,8 @@ export async function getCallList(): Promise<CallListRow[]> {
     claim_pending: r.claim_pending === true, waiver_pending: r.waiver_pending === true,
     daily_rent: r.daily_rent == null ? null : Number(r.daily_rent), rent_credit: Math.round(Number(r.rent_credit)),
     allotment_code: r.allotment_code,
+    penalty_pending: Math.round(Number(r.penalty_pending)), penalty_count: Number(r.penalty_count),
+    penalty_oldest_days: r.penalty_oldest_days == null ? null : Number(r.penalty_oldest_days),
   }));
 }
 

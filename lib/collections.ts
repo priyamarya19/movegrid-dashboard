@@ -119,6 +119,7 @@ export type ChaseRow = {
   rider_id: string; rider_code: string | null; name: string;
   allotment_code: string | null; days_behind: number; outstanding: number;
   next_due_date: string; sheet_note: string | null;
+  penalty_pending: number; penalty_count: number;
 };
 export const getChaseList = cached(async function getChaseList(scope: HubScope = null): Promise<ChaseRow[]> {
   const S = schemas.ops;
@@ -128,15 +129,27 @@ export const getChaseList = cached(async function getChaseList(scope: HubScope =
       -- "Complete the started weeks" balance (option 2) — same formula as the
       -- rider page and app, so every screen shows one number.
       ${outstandingSql("a")} AS outstanding,
-      to_char(${nextDueSql("a")}, 'YYYY-MM-DD') AS next_due_date
+      to_char(${nextDueSql("a")}, 'YYYY-MM-DD') AS next_due_date,
+      -- Damage and challan penalties, which are owed just as much as the rent but
+      -- lived only on the rider's own profile page — so a rider reading ₹0 here
+      -- could still owe five figures. Kept as its own column, never added into
+      -- outstanding: rent arithmetic must stay rent arithmetic.
+      COALESCE(pen.total, 0) AS penalty_pending,
+      COALESCE(pen.n, 0) AS penalty_count
     FROM ${S}.rider_vehicle_assignments a
     JOIN ${S}.riders r ON r.id = a.rider_id
+    LEFT JOIN LATERAL (
+      SELECT SUM(x.amount)::numeric AS total, COUNT(*)::int AS n
+      FROM ${S}.rider_penalties x
+      WHERE x.rider_id = r.id AND x.status = 'pending'
+    ) pen ON true
     WHERE a.status = 'active'
       ${hubScopeSql(scope, 'a.hub_id')}
-    ORDER BY outstanding DESC`);
+    ORDER BY outstanding DESC, penalty_pending DESC`);
   return res.rows.map((r) => ({
     rider_id: r.rider_id, rider_code: r.rider_code, name: r.name, allotment_code: r.allotment_code,
     days_behind: Number(r.days_behind), outstanding: Number(r.outstanding),
     next_due_date: r.next_due_date, sheet_note: r.sheet_note,
+    penalty_pending: Math.round(Number(r.penalty_pending)), penalty_count: Number(r.penalty_count),
   }));
-}, ["chase-list-v4"], { revalidate: 60 });
+}, ["chase-list-v5"], { revalidate: 60 });

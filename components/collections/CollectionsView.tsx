@@ -28,6 +28,13 @@ export default function CollectionsView({
   const outstanding = owed.reduce((s, r) => s + r.outstanding, 0);
   const maxE = Math.max(1, ...weekly.map((w) => w.expected));
 
+  // A penalty is owed whether or not the rent is current, so the chase list has
+  // to include riders whose only debt is a penalty — otherwise they are on no
+  // report at all and nobody ever rings them.
+  const penaltyTotal = chase.reduce((s, r) => s + r.penalty_pending, 0);
+  const withPenalty = chase.filter((r) => r.penalty_pending > 0);
+  const toChase = chase.filter((r) => r.outstanding > 0 || r.penalty_pending > 0);
+
   const bsum = BUCKETS.map((b) => {
     const rs = chase.filter((r) => b.test(r.days_behind));
     return { ...b, riders: rs.length, amount: rs.reduce((s, r) => s + r.outstanding, 0) };
@@ -35,12 +42,14 @@ export default function CollectionsView({
   const owedTotal = bsum.slice(1).reduce((s, b) => s + b.amount, 0);
 
   const active = bucket ? bsum.find((b) => b.key === bucket) : null;
-  const rows = (active ? chase.filter((r) => active.test(r.days_behind)) : owed).slice().sort((a, z) => z.outstanding - a.outstanding);
+  const rows = (active ? chase.filter((r) => active.test(r.days_behind)) : toChase).slice()
+    .sort((a, z) => (z.outstanding - a.outstanding) || (z.penalty_pending - a.penalty_pending));
 
   const tiles = [
     { lbl: "Expected to date", val: inr(summary.expectedToDate), note: "all rent weeks started" },
     { lbl: "Collected", val: inr(summary.collected), note: `${summary.pct}% collection rate` },
     { lbl: "Outstanding now", val: inr(outstanding), note: "live balance, active riders" },
+    { lbl: "Penalties unpaid", val: inr(penaltyTotal), note: `${withPenalty.length} rider${withPenalty.length !== 1 ? "s" : ""}, on top of rent` },
     { lbl: "Riders behind", val: `${owed.length} of ${chase.length}`, note: `${bsum[3].riders} are 15+ days late` },
   ];
 
@@ -52,7 +61,7 @@ export default function CollectionsView({
       </div>
 
       {/* Stat tiles */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         {tiles.map((t) => (
           <div key={t.lbl} className="bg-surface border border-default rounded-xl p-4">
             <div className="text-[11px] uppercase tracking-wider text-muted font-semibold">{t.lbl}</div>
@@ -112,21 +121,23 @@ export default function CollectionsView({
         <div className="px-5 py-4 border-b border-default flex items-center justify-between">
           <h2 className="text-primary font-semibold text-[15px]">Chase list</h2>
           <span className="text-xs text-muted">
-            {active ? `${active.label}: ${rows.length} rider${rows.length !== 1 ? "s" : ""} · ${inr(rows.reduce((s, r) => s + r.outstanding, 0))}` : `${owed.length} riders with a balance`}
+            {active
+              ? `${active.label}: ${rows.length} rider${rows.length !== 1 ? "s" : ""} · ${inr(rows.reduce((s, r) => s + r.outstanding, 0))}`
+              : `${owed.length} riders with a balance${toChase.length > owed.length ? ` · ${toChase.length - owed.length} owing a penalty only` : ""}`}
           </span>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-default">
-                {["Rider", "Allotment", "Next due", "Days behind", "Outstanding", "Sheet note"].map((h) => (
-                  <th key={h} className={`px-5 py-3 text-[11px] text-muted uppercase tracking-wider font-medium ${h === "Days behind" || h === "Outstanding" ? "text-right" : "text-left"}`}>{h}</th>
+                {["Rider", "Allotment", "Next due", "Days behind", "Outstanding", "Penalty", "Sheet note"].map((h) => (
+                  <th key={h} className={`px-5 py-3 text-[11px] text-muted uppercase tracking-wider font-medium ${h === "Days behind" || h === "Outstanding" || h === "Penalty" ? "text-right" : "text-left"}`}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {rows.length === 0 ? (
-                <tr><td colSpan={6} className="px-5 py-8 text-center text-muted">No riders in this bucket.</td></tr>
+                <tr><td colSpan={7} className="px-5 py-8 text-center text-muted">No riders in this bucket.</td></tr>
               ) : rows.map((r) => {
                 const b = BUCKETS.find((x) => x.test(r.days_behind)) ?? BUCKETS[0];
                 return (
@@ -139,6 +150,14 @@ export default function CollectionsView({
                     <td className="px-5 py-3 text-secondary text-xs whitespace-nowrap">{dateIN(r.next_due_date + "T00:00:00", { day: "numeric", month: "short" })}</td>
                     <td className="px-5 py-3 text-right"><span className={`text-xs font-semibold tabular-nums ${b.cls}`}>{r.days_behind <= 0 ? "on track" : `${r.days_behind}d`}</span></td>
                     <td className="px-5 py-3 text-right text-primary font-semibold tabular-nums">{r.outstanding > 0 ? inr(r.outstanding) : "—"}</td>
+                    <td className="px-5 py-3 text-right tabular-nums">
+                      {r.penalty_pending > 0 ? (
+                        <>
+                          <span className="text-accent-purple font-semibold">{inr(r.penalty_pending)}</span>
+                          <p className="text-muted text-[11px]">{r.penalty_count} unpaid</p>
+                        </>
+                      ) : <span className="text-faint">—</span>}
+                    </td>
                     <td className="px-5 py-3 text-secondary text-xs max-w-[240px] truncate" title={r.sheet_note ?? undefined}>{r.sheet_note ? `📝 ${r.sheet_note}` : <span className="text-faint">—</span>}</td>
                   </tr>
                 );

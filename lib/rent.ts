@@ -128,12 +128,11 @@ export async function getRiderCycle(riderId: string): Promise<CycleWeek[]> {
         -- Where to resume from. Once the nightly job has written dues we carry
         -- on after the last one; before that we have to SYNTHESISE week 1, and
         -- it must land where the job would have put it — starting on the
-        -- handover day. The fallback was assigned_date, which made week 1 start
-        -- the day AFTER, so a brand-new allotment showed its first week a day
-        -- late until the cron caught up. That is why Gaurav's fully paid week
-        -- read "PARTIAL ₹1,560 / ₹1,820" beside "Outstanding ₹0 — paid up".
+        -- first chargeable day, which is rent_start_date and NOT the handover
+        -- day: when the handover day is free the two differ, and anchoring on
+        -- assigned_date printed the week a day ahead of the rent it billed.
         COALESCE((SELECT MAX(e.period_end) FROM existing e WHERE e.assignment_id = a.id),
-                 a.assigned_date - 1) AS last_covered,
+                 COALESCE(a.rent_start_date, a.assigned_date) - 1) AS last_covered,
         COALESCE((SELECT MAX(e.week_no) FROM existing e WHERE e.assignment_id = a.id), 0) AS last_week_no
       FROM ${S}.rider_vehicle_assignments a
       WHERE a.rider_id = $1 AND a.status = 'active'

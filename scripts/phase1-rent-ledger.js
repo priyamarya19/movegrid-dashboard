@@ -46,6 +46,7 @@ async function run() {
     const asg = await client.query(`
       SELECT a.id, a.daily_rent, a.continues_from_assignment_id,
              to_char(a.assigned_date,'YYYY-MM-DD') AS assigned_date,
+             to_char(a.rent_start_date,'YYYY-MM-DD') AS rent_start_date,
              to_char(a.returned_date,'YYYY-MM-DD') AS returned_date,
              a.rider_id, a.vehicle_id, r.mobile, m.oem
       FROM ${S}.rider_vehicle_assignments a
@@ -104,12 +105,14 @@ async function run() {
       // A continuation (issue-swap) picks up both its week number AND its period
       // cadence from where the linked assignment left off — see lib/rentMath.
       const linkedEnd = a.continues_from_assignment_id && lastPeriodEndByAssignment[a.continues_from_assignment_id];
-      // Week 1 starts on the HANDOVER day, and deliberately so: every one of
-      // the 121 stored tenancies is anchored that way, and the coverage
-      // arithmetic in PAID_FROM_BALANCE absorbs the one-day offset for riders
-      // whose rent starts the next morning. Switching this to rent_start_date
-      // would slide every rider's entire weekly ledger a day later.
-      const startISO = linkedEnd ? addDaysISO(linkedEnd, 1) : a.assigned_date;
+      // Week 1 starts on the first CHARGEABLE day, not the day the scooter went
+      // out. Those differ whenever the handover day is free — which, under the
+      // old blanket rule, was every single tenancy — so anchoring on
+      // assigned_date printed every week one day ahead of the rent it billed.
+      // paid_through_date has always been measured from rent_start_date, so the
+      // two ran a day apart and a fully-paid rider's next week showed a stray
+      // day as "Partial". Corrected 8 Sep 2026.
+      const startISO = linkedEnd ? addDaysISO(linkedEnd, 1) : (a.rent_start_date || a.assigned_date);
       const startWeek = linkedEnd ? (lastWeekByAssignment[a.continues_from_assignment_id] || 0) + 1 : 1;
 
       const { weeks, lastWeekNo, lastPeriodEnd } = generateWeeks({ startISO, cutoffISO, startWeekNo: startWeek });
