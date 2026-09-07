@@ -96,6 +96,25 @@ module.exports = async function run() {
       t.check("...so it reads Collected, not Partial", wk1.status === "Collected", wk1.status);
     }
 
+    // ── and it starts on the chargeable day, not the handover day ─────────
+    //
+    // These differ for every late handover, and the ledger used to anchor on
+    // assigned_date: Gaurav read "3 Sept – 9 Sept" beside "paid through 10
+    // Sept". The free day was printed as the first day of the week he paid for,
+    // and the stray day at the far end landed in week 2 as a false Partial.
+    const lateCycle = await fetch(`${BASE}/api/riders/${late.id}/rent`, { headers: f.staff }).then((x) => x.json());
+    const lw1 = (lateCycle.weeks ?? lateCycle.cycle ?? [])[0];
+    t.check("a late handover has a week 1 too", !!lw1, JSON.stringify(lateCycle).slice(0, 80));
+    if (lw1) {
+      t.check("...starting the day rent starts, not the day the scooter went out",
+        lw1.period_start === addDays(today, 1), `${lw1.period_start} (handover was ${today})`);
+      t.check("...and ending where the money runs out",
+        lw1.period_end === addDays(today, 7), lw1.period_end);
+      t.check("...so a fully paid week reads Collected",
+        lw1.status === "Collected" && Number(lw1.paid) === Number(lw1.amount),
+        `${lw1.status} ₹${lw1.paid}/₹${lw1.amount}`);
+    }
+
     // ── overriding the date needs an admin ────────────────────────────────
     const ovr = await f.rider();
     const wanted = addDays(today, 4);

@@ -30,6 +30,12 @@ const S = "mg_data_uat";
 const A = "uat_auth";
 const BASE = process.env.TEST_BASE_URL || "http://localhost:3000";
 
+// The three cron sweeps (balance expiry, ticket auto-close, location prune) are
+// gated on CRON_SECRET, which belongs to the server being tested — not to this
+// checkout. Running against the deployed UAT box with the local file's secret
+// makes all three 401 and look like a code regression. A shell CRON_SECRET wins.
+env.CRON_SECRET = process.env.CRON_SECRET || env.CRON_SECRET;
+
 function connect() {
   return new Client({
     host: env.RDS_HOST, port: +env.RDS_PORT, user: env.RDS_USER,

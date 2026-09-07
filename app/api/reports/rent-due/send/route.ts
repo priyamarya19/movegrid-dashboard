@@ -20,6 +20,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
+  // ?preview=1 returns the rows and sends nothing — so the call list can be
+  // inspected (and tested) without putting mail in anyone's inbox.
+  if (req.nextUrl.searchParams.get("preview")) {
+    return NextResponse.json({ sent: false, preview: true, rows: await getCallList() });
+  }
+
   const recipientsRes = await pool.query(
     `SELECT email FROM ${schemas.ops}.report_recipients WHERE report_key = 'rent_due' AND enabled = true`
   );
