@@ -39,16 +39,24 @@ export async function requireRecon(req: NextRequest): Promise<Allowed | Denied> 
 }
 
 /**
- * Admins who hold the Recon grant — the only people the workbook may be sent
- * to. Restricting recipients to the same list means the email cannot put the
- * bank statement in front of someone who is not allowed to open it in the app.
+ * Who the finished workbook may be emailed to: every active admin, whether or
+ * not they hold the Recon grant.
+ *
+ * The grant governs who may RUN a reconciliation, not who may read one. A
+ * founder who never opens the tool still wants the result in their inbox, and
+ * forwarding it by hand is what would otherwise happen.
+ *
+ * The consequence, stated plainly rather than left implicit: an admin without
+ * the grant cannot open the tool but can receive its output by email. That is
+ * deliberate. The admin role is still required — a hub in-charge or an ops
+ * manager can never be made a recipient.
  */
 export async function reconRecipients(ids?: string[]) {
-  const params: unknown[] = [RECON_PAGE_KEY];
+  const params: unknown[] = [];
   let filter = "";
   if (ids?.length) {
     params.push(ids);
-    filter = "AND u.id = ANY($2::uuid[])";
+    filter = "AND u.id = ANY($1::uuid[])";
   }
   const res = await pool.query(
     `SELECT u.id, u.name, u.email
@@ -57,7 +65,6 @@ export async function reconRecipients(ids?: string[]) {
       WHERE r.name = 'admin'
         AND u.status = 'active'
         AND u.email IS NOT NULL
-        AND u.app_pages @> ARRAY[$1]::text[]
         ${filter}
       ORDER BY u.name`,
     params

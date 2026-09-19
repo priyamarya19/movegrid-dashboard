@@ -181,12 +181,18 @@ module.exports = async function run() {
     // ── the statement cannot be emailed around the grant ──────────────────
     const ungranted = await fixtures(c, { role: "admin" });
     await grant(ungranted.userId, false);
-    let deny = await fetch(`${BASE}/api/recon/send`, {
-      method: "POST", headers: f.staff, body: JSON.stringify({ token, userIds: [ungranted.userId] }),
+    // Running and receiving are separate on purpose: a founder who never opens
+    // the tool still wants the reconciliation in their inbox.
+    const run2 = await post(statementCsv([
+      { date: dmy(d2), narration: upi("ZZ Alpha", "700000000009"), ref: "0000700000000009", deposit: 500 },
+    ]), d2, d2);
+    const listed = (run2.json.admins ?? []).some((a) => a.id === ungranted.userId);
+    t.check("an admin without the grant is still offered as a recipient", listed, String(listed));
+    const toUngranted = await fetch(`${BASE}/api/recon/send`, {
+      method: "POST", headers: f.staff,
+      body: JSON.stringify({ token: run2.json.token, userIds: [ungranted.userId] }),
     });
-    t.check("an admin without the grant cannot be emailed the statement", deny.status === 400, String(deny.status));
-    const listed = (r.json.admins ?? []).some((a) => a.id === ungranted.userId);
-    t.check("...and is not offered as a recipient", !listed, String(listed));
+    t.check("...and can be emailed the workbook", toUngranted.status === 200, String(toUngranted.status));
     await cleanup(c, ungranted.made);
 
     // ── sending ───────────────────────────────────────────────────────────

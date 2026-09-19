@@ -6,10 +6,10 @@ import { getRun, dropRun } from "@/lib/reconCache";
 
 // POST /api/recon/send — email a finished reconciliation to chosen admins.
 //
-// Recipients are resolved server-side from user ids against the admin role AND
-// the Recon grant — never taken as addresses from the client — so this endpoint
-// cannot post the company's bank statement to an arbitrary inbox, nor to an
-// admin who is not allowed to open it in the app.
+// Recipients are resolved server-side from user ids against the admin role —
+// never taken as addresses from the client — so this endpoint cannot post the
+// company's bank statement to an arbitrary inbox. Any active admin may receive
+// it, including one who cannot run a reconciliation themselves.
 
 const inr = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
 const dmy = (iso: string) =>
@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
   const people = await reconRecipients(userIds);
   if (!people.length) {
     return NextResponse.json(
-      { error: "None of those people are admins with Recon access. Grant it in Settings → Users first." },
+      { error: "None of those people are active admins with an email address." },
       { status: 400 }
     );
   }

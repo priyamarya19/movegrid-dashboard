@@ -88,8 +88,8 @@ export async function POST(req: NextRequest) {
 
   putRun({ token, userId: guard.session.userId, runBy, meta, result, workbook, filename });
 
-  // Who the workbook can be sent to: the same people who are allowed to open
-  // it here, so an email cannot route the statement around the grant.
+  // Who the workbook can be sent to: every active admin. Holding the Recon
+  // grant governs running a reconciliation, not receiving one.
   const admins = await reconRecipients();
 
   return NextResponse.json({
