@@ -2,6 +2,7 @@ import pool from "@/lib/db";
 import { schemas } from "@/lib/schemas";
 import { hubScopeSql, type HubScope } from "@/lib/hubScope";
 import { cached } from "@/lib/cache";
+import { rangeCondition } from "@/lib/dateRange";
 
 // Single source of truth for rent numbers. Every dashboard (admin/ops/investor), the
 // rider page, the email reports, and the mobile app all read from these functions —
@@ -187,9 +188,21 @@ export async function getRiderCycle(riderId: string): Promise<CycleWeek[]> {
 
 // All-time ledger summary — the headline numbers shared by every dashboard.
 // expected/collected are historical (need rent_dues); overdue is live (paid_through_date).
-export const getLedgerSummary = cached(async function getLedgerSummary(scope: HubScope = null) {
+/**
+ * @param range Restricts the PERIOD figures only — expected and collected, which
+ *   are sums over rent weeks and so have a meaningful window. The live figures
+ *   (overdue, pending this week, collected today) are a position as of right
+ *   now, read from paid_through_date, and are deliberately left alone: there is
+ *   no stored history of who was behind in August, so filtering them by date
+ *   would quietly answer "today" under an August heading.
+ */
+export const getLedgerSummary = cached(async function getLedgerSummary(
+  scope: HubScope = null,
+  range?: { range?: string | null; from?: string | null; to?: string | null }
+) {
   const S = schemas.ops;
   const hubHist = hubScopeSql(scope, 'a.hub_id');
+  const period = rangeCondition("d.period_start", range?.range, range?.from, range?.to);
   const res = await pool.query(`
     WITH RECURSIVE ${CHAIN_CTE(S)},
     hist AS (
@@ -197,7 +210,7 @@ export const getLedgerSummary = cached(async function getLedgerSummary(scope: Hu
       FROM ${S}.rent_dues d
       JOIN ${S}.rider_vehicle_assignments a ON a.id = d.assignment_id
       LEFT JOIN chain c ON c.assignment_id = d.assignment_id
-      WHERE true${hubHist}
+      WHERE ${period}${hubHist}
     ),
     live AS (
       -- Rent is billed weekly, so a display amount is always a whole week's rent —
@@ -243,7 +256,7 @@ export const getLedgerSummary = cached(async function getLedgerSummary(scope: Hu
     collectedToday: Number(r.collected_today),
     pct: expected > 0 ? Math.round((collected / expected) * 100) : 0,
   };
-}, ["ledger-summary-v7"], { revalidate: 60 });
+}, ["ledger-summary-v8"], { revalidate: 60 });
 
 // Riders currently overdue — computed directly from paid_through_date, no rent_dues
 // dependency (so it can never go stale relative to today). Shared everywhere.

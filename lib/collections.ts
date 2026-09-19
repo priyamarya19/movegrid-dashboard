@@ -3,6 +3,7 @@ import { schemas } from "@/lib/schemas";
 import { hubScopeSql, type HubScope } from "@/lib/hubScope";
 import { cached } from "@/lib/cache";
 import { nextDueSql, outstandingSql, CHAIN_CTE, PAID_FROM_BALANCE } from "@/lib/rent";
+import { rangeCondition } from "@/lib/dateRange";
 
 // Month-to-date window, in IST (the business timezone used elsewhere in the app).
 const IST = "(now() AT TIME ZONE 'Asia/Kolkata')::date";
@@ -91,8 +92,11 @@ export const getPendingByRider = cached(async function getPendingByRider(): Prom
 // figure is derived from paid_through_date (same rolling-balance model as the
 // rest of the app), capped at the week's amount.
 export type WeeklyCollection = { week: string; expected: number; collected: number };
-export const getWeeklyCollections = cached(async function getWeeklyCollections(): Promise<WeeklyCollection[]> {
+export const getWeeklyCollections = cached(async function getWeeklyCollections(
+  range?: { range?: string | null; from?: string | null; to?: string | null }
+): Promise<WeeklyCollection[]> {
   const S = schemas.ops;
+  const period = rangeCondition("d.period_start", range?.range, range?.from, range?.to);
   const res = await pool.query(`
     WITH RECURSIVE ${CHAIN_CTE(S)}
     SELECT to_char(date_trunc('week', d.period_start), 'YYYY-MM-DD') AS week,
@@ -103,10 +107,10 @@ export const getWeeklyCollections = cached(async function getWeeklyCollections()
     FROM ${S}.rent_dues d
     JOIN ${S}.rider_vehicle_assignments a ON a.id = d.assignment_id
     LEFT JOIN chain c ON c.assignment_id = d.assignment_id
-    WHERE d.period_start <= ${IST}
+    WHERE d.period_start <= ${IST} AND ${period}
     GROUP BY 1 ORDER BY 1`);
   return res.rows.map((r) => ({ week: r.week, expected: Number(r.expected), collected: Number(r.collected) }));
-}, ["weekly-collections-v1"], { revalidate: 60 });
+}, ["weekly-collections-v2"], { revalidate: 60 });
 
 // Live chase list: every active rider with an outstanding balance, how many days
 // behind they are (from paid_through_date), and the ops sheet note if any.

@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import type { WeeklyCollection, ChaseRow } from "@/lib/collections";
 import { dateIN } from "@/lib/format";
+import DateRangeFilter, { rangeQuery, type RangeValue } from "@/components/DateRangeFilter";
 
 type Summary = { expectedToDate: number; collected: number; overdue: number; overdueRiders: number; pct: number };
 
@@ -24,9 +25,31 @@ export default function CollectionsView({
 }: { summary: Summary; weekly: WeeklyCollection[]; chase: ChaseRow[] }) {
   const [bucket, setBucket] = useState<string | null>(null);
 
+  // The date range drives the PERIOD figures only — expected, collected and the
+  // weekly chart, which are sums over rent weeks. Outstanding, penalties and the
+  // chase list are a position as of right now, read live from paid_through_date,
+  // so they are served once with the page and never refiltered: there is no
+  // stored history of who was behind in August to filter them to, and showing
+  // today's number under an August heading would be worse than not offering it.
+  const [range, setRange] = useState<RangeValue>({ range: "all", from: "", to: "" });
+  const [period, setPeriod] = useState({ summary, weekly });
+  const [loadingPeriod, setLoadingPeriod] = useState(false);
+
+  useEffect(() => {
+    if (range.range === "all") { setPeriod({ summary, weekly }); return; }
+    if (range.range === "custom" && !(range.from && range.to)) return;
+    let live = true;
+    setLoadingPeriod(true);
+    fetch(`/api/collections/overview${rangeQuery(range)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => { if (live && j) setPeriod({ summary: j.summary, weekly: j.weekly }); })
+      .finally(() => { if (live) setLoadingPeriod(false); });
+    return () => { live = false; };
+  }, [range, summary, weekly]);
+
   const owed = chase.filter((r) => r.outstanding > 0);
   const outstanding = owed.reduce((s, r) => s + r.outstanding, 0);
-  const maxE = Math.max(1, ...weekly.map((w) => w.expected));
+  const maxE = Math.max(1, ...period.weekly.map((w) => w.expected));
 
   // A penalty is owed whether or not the rent is current, so the chase list has
   // to include riders whose only debt is a penalty — otherwise they are on no
@@ -45,9 +68,16 @@ export default function CollectionsView({
   const rows = (active ? chase.filter((r) => active.test(r.days_behind)) : toChase).slice()
     .sort((a, z) => (z.outstanding - a.outstanding) || (z.penalty_pending - a.penalty_pending));
 
+  const ranged = range.range !== "all";
   const tiles = [
-    { lbl: "Expected to date", val: inr(summary.expectedToDate), note: "all rent weeks started" },
-    { lbl: "Collected", val: inr(summary.collected), note: `${summary.pct}% collection rate` },
+    {
+      lbl: ranged ? "Expected" : "Expected to date",
+      val: inr(period.summary.expectedToDate),
+      note: ranged ? "rent weeks starting in this range" : "all rent weeks started",
+    },
+    { lbl: "Collected", val: inr(period.summary.collected), note: `${period.summary.pct}% collection rate` },
+    // From here down the range does not apply: these are today's position, not
+    // a total over a window.
     { lbl: "Outstanding now", val: inr(outstanding), note: "live balance, active riders" },
     { lbl: "Penalties unpaid", val: inr(penaltyTotal), note: `${withPenalty.length} rider${withPenalty.length !== 1 ? "s" : ""}, on top of rent` },
     { lbl: "Riders behind", val: `${owed.length} of ${chase.length}`, note: `${bsum[3].riders} are 15+ days late` },
@@ -55,10 +85,22 @@ export default function CollectionsView({
 
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="text-primary text-2xl font-bold">Collections</h1>
-        <p className="text-muted text-sm mt-1">Where the rent stands — expected vs collected, and who to chase today.</p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-primary text-2xl font-bold">Collections</h1>
+          <p className="text-muted text-sm mt-1">Where the rent stands — expected vs collected, and who to chase today.</p>
+        </div>
+        <div className="flex items-center gap-2">
+          {loadingPeriod && <span className="text-faint text-xs">updating…</span>}
+          <DateRangeFilter value={range} onChange={setRange} />
+        </div>
       </div>
+      {ranged && (
+        <p className="text-faint text-xs -mt-2">
+          The range applies to expected, collected and the weekly chart. Outstanding, penalties,
+          riders behind and the chase list are today&rsquo;s position and do not change with it.
+        </p>
+      )}
 
       {/* Stat tiles */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
@@ -76,7 +118,7 @@ export default function CollectionsView({
         <h2 className="text-primary font-semibold text-[15px]">Expected vs collected, by week</h2>
         <p className="text-muted text-xs mt-0.5">Each rent week that has started. Recent weeks include rent not yet due.</p>
         <div className="flex items-end gap-2 h-44 mt-4">
-          {weekly.map((w, i) => (
+          {period.weekly.map((w, i) => (
             <div key={i} className="flex-1 h-full relative group flex flex-col justify-end" title={`${fmtWk(w.week)} · ${inr(w.collected)} / ${inr(w.expected)}`}>
               <div className="absolute inset-x-0 bottom-0 rounded-t bg-inset" style={{ height: `${(w.expected / maxE) * 100}%` }} />
               <div className="absolute inset-x-0 bottom-0 rounded-t bg-accent-success" style={{ height: `${(w.collected / maxE) * 100}%` }} />
