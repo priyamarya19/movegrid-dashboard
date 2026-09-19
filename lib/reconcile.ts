@@ -176,13 +176,22 @@ export function reconcile(
     o.date_gap = dayDiff(c.date, o.match_date);
   }
 
-  // Entries outside the statement's own period can never match; separating them
-  // stops the unmatched pile from looking like a problem when it is a mismatch
-  // of windows.
+  // Two different questions, and conflating them loses real matches.
+  //
+  // For REPORTING, "outside the period" means strictly outside the statement —
+  // that is what the user needs told.
+  //
+  // For MATCHING, the window has to be wider. Ops enter a payment when the week
+  // completes, which is often days after the money actually arrived, so a
+  // receipt dated the 16th can legitimately be made up of credits from the 10th
+  // and the 14th. Judging eligibility on the strict period threw those away.
   const inPeriod = (o: BookEntry) => o.rec_date >= stmtFrom && o.rec_date <= stmtTo;
+  const eligible = (o: BookEntry) =>
+    dayDiff(o.rec_date, stmtFrom) >= -SPLIT_FWD_DAYS &&
+    dayDiff(o.rec_date, stmtTo) <= SPLIT_BACK_DAYS;
 
   // ── 2. name + amount + date, assigned globally, best first ─────────────
-  const pending = book.filter((o) => !o.match && inPeriod(o));
+  const pending = book.filter((o) => !o.match && eligible(o));
   type Pair = { o: BookEntry; c: Credit; name: number; gap: number; score: number };
   const pairs: Pair[] = [];
   for (const o of pending) {
@@ -201,12 +210,18 @@ export function reconcile(
 
   for (const p of pairs) {
     if (p.o.match || p.c.used) continue;
-    // With no name agreement at all, only take it when nothing else could claim
-    // either side — otherwise it is a coincidence of amount and date.
+    // With no name agreement at all there is nothing tying this credit to this
+    // rider beyond a figure and a date, so it is only taken when it is the sole
+    // possibility on BOTH sides. Two riders paying ₹1,680 on the same Tuesday
+    // against two anonymous credits is a coin toss, and a coin toss recorded as
+    // a match is what sends someone to chase the wrong rider.
     if (p.name === 0) {
-      const betterForRecord = pairs.some((q) => q !== p && q.o === p.o && !q.c.used && q.name > 0);
-      const betterForCredit = pairs.some((q) => q !== p && q.c === p.c && !q.o.match && q.name > 0);
-      if (betterForRecord || betterForCredit) continue;
+      const better = pairs.some((q) => q !== p && q.name > 0 &&
+        ((q.o === p.o && !q.c.used) || (q.c === p.c && !q.o.match)));
+      if (better) continue;
+      const tied = pairs.some((q) => q !== p && q.score === p.score &&
+        ((q.o === p.o && !q.c.used) || (q.c === p.c && !q.o.match)));
+      if (tied) continue;
     }
     p.c.used = p.o;
     p.o.match = p.c;
@@ -224,7 +239,7 @@ export function reconcile(
 
   // ── 3. instalments ─────────────────────────────────────────────────────
   for (const o of book) {
-    if (o.match || !inPeriod(o)) continue;
+    if (o.match || !eligible(o)) continue;
     const pool_ = credits.filter((c) => !c.used &&
       dayDiff(c.date, o.match_date) <= SPLIT_FWD_DAYS &&
       dayDiff(c.date, o.match_date) >= -SPLIT_BACK_DAYS &&
