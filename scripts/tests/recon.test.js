@@ -32,15 +32,17 @@ module.exports = async function run() {
   const c = connect();
   await c.connect();
   let f, viewer;
+
+  // Recon is the one section an admin does NOT get by being an admin: it opens
+  // a full bank statement, so it needs the role AND a tick in Settings → Users.
+  // Declared out here so the cleanup can revoke it even if the suite throws.
+  const grant = (userId, on) => c.query(
+    on ? `UPDATE ${A}.users SET app_pages = array_append(COALESCE(app_pages,'{}'), 'recon') WHERE id=$1`
+       : `UPDATE ${A}.users SET app_pages = array_remove(COALESCE(app_pages,'{}'), 'recon') WHERE id=$1`,
+    [userId]);
+
   try {
     f = await fixtures(c);
-    // Recon is the one section an admin does NOT get by being an admin: it opens
-    // a full bank statement, so it needs the role AND a tick in Settings → Users.
-    const grant = (userId, on) => c.query(
-      on ? `UPDATE ${A}.users SET app_pages = array_append(COALESCE(app_pages,'{}'), 'recon') WHERE id=$1`
-         : `UPDATE ${A}.users SET app_pages = array_remove(COALESCE(app_pages,'{}'), 'recon') WHERE id=$1`,
-      [userId]);
-
     const today = istToday();
     const d1 = addDays(today, -6), d2 = addDays(today, -5), d3 = addDays(today, -4);
 
@@ -68,9 +70,15 @@ module.exports = async function run() {
     let r = await post(statementCsv([]), d1, d3);
     t.check("an admin without the Recon grant is refused", r.res.status === 403, String(r.res.status));
     t.check("...and is told where it is enabled", /Settings/i.test(r.json.error ?? ""), (r.json.error ?? "").slice(0, 60));
-    const page = await fetch(`${BASE}/recon`, { headers: { Cookie: f.staff.Cookie }, redirect: "manual" });
-    t.check("...and the page itself does not open", page.status >= 300 && page.status < 400,
-      `${page.status} -> ${page.headers.get("location") ?? ""}`);
+    // Next answers a server-component redirect with a 200 carrying a redirect
+    // marker rather than a 3xx, so assert the thing that actually matters: none
+    // of the screen is rendered to someone without the grant.
+    const page = await fetch(`${BASE}/recon`, { headers: { Cookie: f.staff.Cookie } });
+    const pageHtml = await page.text();
+    t.check("...and the page renders none of the tool", !/Bank statement|Reconcile</.test(pageHtml),
+      pageHtml.slice(0, 60));
+    t.check("...it redirects away instead", /NEXT_REDIRECT|__next_redirect|location\.replace/.test(pageHtml),
+      String(page.status));
 
     await grant(f.userId, true);
 
@@ -209,7 +217,7 @@ module.exports = async function run() {
   } catch (e) {
     t.fail++; t.failures.push("threw"); console.error("  THREW:", e.stack);
   } finally {
-    await grant(f?.userId, false).catch(() => {});
+    if (f?.userId) await grant(f.userId, false).catch(() => {});
     await c.query(`DELETE FROM ${S}.rider_payments WHERE rider_id IN
       (SELECT id FROM ${S}.riders WHERE name LIKE 'ZZ %')`).catch(() => {});
     if (viewer) await cleanup(c, viewer.made);
