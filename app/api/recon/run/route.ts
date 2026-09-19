@@ -1,16 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "crypto";
-import pool from "@/lib/db";
-import { schemas } from "@/lib/schemas";
-import { requireRole } from "@/lib/auth";
+import { requireRecon, reconRecipients } from "@/lib/reconAccess";
 import { parseStatement, StatementFormatError } from "@/lib/statement";
 import { loadBook, reconcile, toCredits } from "@/lib/reconcile";
 import { buildReconWorkbook } from "@/lib/reconWorkbook";
 import { putRun, RUN_TTL_MINUTES } from "@/lib/reconCache";
 
 // POST /api/recon/run — reconcile the ops payment book against an uploaded
-// bank statement. Admin only: the statement carries every credit in the
-// account, including investor funding, not just rider money.
+// bank statement. Admin role AND the Recon grant: the statement carries every
+// credit in the account, including investor funding, not just rider money.
 //
 // Nothing is stored. The result is held in memory for a few minutes so it can
 // be downloaded and emailed, and is never written to S3 or the database.
@@ -19,7 +17,7 @@ const MAX_BYTES = 10 * 1024 * 1024;
 const ISO = /^\d{4}-\d{2}-\d{2}$/;
 
 export async function POST(req: NextRequest) {
-  const guard = await requireRole(req, ["admin"]);
+  const guard = await requireRecon(req);
   if ("response" in guard) return guard.response;
 
   let form: FormData;
@@ -90,14 +88,9 @@ export async function POST(req: NextRequest) {
 
   putRun({ token, userId: guard.session.userId, runBy, meta, result, workbook, filename });
 
-  // Who the workbook can be sent to. Admins only, since only admins may see it.
-  const admins = await pool.query(
-    `SELECT u.id, u.name, u.email
-       FROM ${schemas.auth}.users u
-       JOIN ${schemas.auth}.roles r ON r.id = u.role_id
-      WHERE r.name = 'admin' AND u.status = 'active' AND u.email IS NOT NULL
-      ORDER BY u.name`
-  );
+  // Who the workbook can be sent to: the same people who are allowed to open
+  // it here, so an email cannot route the statement around the grant.
+  const admins = await reconRecipients();
 
   return NextResponse.json({
     token,
@@ -114,6 +107,6 @@ export async function POST(req: NextRequest) {
     categories: result.categories,
     warnings: result.warnings,
     outsidePeriod: result.outsidePeriod.length,
-    admins: admins.rows,
+    admins,
   });
 }

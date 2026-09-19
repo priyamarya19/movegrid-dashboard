@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireRole } from "@/lib/auth";
+import { requireRecon } from "@/lib/reconAccess";
 import { getRun } from "@/lib/reconCache";
 
 // GET /api/recon/download?token=… — the workbook from a run held in memory.
 // The token alone is not a grant: the run is only returned to the admin who
 // created it.
 export async function GET(req: NextRequest) {
-  const guard = await requireRole(req, ["admin"]);
+  const guard = await requireRecon(req);
   if ("response" in guard) return guard.response;
 
   const token = req.nextUrl.searchParams.get("token") ?? "";

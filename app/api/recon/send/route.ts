@@ -1,23 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
-import pool from "@/lib/db";
-import { schemas } from "@/lib/schemas";
-import { requireRole } from "@/lib/auth";
+import { requireRecon, reconRecipients } from "@/lib/reconAccess";
 import { sendEmail } from "@/lib/email";
 import { escapeHtml } from "@/lib/html";
 import { getRun, dropRun } from "@/lib/reconCache";
 
 // POST /api/recon/send — email a finished reconciliation to chosen admins.
 //
-// Recipients are resolved from user ids against the admin role rather than
-// taken as addresses from the client, so this endpoint cannot be used to post
-// the company's bank statement to an arbitrary inbox.
+// Recipients are resolved server-side from user ids against the admin role AND
+// the Recon grant — never taken as addresses from the client — so this endpoint
+// cannot post the company's bank statement to an arbitrary inbox, nor to an
+// admin who is not allowed to open it in the app.
 
 const inr = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
 const dmy = (iso: string) =>
   new Date(`${iso}T00:00:00`).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
 
 export async function POST(req: NextRequest) {
-  const guard = await requireRole(req, ["admin"]);
+  const guard = await requireRecon(req);
   if ("response" in guard) return guard.response;
 
   const body = await req.json().catch(() => ({}));
@@ -35,16 +34,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Choose at least one person to send it to." }, { status: 400 });
   }
 
-  const people = await pool.query(
-    `SELECT u.name, u.email
-       FROM ${schemas.auth}.users u
-       JOIN ${schemas.auth}.roles r ON r.id = u.role_id
-      WHERE u.id = ANY($1::uuid[]) AND r.name = 'admin'
-        AND u.status = 'active' AND u.email IS NOT NULL`,
-    [userIds]
-  );
-  if (!people.rows.length) {
-    return NextResponse.json({ error: "None of those people are active admins with an email address." }, { status: 400 });
+  const people = await reconRecipients(userIds);
+  if (!people.length) {
+    return NextResponse.json(
+      { error: "None of those people are admins with Recon access. Grant it in Settings → Users first." },
+      { status: 400 }
+    );
   }
 
   const t = run.result.totals;
@@ -99,7 +94,7 @@ export async function POST(req: NextRequest) {
   ].join("\n");
 
   await sendEmail({
-    to: people.rows.map((p) => p.email),
+    to: people.map((p) => p.email),
     subject: `Bank reconciliation ${dmy(m.from)} – ${dmy(m.to)} · ${ahead ? "bank ahead" : "book ahead"} ${inr(Math.abs(t.difference))}`,
     text,
     html,
@@ -113,5 +108,5 @@ export async function POST(req: NextRequest) {
   // Sent is the end of the run's life — nothing about it is kept.
   dropRun(token);
 
-  return NextResponse.json({ sent: true, recipients: people.rows.map((p) => p.name || p.email) });
+  return NextResponse.json({ sent: true, recipients: people.map((p) => p.name || p.email) });
 }

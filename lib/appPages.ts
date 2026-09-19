@@ -17,7 +17,15 @@ export const APP_PAGES = [
   { key: "users", label: "Users" },
   { key: "support", label: "Support" },
   { key: "rider_tickets", label: "Rider Tickets" },
+  // Unlike every other key here, 'recon' is NOT granted to admins automatically.
+  // It opens an uploaded bank statement — investor funding, cheque deposits,
+  // balances — so it takes the admin role AND a deliberate tick in Settings →
+  // Users. Anyone not ticked does not see the tab and cannot call its routes.
+  { key: "recon", label: "Recon (bank reconciliation)" },
 ] as const;
+
+/** App Pages that an admin does not get merely by being an admin. */
+export const STRICT_APP_PAGES: string[] = ["recon"];
 
 export type AppPageKey = (typeof APP_PAGES)[number]["key"];
 export const APP_PAGE_KEYS: string[] = APP_PAGES.map((p) => p.key);

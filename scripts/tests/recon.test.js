@@ -34,6 +34,13 @@ module.exports = async function run() {
   let f, viewer;
   try {
     f = await fixtures(c);
+    // Recon is the one section an admin does NOT get by being an admin: it opens
+    // a full bank statement, so it needs the role AND a tick in Settings → Users.
+    const grant = (userId, on) => c.query(
+      on ? `UPDATE ${A}.users SET app_pages = array_append(COALESCE(app_pages,'{}'), 'recon') WHERE id=$1`
+         : `UPDATE ${A}.users SET app_pages = array_remove(COALESCE(app_pages,'{}'), 'recon') WHERE id=$1`,
+      [userId]);
+
     const today = istToday();
     const d1 = addDays(today, -6), d2 = addDays(today, -5), d3 = addDays(today, -4);
 
@@ -57,16 +64,27 @@ module.exports = async function run() {
       return { res, json: await res.json().catch(() => ({})) };
     };
 
+    // ── an admin without the grant gets nothing ──────────────────────────
+    let r = await post(statementCsv([]), d1, d3);
+    t.check("an admin without the Recon grant is refused", r.res.status === 403, String(r.res.status));
+    t.check("...and is told where it is enabled", /Settings/i.test(r.json.error ?? ""), (r.json.error ?? "").slice(0, 60));
+    const page = await fetch(`${BASE}/recon`, { headers: { Cookie: f.staff.Cookie }, redirect: "manual" });
+    t.check("...and the page itself does not open", page.status >= 300 && page.status < 400,
+      `${page.status} -> ${page.headers.get("location") ?? ""}`);
+
+    await grant(f.userId, true);
+
     // ── it refuses what it cannot read ────────────────────────────────────
-    let r = await post("just,some,columns\n1,2,3", d1, d3);
+    r = await post("just,some,columns\n1,2,3", d1, d3);
     t.check("a file that is not a statement is refused", r.res.status === 422, String(r.res.status));
     t.check("...and says what it expected", /Date.*Narration.*Deposit|does not look like a bank statement/i.test(r.json.error ?? ""),
       (r.json.error ?? "").slice(0, 70));
 
     // ── only admins ───────────────────────────────────────────────────────
     viewer = await fixtures(c, { role: "hub_incharge" });
+    await grant(viewer.userId, true); // even granted, the role still has to be admin
     r = await post(statementCsv([]), d1, d3, viewer.staff);
-    t.check("a non-admin cannot reconcile", r.res.status === 403, String(r.res.status));
+    t.check("a non-admin cannot reconcile even when granted", r.res.status === 403, String(r.res.status));
     const anon = await fetch(`${BASE}/api/recon/run`, { method: "POST" });
     t.check("no session, no reconciliation", anon.status === 401, String(anon.status));
 
@@ -152,6 +170,17 @@ module.exports = async function run() {
     dl = await fetch(`${BASE}/api/recon/download?token=not-a-real-token`, { headers: f.staff });
     t.check("an unknown token is refused", dl.status === 404, String(dl.status));
 
+    // ── the statement cannot be emailed around the grant ──────────────────
+    const ungranted = await fixtures(c, { role: "admin" });
+    await grant(ungranted.userId, false);
+    let deny = await fetch(`${BASE}/api/recon/send`, {
+      method: "POST", headers: f.staff, body: JSON.stringify({ token, userIds: [ungranted.userId] }),
+    });
+    t.check("an admin without the grant cannot be emailed the statement", deny.status === 400, String(deny.status));
+    const listed = (r.json.admins ?? []).some((a) => a.id === ungranted.userId);
+    t.check("...and is not offered as a recipient", !listed, String(listed));
+    await cleanup(c, ungranted.made);
+
     // ── sending ───────────────────────────────────────────────────────────
     let send = await fetch(`${BASE}/api/recon/send`, {
       method: "POST", headers: f.staff, body: JSON.stringify({ token, userIds: [] }),
@@ -180,6 +209,7 @@ module.exports = async function run() {
   } catch (e) {
     t.fail++; t.failures.push("threw"); console.error("  THREW:", e.stack);
   } finally {
+    await grant(f?.userId, false).catch(() => {});
     await c.query(`DELETE FROM ${S}.rider_payments WHERE rider_id IN
       (SELECT id FROM ${S}.riders WHERE name LIKE 'ZZ %')`).catch(() => {});
     if (viewer) await cleanup(c, viewer.made);
