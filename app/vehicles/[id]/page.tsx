@@ -10,6 +10,7 @@ import VehicleStatusControl from "@/components/vehicles/VehicleStatusControl";
 import VehicleRepairsCard from "@/components/vehicles/VehicleRepairsCard";
 import VehicleHistory from "@/components/vehicles/VehicleHistory";
 import PhotoGallery from "@/components/PhotoGallery";
+import PhotoCarousel from "@/components/PhotoCarousel";
 import { inr, dateIN } from "@/lib/format";
 
 async function getData(id: string) {
@@ -28,6 +29,7 @@ async function getData(id: string) {
 
     pool.query(`
       SELECT rva.assigned_date, rva.returned_date, rva.status, rva.allotment_code,
+             rva.allotment_pics, rva.return_photos, rva.undertaking_url,
              r.name AS rider_name, r.id AS rider_id, r.mobile AS rider_mobile, r.rider_code
       FROM ${schemas.ops}.rider_vehicle_assignments rva
       JOIN ${schemas.ops}.riders r ON r.id = rva.rider_id
@@ -199,15 +201,15 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
           <div className="overflow-x-auto"><table className="w-full text-sm">
             <thead>
               <tr className="border-b border-default">
-                {["Rider", "Allotment ID", "From", "To", "Status"].map((h) => (
+                {["Rider", "Allotment ID", "From", "To", "Status", "Pictures"].map((h) => (
                   <th key={h} className="text-left px-5 py-3 text-[11px] text-muted uppercase tracking-wider">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {assignments.length === 0 ? (
-                <tr><td colSpan={5} className="px-5 py-8 text-center text-muted">No assignments yet</td></tr>
-              ) : assignments.map((a: { rider_id: string; rider_name: string; rider_mobile: string; rider_code: string; allotment_code: string; assigned_date: string; returned_date: string; status: string }, i: number) => (
+                <tr><td colSpan={6} className="px-5 py-8 text-center text-muted">No assignments yet</td></tr>
+              ) : assignments.map((a: { rider_id: string; rider_name: string; rider_mobile: string; rider_code: string; allotment_code: string; assigned_date: string; returned_date: string; status: string; allotment_pics: string[] | null; return_photos: string[] | null; undertaking_url: string | null }, i: number) => (
                 <tr key={i} className="border-b border-subtle">
                   <td className="px-5 py-3">
                     <Link href={`/riders/${a.rider_id}`} className="text-accent-purple hover:underline">{a.rider_name}</Link>
@@ -217,6 +219,15 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
                   <td className="px-5 py-3 text-secondary text-xs">{dateIN(a.assigned_date, { day: "numeric", month: "short", year: "numeric" })}</td>
                   <td className="px-5 py-3 text-secondary text-xs">{a.returned_date ? dateIN(a.returned_date, { day: "numeric", month: "short", year: "numeric" }) : "Active"}</td>
                   <td className="px-5 py-3"><span className={`px-2 py-0.5 rounded-full text-xs capitalize ${statusColor[a.status] ?? "bg-muted/20 text-muted"}`}>{a.status}</span></td>
+                  <td className="px-5 py-3">
+                    {/* Handover first, then the return, so stepping forward walks
+                        this scooter's condition in the order it happened. */}
+                    <PhotoCarousel groups={[
+                      { label: `Handover ${dateIN(a.assigned_date, { day: "numeric", month: "short" })}`, keys: a.allotment_pics ?? [] },
+                      { label: a.returned_date ? `Return ${dateIN(a.returned_date, { day: "numeric", month: "short" })}` : "Return", keys: a.return_photos ?? [] },
+                      { label: "Signed undertaking", keys: [a.undertaking_url] },
+                    ]} />
+                  </td>
                 </tr>
               ))}
             </tbody>
