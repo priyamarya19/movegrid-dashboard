@@ -44,6 +44,10 @@ export default function VehicleReturnForm() {
   // class of problem: the only scooters offered are ones that can be returned.
   const [vehicleId, setVehicleId] = useState("");
   const [options, setOptions] = useState<VehicleOption[]>([]);
+  // "not fetched yet" and "genuinely none out" look identical on an empty array,
+  // and telling someone there are no scooters when the list is still loading is
+  // how they give up on the page.
+  const [optionsLoaded, setOptionsLoaded] = useState(false);
   const [optionsError, setOptionsError] = useState("");
   const [assignment, setAssignment] = useState<AssignmentInfo | null>(null);
   const [evLookingUp, setEvLookingUp] = useState(false);
@@ -105,6 +109,8 @@ export default function VehicleReturnForm() {
         if (live) setOptions(list);
       } catch {
         if (live) setOptionsError("Could not load the vehicle list — reload the page and try again.");
+      } finally {
+        if (live) setOptionsLoaded(true);
       }
     })();
     return () => { live = false; };
@@ -196,8 +202,9 @@ export default function VehicleReturnForm() {
             : evLookingUp ? "Loading the allotment…"
             : assignment ? `Rider: ${assignment.rider_name}`
             : evError ? evError
+            : !optionsLoaded ? "Loading the list of scooters…"
             : options.length ? `${options.length} scooter${options.length === 1 ? "" : "s"} currently out`
-            : "Loading…"
+            : "Nothing is out on rent right now"
           }
         >
           <select
@@ -207,7 +214,7 @@ export default function VehicleReturnForm() {
             required
           >
             <option value="">
-              {options.length ? "Select a scooter…" : "No scooters are currently out"}
+              {!optionsLoaded ? "Loading…" : options.length ? "Select a scooter…" : "No scooters are currently out"}
             </option>
             {options.map((v) => (
               <option key={v.id} value={v.id}>
