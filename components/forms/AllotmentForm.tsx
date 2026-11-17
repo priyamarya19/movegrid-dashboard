@@ -40,13 +40,18 @@ export default function AllotmentForm() {
   const [evError, setEvError] = useState("");
   const evTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [readyList, setReadyList] = useState<VehicleInfo[]>([]);
+  // Before the fetch lands the list is empty, which reads the same as genuinely
+  // having nothing to allot — and "None ready to deploy" is exactly the message
+  // that sends someone away from the page.
+  const [readyLoaded, setReadyLoaded] = useState(false);
 
   // Only 'ready_to_deploy' vehicles are allottable — load them for the dropdown.
   useEffect(() => {
     fetch(`/api/vehicles?status=ready_to_deploy`)
       .then(r => r.ok ? r.json() : [])
-      .then((rows: VehicleInfo[]) => setReadyList(rows))
-      .catch(() => setReadyList([]));
+      .then((rows: VehicleInfo[]) => setReadyList(Array.isArray(rows) ? rows : []))
+      .catch(() => setReadyList([]))
+      .finally(() => setReadyLoaded(true));
   }, []);
 
   // Rider lookup state
@@ -198,10 +203,10 @@ export default function AllotmentForm() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
 
         <Section title="Vehicle" />
-        <Field label="EV / Scooter Number" required hint={evLookingUp ? "Looking up..." : vehicle ? `${vehicle.oem} ${vehicle.model_name} — ✅ ready to deploy` : readyList.length ? "Only ready-to-deploy vehicles are shown" : "No vehicles are ready to deploy yet — ops must clear one first"}>
+        <Field label="EV / Scooter Number" required hint={evLookingUp ? "Looking up..." : vehicle ? `${vehicle.oem} ${vehicle.model_name} — ✅ ready to deploy` : !readyLoaded ? "Loading the list of vehicles…" : readyList.length ? `${readyList.length} ready to deploy` : "No vehicles are ready to deploy yet — ops must clear one first"}>
           <select className={sel + (vehicle ? " border-accent-success/30" : "")}
             value={evInput} onChange={e => setEvInput(e.target.value)} required>
-            <option value="">{readyList.length ? "Select a vehicle…" : "None ready to deploy"}</option>
+            <option value="">{!readyLoaded ? "Loading…" : readyList.length ? "Select a vehicle…" : "None ready to deploy"}</option>
             {readyList.map(v => (
               <option key={v.id} value={v.ev_number}>{v.ev_number} — {v.oem} {v.model_name}</option>
             ))}
