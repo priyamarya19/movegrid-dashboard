@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import ImageUpload from "@/components/ImageUpload";
 import PaymentProof, { PaymentProofValue, emptyProof, proofValid } from "@/components/PaymentProof";
@@ -27,17 +27,27 @@ const inp = "w-full bg-base border border-default rounded-xl px-4 py-2.5 text-pr
 type AssignmentInfo = { id: string; rider_name: string; ev_number: string; assigned_date: string; status: string;
   paid_through_date?: string | null; daily_rent?: number | string | null };
 
+type VehicleOption = { id: string; ev_number: string; rider: string | null };
+
 export default function VehicleReturnForm() {
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
-  // EV lookup
-  const [evInput, setEvInput] = useState("");
+  // Which scooter is coming back.
+  //
+  // This used to be a text box matched exactly against ev_number, which meant
+  // typing "N0070" — what everyone actually calls the scooter — found nothing,
+  // left the submit button disabled, and gave no clue why. One scooter in the
+  // fleet is also spelled MG426N0065 rather than MG0426N0065, so even a careful
+  // typist could never find that one. Picking from the list removes the whole
+  // class of problem: the only scooters offered are ones that can be returned.
+  const [vehicleId, setVehicleId] = useState("");
+  const [options, setOptions] = useState<VehicleOption[]>([]);
+  const [optionsError, setOptionsError] = useState("");
   const [assignment, setAssignment] = useState<AssignmentInfo | null>(null);
   const [evLookingUp, setEvLookingUp] = useState(false);
   const [evError, setEvError] = useState("");
-  const evTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [form, setForm] = useState({
     rent_cleared: "" as "" | "true" | "false",
@@ -78,29 +88,56 @@ export default function VehicleReturnForm() {
     }));
   }
 
-  // Auto-lookup active assignment by EV number
+  // Only scooters currently out with a rider can be handed back, so that is the
+  // whole list.
   useEffect(() => {
-    if (!evInput.trim()) { setAssignment(null); setEvError(""); return; }
-    if (evTimer.current) clearTimeout(evTimer.current);
-    evTimer.current = setTimeout(async () => {
+    let live = true;
+    (async () => {
+      try {
+        const res = await fetch("/api/vehicles?status=assigned");
+        if (!res.ok) throw new Error(String(res.status));
+        const body = await res.json();
+        const list: VehicleOption[] = (Array.isArray(body) ? body : body.vehicles ?? [])
+          .map((v: { id: string; ev_number: string; assigned_rider?: string | null }) => ({
+            id: v.id, ev_number: v.ev_number, rider: v.assigned_rider ?? null,
+          }))
+          .sort((a: VehicleOption, b: VehicleOption) => a.ev_number.localeCompare(b.ev_number));
+        if (live) setOptions(list);
+      } catch {
+        if (live) setOptionsError("Could not load the vehicle list — reload the page and try again.");
+      }
+    })();
+    return () => { live = false; };
+  }, []);
+
+  // Resolve the tenancy for whichever scooter was picked.
+  useEffect(() => {
+    if (!vehicleId) { setAssignment(null); setEvError(""); return; }
+    let live = true;
+    (async () => {
       setEvLookingUp(true); setEvError("");
       try {
-        const res = await fetch(`/api/vehicles/lookup?ev_number=${encodeURIComponent(evInput.trim())}`);
-        if (res.ok) {
-          const v = await res.json();
-          if (v.status !== "assigned") { setAssignment(null); setEvError("This vehicle has no active allotment"); return; }
-          // Fetch active assignment details
-          const aRes = await fetch(`/api/vehicles/${v.id}/assignment`);
-          if (aRes.ok) setAssignment(await aRes.json());
-          else setAssignment({ id: v.id, rider_name: "Unknown", ev_number: v.ev_number, assigned_date: "", status: "assigned" });
-        } else { setAssignment(null); setEvError("Vehicle not found"); }
-      } finally { setEvLookingUp(false); }
-    }, 600);
-  }, [evInput]);
+        const aRes = await fetch(`/api/vehicles/${vehicleId}/assignment`);
+        if (!live) return;
+        if (aRes.ok) setAssignment(await aRes.json());
+        else {
+          setAssignment(null);
+          // The list is built from status='assigned', so this means the two
+          // disagree — someone returned it elsewhere while this page was open.
+          setEvError("That scooter no longer has an active allotment. Reload the page.");
+        }
+      } catch {
+        if (live) { setAssignment(null); setEvError("Could not load the allotment. Try again."); }
+      } finally {
+        if (live) setEvLookingUp(false);
+      }
+    })();
+    return () => { live = false; };
+  }, [vehicleId]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!assignment) { setError("Please enter a valid EV number with an active allotment"); return; }
+    if (!assignment) { setError("Choose the scooter being returned"); return; }
     if (form.rent_cleared === "true" && !proofValid(settle)) {
       setError("Rent was cleared — select a payment mode and upload the proof image"); return;
     }
@@ -151,9 +188,33 @@ export default function VehicleReturnForm() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
 
         <Section title="Identify Vehicle" />
-        <Field label="EV / Scooter Number" required hint={evLookingUp ? "Looking up..." : assignment ? `Active allotment found — Rider: ${assignment.rider_name}` : evError}>
-          <input className={inp + (evError ? " border-accent-danger-alt/50" : assignment ? " border-accent-success/30" : "")}
-            value={evInput} onChange={e => setEvInput(e.target.value)} placeholder="MG-001" required />
+        <Field
+          label="EV / Scooter Number"
+          required
+          hint={
+            optionsError ? optionsError
+            : evLookingUp ? "Loading the allotment…"
+            : assignment ? `Rider: ${assignment.rider_name}`
+            : evError ? evError
+            : options.length ? `${options.length} scooter${options.length === 1 ? "" : "s"} currently out`
+            : "Loading…"
+          }
+        >
+          <select
+            className={inp + (evError || optionsError ? " border-accent-danger-alt/50" : assignment ? " border-accent-success/30" : "")}
+            value={vehicleId}
+            onChange={(e) => setVehicleId(e.target.value)}
+            required
+          >
+            <option value="">
+              {options.length ? "Select a scooter…" : "No scooters are currently out"}
+            </option>
+            {options.map((v) => (
+              <option key={v.id} value={v.id}>
+                {v.ev_number}{v.rider ? ` — ${v.rider}` : ""}
+              </option>
+            ))}
+          </select>
         </Field>
         {assignment && (
           <Field label="Allotment Date">
