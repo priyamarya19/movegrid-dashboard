@@ -136,10 +136,14 @@ export default function VehicleForm({
           </select>
         </Field>
 
+        {/* Required only when adding a vehicle. Editing must never be blocked by
+            a field the existing row has always been missing — 11 vehicles have
+            no motor or controller number, and requiring them here would make
+            those rows uneditable, which is the opposite of the point. */}
         <Section title="Hardware Numbers" />
-        <Field label="Chassis Number" required><input className={inp} value={form.chassis_number} onChange={e => set("chassis_number", e.target.value)} placeholder="Chassis number" required /></Field>
-        <Field label="Motor Number" required><input className={inp} value={form.motor_number} onChange={e => set("motor_number", e.target.value)} placeholder="Motor number" required /></Field>
-        <Field label="Controller Number" required><input className={inp} value={form.controller_number} onChange={e => set("controller_number", e.target.value)} placeholder="Controller number" required /></Field>
+        <Field label="Chassis Number" required={!editing}><input className={inp} value={form.chassis_number} onChange={e => set("chassis_number", e.target.value)} placeholder="Chassis number" required={!editing} /></Field>
+        <Field label="Motor Number" required={!editing}><input className={inp} value={form.motor_number} onChange={e => set("motor_number", e.target.value)} placeholder="Motor number" required={!editing} /></Field>
+        <Field label="Controller Number" required={!editing}><input className={inp} value={form.controller_number} onChange={e => set("controller_number", e.target.value)} placeholder="Controller number" required={!editing} /></Field>
 
         <Section title="IOT" />
         <Field label="IOT / IMEI Number"><input className={inp} value={form.iot_imei} onChange={e => set("iot_imei", e.target.value)} placeholder="IMEI number" /></Field>
@@ -159,8 +163,10 @@ export default function VehicleForm({
           </select>
         </Field>
 
+        {/* Never mandatory. Not one vehicle on record has a purchase date, and
+            the API has never asked for one — only EV number and OEM. */}
         <Section title="Purchase Info" />
-        <Field label="Purchase Date" required><input type="date" className={inp} value={form.purchase_date} onChange={e => set("purchase_date", e.target.value)} required /></Field>
+        <Field label="Purchase Date"><input type="date" className={inp} value={form.purchase_date} onChange={e => set("purchase_date", e.target.value)} /></Field>
         <Field label="Purchase Price (₹)"><input type="number" className={inp} value={form.price} onChange={e => set("price", e.target.value)} placeholder="0" /></Field>
 
         <Section title="Documents & Photos" />
