@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { schemas } from "@/lib/schemas";
-import { requireRole, requireSession, forbiddenResponse } from "@/lib/auth";
+import { requireRole, requireSession, forbiddenResponse, canEditVehicleDetails } from "@/lib/auth";
 import { logVehicleStatus } from "@/lib/vehicleStatusLog";
+import { writeAudit } from "@/lib/audit";
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const guard = await requireRole(req);
@@ -89,6 +90,92 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       reason: reason || null, source: "manual", actor: session.name,
     });
     return NextResponse.json({ success: true, status: body.status });
+  }
+
+  // --- Vehicle details edit ---
+  // Admins always; anyone else needs the "vehicle_edit" App Page granted in
+  // Settings → Users. These are identity fields (chassis, motor, IMEI), so every
+  // change is audited with its before/after — a silently corrected chassis
+  // number is indistinguishable from a swapped vehicle otherwise.
+  if (body.details && typeof body.details === "object") {
+    const allowed = await canEditVehicleDetails(session);
+    if (!allowed) return forbiddenResponse();
+
+    const d = body.details as Record<string, unknown>;
+    const TEXT_FIELDS = [
+      "ev_number", "chassis_number", "motor_number", "controller_number",
+      "iot_imei", "iot_partner", "battery_number", "battery_partner",
+      "vehicle_photo_url", "rc_book_url",
+    ] as const;
+
+    const before = await pool.query(
+      `SELECT v.*, m.oem FROM ${schemas.ops}.vehicles v
+       LEFT JOIN ${schemas.ops}.vehicle_models m ON m.id = v.model_id
+       WHERE v.id = $1`,
+      [id]
+    );
+    const prev = before.rows[0];
+    if (!prev) return NextResponse.json({ error: "Vehicle not found" }, { status: 404 });
+
+    const sets: string[] = [];
+    const vals: unknown[] = [];
+    const changed: Record<string, { from: unknown; to: unknown }> = {};
+    const push = (col: string, value: unknown) => {
+      if (value === undefined) return;
+      const normalised = value === "" ? null : value;
+      if (String(prev[col] ?? "") === String(normalised ?? "")) return;
+      sets.push(`${col} = $${sets.length + 1}`);
+      vals.push(normalised);
+      changed[col] = { from: prev[col] ?? null, to: normalised };
+    };
+
+    for (const f of TEXT_FIELDS) {
+      if (d[f] !== undefined) push(f, typeof d[f] === "string" ? (d[f] as string).trim() : d[f]);
+    }
+    if (d.hub_id !== undefined) push("hub_id", d.hub_id || null);
+    if (d.purchase_date !== undefined) push("purchase_date", d.purchase_date || null);
+    if (d.price !== undefined) push("price", d.price === "" || d.price === null ? null : Number(d.price));
+    if (Array.isArray(d.vehicle_photos)) {
+      const pics = (d.vehicle_photos as string[]).filter(Boolean);
+      push("vehicle_photos", pics.length ? pics : null);
+    }
+
+    // OEM arrives by name (that's what the form offers); resolve it to a model.
+    if (typeof d.oem === "string" && d.oem && d.oem !== prev.oem) {
+      const model = await pool.query(
+        `SELECT id FROM ${schemas.ops}.vehicle_models WHERE oem = $1 LIMIT 1`,
+        [d.oem]
+      );
+      if (!model.rows[0]) return NextResponse.json({ error: `No model row for OEM "${d.oem}"` }, { status: 400 });
+      push("model_id", model.rows[0].id);
+      changed.oem = { from: prev.oem ?? null, to: d.oem };
+    }
+
+    if (!sets.length) return NextResponse.json({ success: true, changed: 0 });
+
+    // EV number identifies the bike to everyone who touches it. Assignments and
+    // payments key off the vehicle id, so a rename is safe for the data — but it
+    // must not collide with another bike.
+    if (changed.ev_number) {
+      const clash = await pool.query(
+        `SELECT id FROM ${schemas.ops}.vehicles WHERE LOWER(ev_number) = LOWER($1) AND id <> $2 LIMIT 1`,
+        [changed.ev_number.to, id]
+      );
+      if (clash.rows[0]) {
+        return NextResponse.json({ error: `EV number ${changed.ev_number.to} already belongs to another vehicle` }, { status: 409 });
+      }
+    }
+
+    vals.push(id);
+    await pool.query(`UPDATE ${schemas.ops}.vehicles SET ${sets.join(", ")} WHERE id = $${vals.length}`, vals);
+
+    await writeAudit({
+      action: "vehicle_details_edited", entity: "vehicle", entityId: id,
+      actorId: session.userId, actorName: session.name, req,
+      details: { ev_number: prev.ev_number, changed },
+    });
+
+    return NextResponse.json({ success: true, changed: Object.keys(changed).length });
   }
 
   // --- Investor mapping (admin only) ---

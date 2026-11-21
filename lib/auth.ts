@@ -202,6 +202,22 @@ export async function userHasAppPage(userId: string, page: string): Promise<bool
   }
 }
 
+/**
+ * Who may edit a vehicle's identity and hardware fields.
+ *
+ * Admins always. Everyone else needs the "vehicle_edit" App Page ticked against
+ * their user in Settings → Users — same mechanism as the other sensitive
+ * sections, so there is one place to grant it and it takes effect immediately
+ * without re-issuing anyone's token.
+ */
+export async function canEditVehicleDetails(session: {
+  userId: string;
+  role: string;
+}): Promise<boolean> {
+  if (session.role === "admin") return true;
+  return userHasAppPage(session.userId, "vehicle_edit");
+}
+
 // Per-user "can view the Allotments list" permission (auth schema, migration 012).
 // Read live from the DB rather than the JWT so an admin ticking/unticking the box
 // takes effect immediately, without re-issuing tokens. Default false.

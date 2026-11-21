@@ -17,6 +17,9 @@ export const APP_PAGES = [
   { key: "users", label: "Users" },
   { key: "support", label: "Support" },
   { key: "rider_tickets", label: "Rider Tickets" },
+  // Not a section but a capability: ticking this lets a non-admin edit a
+  // vehicle's identity and hardware fields. Admins have it by default.
+  { key: "vehicle_edit", label: "Edit Vehicle Details" },
   // Unlike every other key here, 'recon' is NOT granted to admins automatically.
   // It opens an uploaded bank statement — investor funding, cheque deposits,
   // balances — so it takes the admin role AND a deliberate tick in Settings →

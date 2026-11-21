@@ -4,7 +4,7 @@ import DashboardLayout from "@/components/DashboardLayout";
 import pool from "@/lib/db";
 import { schemas } from "@/lib/schemas";
 import BackButton from "@/components/BackButton";
-import { getSession } from "@/lib/auth";
+import { getSession, canEditVehicleDetails } from "@/lib/auth";
 import VehicleInvestorCard from "@/components/vehicles/VehicleInvestorCard";
 import VehicleStatusControl from "@/components/vehicles/VehicleStatusControl";
 import VehicleRepairsCard from "@/components/vehicles/VehicleRepairsCard";
@@ -81,6 +81,8 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
   const { vehicle, assignments, payouts, repairs } = data;
   const isAdmin = session?.role === "admin";
   const canEditStatus = !!session && ["admin", "ops_manager"].includes(session.role);
+  // Admins by default; anyone else needs the "Edit Vehicle Details" App Page.
+  const canEditVehicle = !!session && (await canEditVehicleDetails(session));
   const activeAssignment = assignments.find((a: { status: string }) => a.status === "active");
   const totalPayouts = payouts.reduce((s: number, p: { amount: number }) => s + Number(p.amount), 0);
 
@@ -118,7 +120,21 @@ export default async function VehicleDetailPage({ params }: { params: Promise<{ 
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <div className="bg-surface border border-default rounded-xl p-5">
-            <h2 className="text-primary font-semibold mb-4">Vehicle Details</h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-primary font-semibold">Vehicle Details</h2>
+              {canEditVehicle && (
+                <Link
+                  href={`/vehicles/${vehicle.id}/edit`}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-default text-muted hover:text-primary hover:border-strong text-xs font-medium transition-colors"
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                    <path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4z" />
+                  </svg>
+                  Edit
+                </Link>
+              )}
+            </div>
             {[
               { label: "EV Number", value: vehicle.ev_number },
               { label: "Chassis No.", value: vehicle.chassis_number ?? "—" },

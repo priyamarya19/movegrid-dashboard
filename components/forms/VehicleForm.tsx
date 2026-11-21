@@ -27,19 +27,41 @@ function Field({ label, required, children }: { label: string; required?: boolea
 const inp = "w-full bg-base border border-default rounded-xl px-4 py-2.5 text-primary text-sm placeholder-faint focus:outline-none focus:border-accent-teal transition-colors";
 const sel = "w-full bg-base border border-default rounded-xl px-4 py-2.5 text-primary text-sm focus:outline-none focus:border-accent-teal transition-colors";
 
-export default function VehicleForm() {
+/** The vehicle row as the edit page hands it over. Every field optional — rows
+ *  created early on, or by the ops app, are missing most of them. */
+export type EditableVehicle = Partial<{
+  ev_number: string; chassis_number: string; motor_number: string;
+  controller_number: string; oem: string; iot_imei: string; iot_partner: string;
+  battery_number: string; battery_partner: string; hub_id: string;
+  purchase_date: string; price: number | string;
+  vehicle_photo_url: string; rc_book_url: string; vehicle_photos: string[];
+}>;
+
+/** `vehicleId` present → edit an existing vehicle; absent → create a new one. */
+export default function VehicleForm({
+  vehicle,
+  vehicleId,
+}: { vehicle?: EditableVehicle; vehicleId?: string } = {}) {
   const router = useRouter();
+  const editing = !!vehicleId;
   const [hubs, setHubs] = useState<Hub[]>([]);
   const [oems, setOems] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
+  const s = (v: unknown) => (v === null || v === undefined ? "" : String(v));
   const [form, setForm] = useState({
-    ev_number: "", chassis_number: "", motor_number: "", controller_number: "",
-    oem: "", iot_imei: "", iot_partner: "", battery_number: "", battery_partner: "",
-    hub_id: "", purchase_date: "", price: "",
-    vehicle_photo_url: "", rc_book_url: "",
-    vehicle_photos: [] as string[],
+    ev_number: s(vehicle?.ev_number), chassis_number: s(vehicle?.chassis_number),
+    motor_number: s(vehicle?.motor_number), controller_number: s(vehicle?.controller_number),
+    oem: s(vehicle?.oem), iot_imei: s(vehicle?.iot_imei), iot_partner: s(vehicle?.iot_partner),
+    battery_number: s(vehicle?.battery_number), battery_partner: s(vehicle?.battery_partner),
+    hub_id: s(vehicle?.hub_id),
+    // <input type="date"> only accepts yyyy-mm-dd; a timestamp from the DB
+    // would silently render the field blank and wipe the date on save.
+    purchase_date: s(vehicle?.purchase_date).slice(0, 10),
+    price: s(vehicle?.price),
+    vehicle_photo_url: s(vehicle?.vehicle_photo_url), rc_book_url: s(vehicle?.rc_book_url),
+    vehicle_photos: (vehicle?.vehicle_photos ?? []) as string[],
   });
 
   useEffect(() => { fetch("/api/hubs").then(r => r.json()).then(setHubs);
@@ -52,14 +74,36 @@ export default function VehicleForm() {
     setSubmitting(true);
     setError("");
     try {
+      const payload = {
+        ...form,
+        price: form.price ? Number(form.price) : null,
+        hub_id: form.hub_id || null,
+        vehicle_photos: form.vehicle_photos.filter(Boolean).length ? form.vehicle_photos.filter(Boolean) : null,
+      };
+
+      if (editing) {
+        const res = await fetch(`/api/vehicles/${vehicleId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ details: payload }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) { setError(data.error || "Failed to save changes"); return; }
+        router.push(`/vehicles/${vehicleId}`);
+        router.refresh();
+        return;
+      }
+
       const res = await fetch("/api/vehicles", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...form, price: form.price ? Number(form.price) : null, hub_id: form.hub_id || null, vehicle_photos: form.vehicle_photos.filter(Boolean).length ? form.vehicle_photos.filter(Boolean) : null }),
+        body: JSON.stringify(payload),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) { setError(data.error || "Failed to create vehicle"); return; }
       router.push(`/vehicles/${data.id}`);
+    } catch {
+      setError("Could not reach the server. Check your connection and try again.");
     } finally { setSubmitting(false); }
   }
 
@@ -143,7 +187,7 @@ export default function VehicleForm() {
       <div className="flex items-center gap-3 pt-2">
         <button type="submit" disabled={submitting}
           className="px-6 py-2.5 rounded-xl bg-accent-teal hover:bg-accent-success text-on-dark text-sm font-semibold disabled:opacity-60 transition-colors">
-          {submitting ? "Saving..." : "Add Vehicle"}
+          {submitting ? "Saving..." : editing ? "Save Changes" : "Add Vehicle"}
         </button>
         <button type="button" onClick={() => router.back()}
           className="px-4 py-2.5 rounded-xl border border-default text-muted hover:text-primary text-sm transition-colors">
